@@ -1,0 +1,8 @@
+{
+  "rule": "ZST-2",
+  "category": "malformed",
+  "detail": "zstd.frame",
+  "exit": 6,
+  "base": "zstd-mixed",
+  "mutation": "zeros.bin as a frame with no content size that decodes to raw_length + 1 bytes (N10)"
+}

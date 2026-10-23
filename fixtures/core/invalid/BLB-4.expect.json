@@ -4,5 +4,8 @@
   "detail": "blob.layout",
   "exit": 6,
   "base": "worked-example",
-  "mutation": "blob[1] offset = 39 (should be 38)"
+  "mutation": "blob[1] offset = 39 (should be 38)",
+  "also_violates": [
+    "blob.hash"
+  ]
 }

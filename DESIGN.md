@@ -1,6 +1,6 @@
 # Chst — Design
 
-> Status: **DRAFT for independent review** (revised after review rounds 1–3; see §9).
+> Status: **DRAFT for independent review** (revised after review rounds 1–7; see §9, and the full review records in `reviews/`).
 > The format is **Chst**, pronounced "chest". Its magic bytes are `CHST`, its file
 > extension is `.chst`, and the CLI binary is `chst`.
 >
@@ -325,11 +325,14 @@ Detailed byte layouts live in `FORMAT_SPEC.md`.
     Core fixtures stay byte-exact.
   - The TypeScript reader needs a Zstandard decoder (D15).
   - **The zstd library is shared on the Rust side, and that's accepted (review round 2).**
-    The Rust `zstd` crate wraps C libzstd. Since round 5 the generator writes its own
-    Raw/RLE-block frames with no zstd library at all, so the fixtures don't depend on
-    libzstd either. Compressed bytes are never compared, only decoded content and
-    structure. Blob keys are SHA-256 over the stored bytes, and decoded output must match
-    the original content and length.
+    The Rust `zstd` crate wraps C libzstd. The generator writes its own Raw/RLE-block
+    frames, and verifies content checksums with its own pure-Python XXH64. It uses the
+    standard library's `compression.zstd` (which wraps libzstd) only for one job: decoding
+    the single libzstd-made Compressed frame embedded in the catalog, whose output it then
+    compares with the known text. So the fixtures depend on libzstd only through that one
+    known-answer check (corrected in round 7, N19). Compressed bytes are never compared,
+    only decoded content and structure. Blob keys are SHA-256 over the stored bytes, and
+    decoded output must match the original content and length.
 
 ### D8 — Paths
 - **Options:** (A) strict portable rules; (B) portable without normalisation; (C) raw bytes;
@@ -348,7 +351,7 @@ Detailed byte layouts live in `FORMAT_SPEC.md`.
   - Non-ASCII case collisions (for example, Turkish dotless i) aren't detected by the
     format. Create-new extraction (D10) catches them on case-insensitive filesystems.
   - Rust needs a Unicode normalisation library; TypeScript has `String.prototype.normalize`.
-  - NFC uses Unicode 15.1 or later (confirmed in review round 1).
+  - NFC uses exactly Unicode 16.0 (round 6, F12; round 1 had said "15.1 or later").
 - **Amendment (review round 1): complete platform rules.** FORMAT_SPEC §9, §14, §15 and
   §15.1 now cover:
   - **Windows:** reserved device names, including `CONIN$`/`CONOUT$` and trailing-space
@@ -456,8 +459,9 @@ Detailed byte layouts live in `FORMAT_SPEC.md`.
 - **Choice: C.**
   - The stable category determines the exit code.
   - The detail code names the spec rule that fired.
-  - Each negative fixture violates exactly one rule, so the expected detail code is
-    unambiguous.
+  - Each negative fixture has exactly one expected detail: the first rule it breaks in
+    FORMAT_SPEC §13's order (round 6). Later rules it also breaks are recorded in
+    `also_violates`, for information only.
 
 | Exit | Category | Exit | Category |
 |---|---|---|---|
@@ -534,7 +538,10 @@ exactly one expected detail, with no lists of acceptable alternatives.
   - The fixture generator (`fixtures/gen/`) and the helper scripts (`tools/acceptance/`)
     use the **standard library only** (`hashlib`, `struct`, `json`, `unicodedata`,
     `pathlib`, `argparse`). That includes Extended: the generator writes its own
-    Raw/RLE-block Zstandard frames. (`zstandard` was dropped in round 5.)
+    Raw/RLE-block Zstandard frames, and checks content checksums with its own XXH64. The
+    standard library's `compression.zstd` is used only to decode the one embedded
+    libzstd-made frame for a known-answer check, so it must be present (D16). (`zstandard`
+    was dropped in round 5.)
 - **TypeScript reader (Extended):**
   - **No runtime dependencies.** It uses `node:crypto` (SHA-256),
     `String.prototype.normalize` (NFC) and `node:zlib` Zstandard decoding.
@@ -558,7 +565,7 @@ exactly one expected detail, with no lists of acceptable alternatives.
 | Rust stable | `rust-toolchain.toml` with `channel = "1.99.1"` and components `rustfmt`, `clippy`; `rust-version = "1.99"`; edition 2024 | 1.99.1 is the current stable (released 2026-10-13) and is what's installed on the owner's WSL machine |
 | Rust nightly (fuzzing only) | `fuzz/rust-toolchain.toml` with `channel = "nightly-2026-10-01"`, invoked as `cargo +<that> fuzz` | A dated nightly, so fuzz builds are reproducible. Not yet confirmed to have every component on all three runners; the first full CI run confirms it. If it doesn't, the fallback is the nearest earlier date that does. |
 | cargo-fuzz | 0.13.2 (`cargo install --locked`) | Latest release at proposal time |
-| Python | **3.14, always invoked explicitly as `python3.14`**. Its `unicodedata` is exactly Unicode 16.0, which PATH-2 requires (round 6, F12; AC-ENG-6) | Its `unicodedata` is Unicode 16.0, which meets PATH-2's 15.1 minimum. The system `python3` on the owner's WSL machine is 3.12.3 (Unicode 15.0.0, below the spec minimum), so no check or document may call plain `python3`. The owner has installed 3.14 locally. The CI workflow must provide a `python3.14` command on every runner; on Windows that's a shim to the interpreter `setup-python` installs. |
+| Python | **3.14, always invoked explicitly as `python3.14`**. Its `unicodedata` is exactly Unicode 16.0, which PATH-2 requires (round 6, F12; AC-ENG-6) | Its `unicodedata` is exactly Unicode 16.0, as PATH-2 requires, and it must include the optional `compression.zstd` module, which CPython builds only when libzstd is present; AC-ENG-6 checks both (N19). The system `python3` on the owner's WSL machine is 3.12.3 (Unicode 15.0.0, below the spec minimum), so no check or document may call plain `python3`. The owner has installed 3.14 locally. The CI workflow must provide a `python3.14` command on every runner; on Windows that's a shim to the interpreter `setup-python` installs. |
 | Unicode tables | **Exactly 16.0** in every reader (round 6, F12): `unicode-normalization` with 16.0 tables (AC-ENG-8), Python 3.14 (AC-ENG-6), and Node ICU (AC-X-TS-3) | Conforming readers must agree on every path |
 | Node (Extended TypeScript reader only) | **24 LTS** | Active LTS. It has `node:zlib` zstd and TypeScript type stripping. |
 | jq | 1.7 or later | Has `walk`, which `jqn` uses |
@@ -761,6 +768,18 @@ The reviewer's §9 recommendations, as applied:
 - **Reparse points:** F46.
 - **Runner feasibility:** includes enabling 8.3 names (F38).
 - **Node zstd:** item 5 above.
+
+## 9g. Review round 7 decisions (second independent review: 23 new findings)
+
+| # | Item | Owner decision |
+|---|---|---|
+| 1 | N1, N2 | Accepted as proposed. N1: ZST-1 means only "content size in the header ≠ `raw_length`"; every decoding failure is ZST-2, in one capped pass. N2: the staging directory is held by handle, with identity checks around the rename, plus the threat-model sentence and an AC-SAFE-14 staging-swap test. |
+| 2 | N3, N6, N8, N9, N12 | Accepted as proposed. |
+| 3 | N15 | Ban U+061C, U+200E and U+200F in PATH-6 too, for the same reason as F42, and pin General_Category to Unicode 16.0. |
+| 4 | N19 | The narrower fix: AC-ENG-6 checks that `compression.zstd` is present; D7 and D15 are corrected; content checksums are verified with a pure-Python XXH64; and the one Compressed frame's output is compared with the known text. |
+| 5 | N21 | Dropped. Pin the exact Node version when Extended starts, if needed. |
+| 6 | N4, N5, N7, N10, N11, N13, N14, N16, N17, N18, N20, N23 | Applied as proposed. N22 needed nothing. |
+| 7 | Review records | Each review's report and closure table is kept in `reviews/` (`review-1.md`, `review-2.md`, and so on for every later review). |
 
 Still open, for the next reviewer (until `plan-v1`):
 

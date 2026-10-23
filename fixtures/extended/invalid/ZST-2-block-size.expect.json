@@ -1,0 +1,8 @@
+{
+  "rule": "ZST-2",
+  "category": "malformed",
+  "detail": "zstd.frame",
+  "exit": 6,
+  "base": "zstd-mixed",
+  "mutation": "an 8192-byte RLE block in a 1 KiB window: Block_Size over min(Window, 128 KiB) (N11)"
+}

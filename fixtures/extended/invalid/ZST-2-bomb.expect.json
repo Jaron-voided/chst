@@ -1,0 +1,8 @@
+{
+  "rule": "ZST-2",
+  "category": "malformed",
+  "detail": "zstd.frame",
+  "exit": 6,
+  "base": "zstd-mixed",
+  "mutation": "raw_length 1 MiB, frame of 8192 RLE blocks decoding to 1 GiB, no content size (N10)"
+}

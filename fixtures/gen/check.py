@@ -33,8 +33,10 @@ READERS = {
 
 
 def banned_char(ch):
+    """PATH-6: C0, DEL, C1, and every bidirectional control (U+061C, U+200E/F, U+202A-E, U+2066-9)."""
     o = ord(ch)
-    return o < 0x20 or 0x7F <= o <= 0x9F or 0x202A <= o <= 0x202E or 0x2066 <= o <= 0x2069
+    return (o < 0x20 or 0x7F <= o <= 0x9F or o in (0x061C, 0x200E, 0x200F)
+            or 0x202A <= o <= 0x202E or 0x2066 <= o <= 0x2069)
 
 
 def path_violations(path):
@@ -100,45 +102,101 @@ def zstd_header(frame):
     return {"pos": pos, "window": window, "dict": did, "fcs": fcs, "checksum": checksum}
 
 
+# XXH64 (seed 0), written here so content checksums are verified without libzstd (N19).
+_P1, _P2, _P3, _P4, _P5 = (0x9E3779B185EBCA87, 0xC2B2AE3D27D4EB4F, 0x165667B19E3779F9,
+                           0x85EBCA77C2B2AE63, 0x27D4EB2F165667C5)
+_M = (1 << 64) - 1
+
+
+def _rotl(x, r):
+    return ((x << r) | (x >> (64 - r))) & _M
+
+
+def _round(acc, lane):
+    return (_rotl((acc + lane * _P2) & _M, 31) * _P1) & _M
+
+
+def xxh64(data, seed=0):
+    n, p = len(data), 0
+    if n >= 32:
+        v = [(seed + _P1 + _P2) & _M, (seed + _P2) & _M, seed & _M, (seed - _P1) & _M]
+        while p + 32 <= n:
+            for i in range(4):
+                v[i] = _round(v[i], int.from_bytes(data[p + 8 * i:p + 8 * i + 8], "little"))
+            p += 32
+        h = (_rotl(v[0], 1) + _rotl(v[1], 7) + _rotl(v[2], 12) + _rotl(v[3], 18)) & _M
+        for lane in v:
+            h = ((h ^ _round(0, lane)) * _P1 + _P4) & _M
+    else:
+        h = (seed + _P5) & _M
+    h = (h + n) & _M
+    while p + 8 <= n:
+        h = (_rotl(h ^ _round(0, int.from_bytes(data[p:p + 8], "little")), 27) * _P1 + _P4) & _M
+        p += 8
+    if p + 4 <= n:
+        h = (_rotl(h ^ (int.from_bytes(data[p:p + 4], "little") * _P1 & _M), 23) * _P2 + _P3) & _M
+        p += 4
+    while p < n:
+        h = (_rotl(h ^ (data[p] * _P5 & _M), 11) * _P1) & _M
+        p += 1
+    h ^= h >> 33
+    h = (h * _P2) & _M
+    h ^= h >> 29
+    h = (h * _P3) & _M
+    return h ^ (h >> 32)
+
+
 def zstd_check(frame, raw_length):
-    """ZST-2 / ZST-1 for one encoded blob (§12.5), in that order. Returns a rule or None."""
+    """§13 step 11 for one encoded blob (N1): header -> ZST-2; FCS != raw_length -> ZST-1;
+    then one capped decoding pass, where every failure is ZST-2. Returns a rule or None."""
     h = zstd_header(frame)
     if h is None or h["dict"] != 0 or h["window"] is None or h["window"] > ZSTD_WINDOW_MAX:
         return "ZST-2"
-    pos, out, simple = h["pos"], bytearray(), True
+    if h["fcs"] is not None and h["fcs"] != raw_length:
+        return "ZST-1"
+    block_max = min(h["window"], 128 * 1024)
+    pos, produced, pieces, simple = h["pos"], 0, [], True
     while True:
         if pos + 3 > len(frame):
-            return "ZST-2"
+            return "ZST-2"  # truncated
         hdr = int.from_bytes(frame[pos:pos + 3], "little")
         pos += 3
         last, btype, size = hdr & 1, (hdr >> 1) & 3, hdr >> 3
-        if btype == 3:
-            return "ZST-2"
+        if btype == 3 or size > block_max:
+            return "ZST-2"  # reserved block type, or Block_Size over min(Window, 128 KiB)
         body = 1 if btype == 1 else size
         if pos + body > len(frame):
             return "ZST-2"
-        if btype == 0:
-            out += frame[pos:pos + size]
-        elif btype == 1:
-            out += frame[pos:pos + 1] * size
-        else:
+        if btype == 2:
             simple = False
+        else:
+            produced += size
+            if produced > raw_length:
+                return "ZST-2"  # output cap: never materialise more than raw_length
+            pieces.append(frame[pos:pos + size] if btype == 0 else frame[pos:pos + 1] * size)
         pos += body
         if last:
             break
+    body_end = pos
     pos += 4 if h["checksum"] else 0
     if pos != len(frame):
         return "ZST-2"  # trailing bytes, a second frame, or a truncated checksum
-    if h["fcs"] is not None and h["fcs"] != raw_length:
-        return "ZST-1"
-    if not simple or h["checksum"]:
-        from compression import zstd  # standard library (3.14); used only to decode, never to build
+    if simple:
+        out = b"".join(pieces)
+    else:
+        # Compressed blocks are decoded by the standard library's libzstd binding, with the
+        # checksum flag cleared so the checksum below is verified independently (XXH64).
+        from compression import zstd  # decoding only; the generator never compresses with it
+        plain = frame[:4] + bytes([frame[4] & ~0x04]) + frame[5:body_end]
         try:
-            out = zstd.decompress(frame)
+            d = zstd.ZstdDecompressor()
+            out = d.decompress(plain, max_length=raw_length + 1)
         except zstd.ZstdError:
             return "ZST-2"
     if len(out) != raw_length:
-        return "ZST-1"
+        return "ZST-2"  # short or long output
+    if h["checksum"] and (xxh64(out) & 0xFFFFFFFF).to_bytes(4, "little") != frame[body_end:body_end + 4]:
+        return "ZST-2"
     return None
 
 
@@ -308,7 +366,7 @@ def check(data, limits=None, mode="verify", reader="extended"):
         add("CAN-2")
     if zstd_on and not any(b["enc"] == ENC_ZSTD for b in blobs):  # (m) FLG-1, for flags the reader knows
         add("FLG-1")
-    if known["opt"] & OPT_ENTRY_ATTRS and bool(opt & OPT_ENTRY_ATTRS) != (ers >= ENTRY_RECORD_ATTRS):
+    if attrs_on and ers < ENTRY_RECORD_ATTRS:  # N9: one direction only; "clear => 48" is SEC-5's job
         add("FLG-1")
     if known["opt"] & OPT_KV_METADATA and bool(opt & OPT_KV_METADATA) != bool(kv):
         add("FLG-1")
@@ -323,9 +381,11 @@ def check(data, limits=None, mode="verify", reader="extended"):
         by_key = {b["key"]: b for b in blobs}
         if sum(by_key[e["key"]]["raw"] for e in entries if e["type"] == FILE and e["key"] in by_key) > lim["total"]:
             add("LIM-5")
-    if mode == "list" or v:
+    if mode == "list":
         return v
-    for b in blobs:  # step 11, in blob-table order
+    for b in blobs:  # step 11, in blob-table order; evaluated even after earlier violations (N18)
+        if b["offset"] + b["stored"] > n:
+            continue  # BLB-4 already describes it; there are no bytes to hash
         stored = data[b["offset"]:b["offset"] + b["stored"]]
         if hashlib.sha256(stored).digest() != b["key"]:
             add("BLB-6")

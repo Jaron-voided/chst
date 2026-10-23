@@ -23,9 +23,9 @@ Conformance classes:
 | **Reporting tool** | Additionally, Appendix B for its `--json` reports |
 
 **Rules.** Each requirement a reader checks has a rule ID in bold, such as **HDR-2**.
-Every rule ID that can produce an error maps to exactly one error category and one detail
-code (§16, Appendix A). A few writer and extractor rules are requirements only and produce
-no error of their own.
+Every reader rule that can produce an error maps to exactly one error category and one
+detail code (§16, Appendix A). A few writer and extractor rules have more than one outcome,
+each listed in Appendix A, and some are requirements only, with no error of their own.
 A violation of any reader rule makes the file invalid. A reader MUST NOT report success
 for an invalid file.
 
@@ -220,8 +220,9 @@ maximal substring between `/` characters.
 - **PATH-5** No segment may be `.` or `..`.
 - **PATH-6** No control or directional-formatting code point:
   - U+0000–U+001F, U+007F and the C1 controls U+0080–U+009F;
-  - the bidirectional embedding, override and isolate characters U+202A–U+202E and
-    U+2066–U+2069.
+  - every bidirectional control character: U+061C ARABIC LETTER MARK, U+200E and U+200F
+    (the left-to-right and right-to-left marks), the embedding and override characters
+    U+202A–U+202E, and the isolate characters U+2066–U+2069 (N15).
 
   The bidirectional characters can make an extracted name display as something else in
   every file manager (for example `invoice` + U+202E + `fdp.exe` displays as `invoiceexe.pdf`). Ordinary right-to-left names use
@@ -343,18 +344,21 @@ flag) · all others undefined.
 - A blob with `encoding` 1 contains exactly one complete Zstandard frame (RFC 8878),
   consuming exactly `stored_length` bytes. Skippable frames and trailing bytes are not
   allowed.
-- **ZST-1** If the frame header has a Frame_Content_Size, it MUST equal `raw_length`.
-  Decoding MUST produce exactly `raw_length` bytes. A decoder MUST stop as soon as output
-  would exceed `raw_length`.
-- **ZST-2** The stored bytes MUST form exactly one valid, complete frame as above. In
-  addition:
-  - `stored_length` ≥ 4. This is checked in step 10, so no decoder ever sees a shorter blob.
-  - Window_Size MUST be ≤ 8 MiB (8,388,608 bytes). With Single_Segment_Flag set, the window
-    is Frame_Content_Size.
-  - Dictionary_ID MUST be absent or 0.
-  - If Content_Checksum_Flag is set, the checksum MUST match.
-  - Decoders MUST be configured to refuse larger windows (libzstd `ZSTD_d_windowLogMax` =
-    23), so memory is bounded whatever the header claims.
+- **ZST-1** If the frame header has a Frame_Content_Size, it MUST equal `raw_length`. This
+  is judged from the header alone, before any block is decoded (N1).
+- **ZST-2** Every other way an encoded blob can fail is ZST-2 (N1):
+  - `stored_length` < 4. This is checked in step 10, so no decoder ever sees a shorter blob.
+  - A bad frame header: wrong magic (including a skippable frame), the reserved bit set,
+    a header longer than the blob, Window_Size over 8 MiB (8,388,608 bytes; with
+    Single_Segment_Flag set, the window is Frame_Content_Size), or a Dictionary_ID other
+    than absent or 0.
+  - Anything found while decoding: a reserved block type, a Block_Size over
+    min(Window_Size, 128 KiB), a truncated block, a corrupt Compressed block, output that
+    would exceed `raw_length`, output shorter than `raw_length`, any byte after the frame
+    (including a truncated checksum), or a content checksum that doesn't match.
+  - Decoding is one pass with output capped at `raw_length`: the decoder stops at the first
+    byte beyond it. Decoders MUST be configured to refuse larger windows (libzstd
+    `ZSTD_d_windowLogMax` = 23), so memory is bounded whatever the header claims.
 - **ZST-3** For `encoding` 1, `stored_length < raw_length` MUST hold. A writer stores a blob
   compressed only if the result is strictly smaller.
 - The key still hashes the stored (compressed) bytes, so BLB-6 is checked without decoding.
@@ -401,6 +405,12 @@ These features change no bytes of the format. They define tool behaviour only.
   - `?` matches exactly one code point other than `/`.
   - `[...]` matches one code point from a set of literal code points and `x-y` ranges,
     ordered by code point. A leading `!` negates the set. A class never matches `/`.
+    - A `]` straight after `[` or `[!` is a literal, not the end of the class, so `[]]`
+      matches `]` and `[!]]` matches anything but `]`. That is also how to match a literal
+      `[` inside a class: `[[]`.
+    - A `-` first or last in the class is a literal.
+    - An unterminated `[`, an empty class, or a range with x > y is `usage` /
+      `usage.pattern` (N16).
   - `**` as a complete segment matches zero or more whole segments, so `a/**` matches `a`
     and everything under it.
   - A pattern with no wildcard matches exactly that path.
@@ -410,6 +420,8 @@ These features change no bytes of the format. They define tool behaviour only.
   selected entries have their parents, but an ancestor added this way **isn't itself
   selected**, so its other children aren't included. EXT-1 … EXT-10 apply unchanged,
   including the fresh-destination rule. LIM-5 counts only the selected file entries.
+  Step 11 covers only the blobs referenced by selected file entries, checked while they're
+  written (EXT-7); a damaged blob that isn't selected doesn't fail the extraction (N7).
 - **SEL-1** If any given pattern matches no entry, the extractor MUST fail with
   `refused` / `extract.no-match` before creating anything. The message names the first
   unmatched pattern in command-line order.
@@ -445,7 +457,7 @@ deterministic, so two conforming readers report the same error for the same file
    - SEC-1, for each section header in turn, framing the whole index;
    - SEC-2, over every section;
    - SEC-3;
-   - SEC-4, then SEC-5, each for every section in file order;
+   - SEC-4 for every section in file order; then SEC-5 for every section in file order;
    - LIM-3, on the entry count, before allocating per-entry state.
 10. In order:
     - (a) *Per blob record:* BLB-1, BLB-2, BLB-3, ZST-2 (only its `stored_length` ≥ 4
@@ -469,8 +481,11 @@ deterministic, so two conforming readers report the same error for the same file
     - (o) KV-1.
     - (p) LIM-5, for verify and extract only: over all file entries, or over the selected
       entries for a selective extract (§12.8).
-11. *Per blob record, in table order:* BLB-6. Then, for an encoded blob: ZST-2 (frame
-    structure and header limits, §12.5), then ZST-1.
+11. *Per blob record, in table order* (for a selective extract, only the selected blobs):
+    BLB-6. Then, for an encoded blob (§12.5, N1):
+    - the frame header: ZST-2;
+    - Frame_Content_Size ≠ `raw_length`: ZST-1;
+    - one decoding pass with output capped at `raw_length`: any failure is ZST-2.
 
 Because step 7 comes before every structural check, any change to header bytes 10–11 or
 13–31, or to the index, is reported as `integrity` (TRL-3), unless it also breaks an earlier
@@ -522,15 +537,25 @@ step.
   stores a decomposed form; APFS preserves whatever form was used to create the file).
 - **W-10** Pack MUST refuse to write a container that a reader with the same limit settings
   would reject under LIM-3 … LIM-5 (F24). The error is `limit-exceeded`, with the same
-  detail codes. Pack accepts the same `--max-*` flags as the readers (Appendix C), and no
-  output file is written.
+  detail codes. It also refuses an index over LIM-2's 2³² bytes, as `malformed` /
+  `lim.index-size`, whatever `--max-index-bytes` says (N23). Pack accepts the same `--max-*`
+  flags as the readers (Appendix C), and no output file is written. A writer MUST NOT emit
+  an encoded blob that violates LIM-6 under its `--max-ratio` (default 1000): it stores that
+  blob with `encoding` 0 instead (N8).
 
 ## 15. Extractor requirements [D10]
 
 **Threat model (F17).** These rules defend against two things: a hostile container, and
 other local principals who can write to the destination's parent directory and race the
 extractor. They don't defend against a principal who can already write to the destination
-itself, or who has the extractor's own privileges.
+itself, or who has the extractor's own privileges. A parent-writer can always replace the
+destination after extraction finishes; the guarantees are that nothing is written outside
+staging and that no link is ever followed (N2).
+
+**Order of extractor checks (N12).** An extractor checks, in this order: command-line usage;
+EXT-1; §13 steps 1–10, with LIM-5; SEL-1 (selective extract); creating the staging directory;
+then, per entry in canonical order, EXT-2 and EXT-8 as each is created, and EXT-7 while each
+file is written; then the final rename. The first failure is the one reported.
 
 - **EXT-1** The destination path MUST NOT exist when extraction starts. The check doesn't
   follow a final symlink, so a dangling symlink also counts as existing. Otherwise the
@@ -547,8 +572,26 @@ itself, or who has the extractor's own privileges.
   parent directory (so on the same filesystem).
   - **Creating it (F17):** create-new semantics, with an unpredictable name of the form
     `.<destination name>.chst-<32 lowercase hex digits from a cryptographically secure
-    random source>`. Its mode is 0700 (on Windows, a DACL granting access only to the
-    current user). The staging directory's final mode is set just before the rename.
+    random source>`. Its mode is 0700 (on Windows, see below).
+    - If that name would exceed 255 bytes (on Windows, 255 UTF-16 units), `<destination
+      name>` is truncated to its longest prefix that fits, at a character boundary (N4).
+    - If the name already exists, the result is `refused` / `extract.collision`; there's no
+      retry, and nothing else is created (N5).
+  - **Holding it (N2):** right after creating it, the extractor opens the staging directory
+    with no-follow directory semantics and records its identity (device and inode, or
+    volume serial number and file ID). Every later operation on it uses that handle: the
+    writes under it, its final permissions, and cleanup. Immediately before the final
+    rename, the staging name MUST still resolve, without following links, to that
+    identity; immediately after it, the destination MUST. On a mismatch the result is
+    `refused` / `extract.unsafe-object`: the staging directory is emptied through its
+    handle, and nothing found under either name is touched.
+  - **Final permissions (N6),** set through the handle just before the rename:
+    - Unix: mode `0755 & ~umask`, in Core and Extended alike.
+    - Windows: the staging directory's DACL is protected, with one non-inheritable ACE
+      granting access only to the current user. Each object extracted into it is created
+      with the inheritable ACEs of the destination's parent, so it doesn't inherit the
+      private ACE. Just before the rename, the staging DACL is replaced, through the
+      handle, by an unprotected DACL that inherits from the destination's parent.
   - **Finishing (F16):** on success, the staging directory is renamed to the destination
     with a rename that **MUST NOT replace an existing object**: `renameat2(RENAME_NOREPLACE)`
     on Linux, `renameatx_np(RENAME_EXCL)` on macOS, and
@@ -558,9 +601,13 @@ itself, or who has the extractor's own privileges.
     - If the filesystem doesn't support a no-replace rename, the result is `io` /
       `extract.no-atomic-rename`, and cleanup applies.
   - **Cleanup (F18):** on any error, including integrity, the staging directory and all its
-    contents MUST be removed, and the destination MUST NOT exist afterwards. Cleanup removes
-    entries relative to open directory handles (`unlinkat`, or Windows handle-relative
-    deletion). It never follows a link or reparse point, and never re-resolves a full path.
+    contents MUST be removed. The extractor MUST NOT leave behind a destination it created;
+    an object someone else created at the destination is left untouched (N3). Cleanup
+    removes entries relative to open directory handles (`unlinkat`, or Windows
+    handle-relative deletion). It never follows a link or reparse point, and never
+    re-resolves a full path. Before removing a directory's children, it restores the
+    owner's read, write and search permissions on that directory with `fchmod` on its
+    handle, so modes applied earlier (§12.6) can't block cleanup (N17).
   - **After a crash (F43):** a crash can leave a staging directory behind. It's recognised
     by the name pattern above, and can be deleted by hand.
 - **EXT-5** In Core, files are created with mode 0644 and directories with 0755, both
@@ -614,13 +661,13 @@ several rules, a reader MUST report the first one in §13's order, and only that
 | Category | Meaning | CLI exit code |
 |---|---|---|
 | `usage` | Invalid command-line usage | 2 |
-| `io` | Operating-system I/O failure | 3 |
+| `io` | Operating-system I/O failure, including EXT-4's `extract.no-atomic-rename` | 3 |
 | `not-a-container` | HDR-1, HDR-2 | 4 |
 | `unsupported` | HDR-3, HDR-4, HDR-6, SEC-2 | 5 |
 | `malformed` | A structural, path, canonical or hard-limit rule | 6 |
 | `integrity` | TRL-3, BLB-6, ZST-1 | 7 |
 | `limit-exceeded` | LIM-3 … LIM-6, W-10 | 8 |
-| `refused` | A policy refusal on otherwise valid input (EXT-1, EXT-2, EXT-4, EXT-8, W-3, W-4, W-6, W-7, SEL-1) | 9 |
+| `refused` | A policy refusal on otherwise valid input (EXT-1, EXT-2, EXT-4's `dest-exists` and `collision` outcomes, EXT-8, W-3, W-4, W-6, W-7, SEL-1) | 9 |
 | `internal` | An implementation bug; MUST NOT occur | 70 |
 
 Success is exit code 0. Warnings never change the exit code. The full mapping is in
@@ -845,13 +892,13 @@ SHA-256 of the whole 556-byte file, for fixture checking only:
 | **W-6** | refused | `pack.output-in-source` |
 | **W-7** | refused | `pack.output-exists` |
 | **W-8** | (warning) | `pack.skipped`, or `pack.skipped-placeholder` for cloud-file placeholders |
-| **W-10** | limit-exceeded | the LIM-3 … LIM-5 detail codes (`limit.entries`, `limit.index-size`, `limit.total-size`) |
+| **W-10** | limit-exceeded | the LIM-3 … LIM-5 detail codes (`limit.entries`, `limit.index-size`, `limit.total-size`); `malformed` / `lim.index-size` for LIM-2 |
 | **SEL-1** | refused | `extract.no-match` |
 | **EXT-1** | refused | `extract.dest-exists` |
 | **EXT-2** | refused | `extract.collision` |
 | **EXT-7** | integrity | `blob.hash` |
 | **EXT-8** | refused | `extract.unsafe-object` |
-| **EXT-4** | refused | `extract.dest-exists` (at the final rename); `io` / `extract.no-atomic-rename` |
+| **EXT-4** | refused | `extract.dest-exists` (at the final rename); `extract.collision` (staging name exists); `extract.unsafe-object` (staging identity mismatch); `io` / `extract.no-atomic-rename` |
 | **W-1**, **W-2**, **W-9**, **EXT-3**, **EXT-5**, **EXT-6**, **EXT-9**, **EXT-10** | (requirement; no error of its own) | — |
 | *(retired)* LIM-1 | — | — (§10.1) |
 
@@ -963,7 +1010,9 @@ behaviour differently, but must keep the limits configurable (§10.2).
 | inspect | `chst inspect FILE [--json] [limits]` |
 | extract | `chst extract FILE -C DEST [limits]`; Extended adds `[PATTERN]…` (§12.8) |
 
-**Limit flags**, accepted by every command, decimal integers:
+**Limit flags**, accepted by every command. Each takes a decimal integer from 0 to 2⁶⁴ − 1;
+any other value is `usage` / `usage.limit`. A limit of 0 means nothing of that kind is
+allowed, for example `--max-entries 0` accepts only an empty container (N23).
 
 | Flag | Sets | Default |
 |---|---|---|
@@ -979,7 +1028,8 @@ behaviour differently, but must keep the limits configurable (§10.2).
 
 **Text output.** Without `--json`, `list` prints one entry per line.
 - Before printing a path, it MUST escape every code point that PATH-6 allows but that isn't
-  printable (F42): General_Category Cc, Cf, Zl, Zp, Co, Cn or Zs other than U+0020. Each is
+  printable (F42): General_Category, per Unicode 16.0 (N15), Cc, Cf, Zl, Zp, Co, Cn or Zs
+  other than U+0020. Each is
   written as `\u{X}`, with X in lowercase hex and no leading zeros.
 - `\` itself is written as `\\`.
 - So U+200B ZERO WIDTH SPACE appears as `\u{200b}`.

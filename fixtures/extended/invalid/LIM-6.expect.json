@@ -4,5 +4,5 @@
   "detail": "limit.ratio",
   "exit": 8,
   "base": "zstd-mixed",
-  "mutation": "zeros.bin enlarged to 2 MiB (ratio about 27000:1, default limit 1000)"
+  "mutation": "zeros.bin replaced by a 2 MiB frame of zeros (ratio about 27000:1, default limit 1000)"
 }

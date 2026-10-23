@@ -1,0 +1,8 @@
+{
+  "rule": "ZST-2",
+  "category": "malformed",
+  "detail": "zstd.frame",
+  "exit": 6,
+  "base": "zstd-mixed",
+  "mutation": "frame header descriptor with its reserved bit set (N11)"
+}

@@ -262,7 +262,7 @@ def core_invalid():
          lambda: m(lambda p: set_(p["entries"][4], path_length=10))(we()), {}),
         ("ENT-6", "", WE_MUTATION, "directory entry 'docs' removed",
          lambda: plan_from([e for e in WE if e["path"] != b"docs"]), {}),
-        ("ENT-6", "-2", "synthetic: file 'f'", "file 'f/g' added under the file 'f'",
+        ("ENT-6", "-2", "none (a synthetic two-file tree)", "a tree holding file 'f' and file 'f/g'; 'f/g' sits under a file",
          lambda: plan_from([f("f", b"x\n"), f("f/g", b"y\n")]), {}),
         ("PATH-1", "", WE_MUTATION, "file 'notes.txt' renamed to bytes 'notes\\xff.txt' (invalid UTF-8)",
          lambda: plan_from([e if e["path"] != b"notes.txt" else dict(e, path=b"notes\xff.txt") for e in WE]), {}),
@@ -327,6 +327,10 @@ def core_invalid():
          lambda: plan_from(WE + [d("docs/a\u202eb")]), {}),
         ("PATH-6", "-isolate", WE_MUTATION, "directory 'docs/a\u2066b' added (LEFT-TO-RIGHT ISOLATE)",
          lambda: plan_from(WE + [d("docs/a\u2066b")]), {}),
+        ("PATH-6", "-rlm", WE_MUTATION, "directory 'docs/a\u200fb' added (RIGHT-TO-LEFT MARK, N15)",
+         lambda: plan_from(WE + [d("docs/a\u200fb")]), {}),
+        ("PATH-6", "-alm", WE_MUTATION, "directory 'docs/a\u061cb' added (ARABIC LETTER MARK, N15)",
+         lambda: plan_from(WE + [d("docs/a\u061cb")]), {}),
         ("PATH-9", "-com0", WE_MUTATION, "directory 'docs/COM0' added",
          lambda: plan_from(WE + [d("docs/COM0")]), {}),
         ("PATH-9", "-com1sup", WE_MUTATION, "directory 'docs/COM\u00b9' added", lambda: plan_from(WE + [d("docs/COM\u00b9")]), {}),
@@ -372,8 +376,8 @@ def extended_invalid():
          lambda: m(zst2)(zstd_plan()), {}),
         ("ZST-3", "", "zstd-mixed", "random.bin stored as a Raw-block frame (encoding 1, stored_length > raw_length)",
          lambda: m(zst3)(zstd_plan()), {}),
-        ("LIM-6", "", "zstd-mixed", "zeros.bin enlarged to 2 MiB (ratio about 27000:1, default limit 1000)",
-         lambda: zstd_plan(2 * 1024 * 1024), {}),
+        ("LIM-6", "", "zstd-mixed", "zeros.bin replaced by a 2 MiB frame of zeros (ratio about 27000:1, default limit 1000)",
+         lambda: m(set_zeros(chst.zstd_frame(b"\x00" * 2 * 1024 * 1024), 2 * 1024 * 1024))(zstd_plan()), {}),
         ("ATT-1", "", "attrs", "entry[1] mtime_nanos = 1000000000",
          lambda: m(att1)(layout(attrs_entries(), attrs=True)), {}),
         ("KV-1", "", "kv", "KV pairs written in descending key order",
@@ -408,9 +412,36 @@ def extended_invalid():
          lambda: m(lambda p: replace_blob_data(p, blob_index(p, ENC_ZSTD), chst.zstd_frame_custom(b"\x00" * 8192, window_log=13, dict_id=1)))(zstd_plan()), {}),
         ("ZST-2", "-short", "zstd-mixed", "zeros.bin stored as 3 bytes with encoding 1 (shorter than any frame)",
          lambda: m(lambda p: replace_blob_data(p, blob_index(p, ENC_ZSTD), chst.ZSTD_MAGIC[:3]))(zstd_plan()), {}),
+        ("FLG-1", "-attrs-short", WE_MUTATION,
+         "optional flags ENTRY_ATTRS and bit 63 (unknown) set, ENTRY_TABLE record_size 48 (N9)",
+         lambda: m(lambda p: set_(p["header"], optional_flags=chst.OPT_ENTRY_ATTRS | 1 << 63))(we()), {}),
+        ("ZST-2", "-no-fcs-overflow", "zstd-mixed", "zeros.bin as a frame with no content size that decodes to raw_length + 1 bytes (N10)",
+         lambda: m(set_zeros(chst.zstd_frame_custom(b"\x00" * 8193, window_log=14)))(zstd_plan()), {}),
+        ("ZST-2", "-bomb", "zstd-mixed", "raw_length 1 MiB, frame of 8192 RLE blocks decoding to 1 GiB, no content size (N10)",
+         lambda: m(set_zeros(chst.zstd_frame_blocks([(1, 128 * 1024, b"\x00")] * 8192, window_log=23), 1024 * 1024))(zstd_plan()), {}),
+        ("ZST-2", "-reserved-fhd", "zstd-mixed", "frame header descriptor with its reserved bit set (N11)",
+         lambda: m(set_zeros(chst.zstd_frame_blocks([(1, 8192, b"\x00")], window_log=13, fhd_extra=0x08)))(zstd_plan()), {}),
+        ("ZST-2", "-block-type", "zstd-mixed", "a block of the reserved type 3 (N11)",
+         lambda: m(set_zeros(chst.zstd_frame_blocks([(3, 8192, b"\x00")], window_log=13)))(zstd_plan()), {}),
+        ("ZST-2", "-block-size", "zstd-mixed", "an 8192-byte RLE block in a 1 KiB window: Block_Size over min(Window, 128 KiB) (N11)",
+         lambda: m(set_zeros(chst.zstd_frame_blocks([(1, 8192, b"\x00")], window_log=10)))(zstd_plan()), {}),
+        ("ZST-2", "-truncated", "zstd-mixed", "the frame's last byte removed (N11)",
+         lambda: m(set_zeros(chst.zstd_frame_blocks([(1, 8192, b"\x00")], window_log=13)[:-1]))(zstd_plan()), {}),
+        ("ZST-2", "-skippable", "zstd-mixed", "a skippable frame placed before the real frame (N11)",
+         lambda: m(set_zeros(bytes.fromhex("502a4d18") + (4).to_bytes(4, "little") + b"skip" + chst.zstd_frame(b"\x00" * 8192)))(zstd_plan()), {}),
         ("ZST-2", "-checksum", "zstd-compressed", "last byte of the frame's content checksum XORed with 0x01",
          lambda: with_frame(compressed_entries(), "text.txt", COMPRESSED_FRAME[:-1] + bytes([COMPRESSED_FRAME[-1] ^ 1])), {}),
     ]
+
+
+def set_zeros(frame, raw_length=None):
+    """Replace zstd-mixed's zeros.bin blob with `frame` (encoding 1), optionally changing raw_length."""
+    def run(p):
+        i = next(i for i, b in enumerate(p["blobs"]) if b["encoding"] == ENC_ZSTD)
+        replace_blob_data(p, i, frame, encoding=ENC_ZSTD)
+        if raw_length is not None:
+            p["blobs"][i]["raw_length"] = raw_length
+    return run
 
 
 def kv_pair(k, v):
@@ -501,6 +532,8 @@ def compat():
         ("entry-attrs", 0, None, lambda: layout([dict(e, mode=0o644, **ATTRS) for e in WE], attrs=True)),
         ("kv-metadata", 0, None, lambda: layout(WE, kv=KV_PAIRS)),
         ("unknown-optional-bit63", 0, None, lambda: m(lambda p: set_(p["header"], optional_flags=1 << 63))(we())),
+        ("unknown-optional-wider-entries", 0, None,  # N9: a future optional flag that widens entry records
+         lambda: m(lambda p: (set_(p["header"], optional_flags=1 << 63), set_(p["entry_section"], record_size=64)))(we())),
         ("unknown-noncritical-section", 0, None,
          lambda: layout(WE, extra_sections=[{"type": 0x7FFFFFF0, "record_size": 1, "payload": b"future"}])),
         ("unknown-critical-section", 5, "SEC-2",

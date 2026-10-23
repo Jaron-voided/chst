@@ -1,0 +1,8 @@
+{
+  "rule": "FLG-1",
+  "category": "malformed",
+  "detail": "flag.mismatch",
+  "exit": 6,
+  "base": "worked-example",
+  "mutation": "optional flags ENTRY_ATTRS and bit 63 (unknown) set, ENTRY_TABLE record_size 48 (N9)"
+}

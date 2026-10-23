@@ -3,6 +3,6 @@
   "category": "malformed",
   "detail": "entry.parent",
   "exit": 6,
-  "base": "synthetic: file 'f'",
-  "mutation": "file 'f/g' added under the file 'f'"
+  "base": "none (a synthetic two-file tree)",
+  "mutation": "a tree holding file 'f' and file 'f/g'; 'f/g' sits under a file"
 }

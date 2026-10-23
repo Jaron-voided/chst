@@ -94,11 +94,31 @@ def zstd_frame_custom(content, *, window_log=None, dict_id=0):
     return bytes(out)
 
 
+def zstd_frame_blocks(blocks, *, window_log, fcs=None, checksum=b"", fhd_extra=0):
+    """A frame with a Window_Descriptor, built block by block. Used only for bad fixtures.
+
+    blocks: (block_type, block_size, body) tuples; the last one gets Last_Block set."""
+    fhd = (3 << 6 if fcs is not None else 0) | (1 << 2 if checksum else 0) | fhd_extra
+    out = bytearray(ZSTD_MAGIC)
+    out.append(fhd)
+    out.append((window_log - 10) << 3)
+    if fcs is not None:
+        out += struct.pack("<Q", fcs)
+    for n, (btype, size, body) in enumerate(blocks):
+        out += ((size << 3) | (btype << 1) | (1 if n == len(blocks) - 1 else 0)).to_bytes(3, "little")
+        out += body
+    return bytes(out) + checksum
+
+
+RATIO_LIMIT = 1000  # LIM-6's default
+
+
 def encode_blob(content, compress):
-    """D7: keep the compressed form only if it is strictly smaller."""
+    """D7 and W-10: keep the compressed form only if it is strictly smaller and doesn't exceed
+    the ratio limit (raw_length <= 1000 x stored_length); otherwise store it."""
     if compress:
         frame = zstd_frame(content)
-        if len(frame) < len(content):
+        if len(frame) < len(content) and len(content) <= RATIO_LIMIT * len(frame):
             return frame, ENC_ZSTD
     return content, ENC_STORED
 

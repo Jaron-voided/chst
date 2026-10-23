@@ -223,6 +223,12 @@ def build(out_root):
             out.json(f"compat/{name}.inspect.json", reports.inspect_report(c))
         bump("compat")
 
+    # The one libzstd-made frame: its decoded output must be exactly the known text (N18, N19).
+    from compression import zstd
+    require(zstd.decompress(catalog.COMPRESSED_FRAME) == catalog.COMPRESSED_TEXT, "COMPRESSED_FRAME output")
+    from check import zstd_check
+    require(zstd_check(catalog.COMPRESSED_FRAME, len(catalog.COMPRESSED_TEXT)) is None, "COMPRESSED_FRAME check")
+
     # extended/valid
     for name, (fn, kw) in catalog.VALID_EXTENDED.items():
         write_valid(out, f"extended/valid/{name}", fn(), **kw)

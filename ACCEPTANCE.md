@@ -361,7 +361,7 @@ grep -qxE 'channel = "1\.99\.1"' rust-toolchain.toml
 test "$(rustc --version | cut -d' ' -f2)" = 1.99.1
 grep -qxE 'channel = "nightly-2026-10-01"' fuzz/rust-toolchain.toml
 command -v python3.14 > /dev/null
-python3.14 -I -c 'import sys, unicodedata
+python3.14 -I -c 'import sys, unicodedata, compression.zstd       # N19: the generator needs compression.zstd
 assert sys.version_info[:2] == (3, 14), sys.version
 assert unicodedata.unidata_version == "16.0.0", unicodedata.unidata_version'
 jq --version | grep -qE '^jq-1\.([7-9]|[1-9][0-9])'
@@ -497,7 +497,8 @@ for r in $(grep -oE '^\| \*\*(HDR|TRL|SEC|BLB|ENT|PATH|CAN|LIM)-[0-9]+\*\*' FORM
 done
 for n in TRL-2-low TRL-2-overflow SEC-1-straddle SEC-3-repeat SEC-5-entry BLB-4-zero-blobs BLB-4-short-last \
          ENT-1-type0 PATH-2-unicode16 PATH-3-empty PATH-3-2 PATH-6-c1 PATH-6-bidi PATH-6-isolate PATH-9-2 PATH-9-3 \
-         PATH-9-com0 PATH-9-com1sup PATH-9-com2sup PATH-9-com3sup PATH-9-lpt1sup PATH-9-lpt2sup PATH-9-lpt3sup ENT-6-2; do
+         PATH-9-com0 PATH-9-com1sup PATH-9-com2sup PATH-9-com3sup PATH-9-lpt1sup PATH-9-lpt2sup PATH-9-lpt3sup ENT-6-2 \
+         PATH-6-rlm PATH-6-alm; do
   test -f "$FX/core/invalid/$n.expect.json" || { echo "missing sub-condition fixture $n"; exit 1; }
 done
 ```
@@ -513,11 +514,9 @@ done
 - **Sub-conditions (F35).** A rule with several independent conditions needs one fixture
   per condition. The required Core names are listed in the second loop above; AC-X-NEG-1
   lists the Extended ones.
-- **Conditions that no fixture can reach** (all because an earlier rule in §13's order
-  always fires first):
-  - FLG-1 for an `encoding` 1 blob without the `ZSTD` flag (BLB-2 fires first);
-  - FLG-1 for `ENTRY_ATTRS` in either direction (SEC-5 fires first, because the reader
-    knows the flag).
+- **A condition no fixture can reach:** FLG-1 for an `encoding` 1 blob without the `ZSTD`
+  flag, because BLB-2 always fires first in §13's order. (FLG-1 for `ENTRY_ATTRS` is now
+  one direction only and is reachable: `FLG-1-attrs-short`, N9.)
 
 #### AC-NEG-2 — Each negative fixture gives exactly the expected category, detail and exit code
 Core · OS all · fast · Traces: D12, #25, #26
@@ -616,6 +615,8 @@ stopping at TRL-3. It asserts:
 - exit 0 occurs only for flips that create a different **valid** container. That means
   only flips in `minor_version`, in unknown optional-flag bits, or in path-pool bytes that
   turn one valid name into another. Any other accepted flip fails the check.
+- `--rehash` skips trailer bytes 16–47, the structure hash itself: rehashing a flip there
+  just restores the original file (N14).
 
 Pass: exit 0 for both.
 
@@ -932,19 +933,32 @@ runs three cases: an empty directory, a symlink on Unix (a junction on Windows),
 regular file. In each, the result must be `refused/extract.dest-exists`, the planted object
 must be unchanged, and staging must be gone.
 
-#### AC-SAFE-14 — The staging directory is private and unpredictable
+#### AC-SAFE-14 — The staging directory is private, unpredictable, and never handled by name
 Core · OS all · fast · Traces: EXT-4, D10
 ```sh
 cargo_test_nonempty --release -p chst-fs --features test-hooks --test staging_props
+cargo_test_nonempty --release -p chst-fs --features test-hooks --test staging_swap
 ```
-A hook pauses extraction right after the staging directory is created (F17). The test
-asserts:
+`staging_props`: a hook pauses extraction right after the staging directory is created
+(F17). The test asserts:
 - its name matches `^\.<dest>\.chst-[0-9a-f]{32}$`;
+- with a 250-byte destination name, the staging name is at most 255 bytes, and its prefix
+  is truncated at a character boundary (N4);
 - two extractions use different names;
 - its mode is 0700 on Unix, or its DACL grants only the current user on Windows;
 - if the test pre-creates a directory with the exact name the next staging directory will
-  use (forced through the hook's random source), creation fails, and nothing is written
-  into the pre-created directory.
+  use (forced through the hook's random source), the result is
+  `refused/extract.collision`, and nothing is written into the pre-created directory (N5);
+- after a successful extraction, the destination root has mode `0755 & ~umask` on Unix.
+  On Windows, the destination and every extracted file carry exactly the inheritable ACEs
+  of the destination's parent and not the private staging ACE (N6).
+
+`staging_swap` (N2): just before the staging directory's final permissions are set, a hook
+renames the staging directory away and puts a symlink (a junction on Windows) to an
+outside directory under its name. The test asserts that the result is
+`refused/extract.unsafe-object`, the outside directory's permissions and contents are
+unchanged, nothing was moved to the destination, and the moved-away staging directory was
+emptied through its handle.
 
 #### AC-SAFE-15 — Cleanup never follows a link
 Core · OS all · fast · Traces: EXT-4, EXT-6, D10
@@ -1150,6 +1164,11 @@ expect_exit 2 $CHST verify
 expect_exit 3 $CHST verify "$W/does-not-exist.chst"
 head -c 100 /dev/urandom > "$W/r" && expect_exit 4 $CHST verify "$W/r"
 : > "$W/e" && expect_exit 4 $CHST verify "$W/e"
+f=$FX/core/valid/worked-example/container.chst                         # N23: limit values
+expect_exit 2 $CHST verify --max-entries -1 $f
+expect_exit 2 $CHST verify --max-entries 18446744073709551616 $f
+expect_exit 0 $CHST verify --max-entries 18446744073709551615 $f
+expect_exit 0 $CHST verify --max-entries 0 $FX/core/valid/empty/container.chst
 ```
 
 #### AC-CLI-2 — Warnings never change the exit code and appear in the JSON
@@ -1200,6 +1219,7 @@ The compat set MUST include:
 | `ENTRY_ATTRS` (64-byte entry records) | 0, listed without attributes |
 | `KV_METADATA` section | 0 |
 | Unknown optional bit 63 | 0 |
+| Unknown optional bit 63 with 64-byte entry records and no `ENTRY_ATTRS` (a future flag widening records, N9) | 0 |
 | Unknown non-critical section `0x7FFFFFF0` | 0 |
 | Unknown critical section `0xFFFFFFF0` | 5 / `sec.unknown-critical` |
 | `minor_version` 65535 | 0 |
@@ -1260,7 +1280,10 @@ The required sub-condition fixtures (F35) are:
 - `KV-1-empty`, `KV-1-utf8`, `KV-1-keylen0`, `KV-1-keylen256`, `KV-1-value-too-long`,
   `KV-1-truncated`, `KV-1-duplicate`;
 - `SEC-4-kv`;
-- `ZST-2-window`, `ZST-2-dictid`, `ZST-2-short`, `ZST-2-checksum`.
+- `ZST-2-window`, `ZST-2-dictid`, `ZST-2-short`, `ZST-2-checksum`, `ZST-2-no-fcs-overflow`,
+  `ZST-2-bomb`, `ZST-2-reserved-fhd`, `ZST-2-block-type`, `ZST-2-block-size`,
+  `ZST-2-truncated`, `ZST-2-skippable` (N10, N11);
+- `FLG-1-attrs-short` (N9).
 
 #### AC-X-ZSTD-1 — Compressed round-trip; compressed only when smaller
 Extended:#12 · OS all · fast · Traces: #12, D7, ZST-3
@@ -1272,16 +1295,23 @@ for d in $FX/extended/valid/zstd-*/; do
        <(jq -S '[.entries[] | {path,type,size,encoding}]' "$d/list.json")
   $CHST extract "$W/c.chst" -C "$W/x" && python3.14 -I tools/acceptance/tree_eq.py "$W/t" "$W/x"
 done
+mkdir -p "$W/big" && head -c 2097152 /dev/zero > "$W/big/zeros.bin"      # N8: over 1000:1 when compressed
+$CHST pack --compress zstd "$W/big" -o "$W/big.chst"
+$CHST list --json "$W/big.chst" | jq -e '.entries[0].encoding == "stored"'
+$CHST verify "$W/big.chst"
 ```
 The fixtures include incompressible random data, which must list as `encoding: "stored"`.
+2 MiB of zeros would compress far beyond the 1000:1 ratio limit, so pack must store it
+(W-10, N8), and the result must pass the default `verify`.
 Comparison deliberately excludes compressed sizes and keys (D7).
 
 #### AC-X-ZSTD-2 — Decompression bombs and huge windows are contained
 Extended:#12 · OS linux · fast · Traces: ZST-1, ZST-2, LIM-6, D11
 ```sh
-for t in ZST-2-window:6:zstd.frame ZST-2-dictid:6:zstd.frame ZST-1:7:zstd.raw-length LIM-6:8:limit.ratio; do
+for t in ZST-2-window:6:zstd.frame ZST-2-dictid:6:zstd.frame ZST-1:7:zstd.raw-length LIM-6:8:limit.ratio \
+         ZST-2-no-fcs-overflow:6:zstd.frame ZST-2-bomb:6:zstd.frame; do
   IFS=: read -r n code det <<< "$t"
-  set +e; /usr/bin/time -f '%M' -o "$W/rss" $CHST verify --json $FX/extended/invalid/$n.chst > "$W/r.json"; rc=$?; set -e
+  set +e; /usr/bin/time -f '%M' -o "$W/rss" timeout 10 $CHST verify --json $FX/extended/invalid/$n.chst > "$W/r.json"; rc=$?; set -e
   test $rc = $code && test "$(jq -r .error.detail "$W/r.json")" = "$det"
   test "$(cat "$W/rss")" -lt 65536                                      # peak RSS < 64 MiB, C allocations included
 done
@@ -1289,7 +1319,10 @@ done
 The memory limit is measured on the whole process's peak RSS (F10), so libzstd's C
 allocations are included; a counting Rust allocator can't see them.
 `ZST-2-window` declares a 2 GiB window, which the reader must refuse from the frame header
-before allocating anything (FORMAT_SPEC §12.5).
+before allocating anything (FORMAT_SPEC §12.5). `ZST-2-no-fcs-overflow` and `ZST-2-bomb`
+have no content size in their headers, so only the decoder's output cap can catch them.
+The bomb would decode to 1 GiB for a 1 MiB `raw_length`, and must fail within 10 seconds
+and 64 MiB (N10).
 
 #### AC-X-ATTR-1 — Modification time and mode round-trip; setuid is never stored or set
 Extended:#16 · OS linux · fast · Traces: #16, ATT-1
@@ -1346,6 +1379,10 @@ $CHST extract $f -C "$W/r" 'docs/[!a].txt'                             # negated
 $CHST extract $f -C "$W/s" 'docs/**'                                   # a/** matches a itself
 (cd "$W/s" && find . | sort) | diff - <(printf '.\n./docs\n./docs/a.txt\n./docs/b.txt\n./docs/empty\n')
 expect_exit 2 $CHST extract $f -C "$W/u" 'docs\a.txt'                  # no escape character
+expect_exit 2 $CHST extract $f -C "$W/v" 'docs/[z-a].txt'              # reversed range (N16)
+# N7: a damaged blob that isn't selected doesn't fail a selective extract
+expect_exit 0 $CHST extract $FX/core/extract-cases/late-blob-hash.chst -C "$W/sel" 'docs/*.txt'
+expect_exit 7 $CHST extract $FX/core/extract-cases/late-blob-hash.chst -C "$W/sel2" 'notes.txt'
 ```
 The behaviour is defined in FORMAT_SPEC §12.8 (F25):
 - ancestors of selected entries are created, but aren't themselves selected, so
