@@ -1,0 +1,10 @@
+{
+  "schema": "chst-tree/1",
+  "entries": [
+    {
+      "path": "empty",
+      "type": "file",
+      "content_b64": ""
+    }
+  ]
+}

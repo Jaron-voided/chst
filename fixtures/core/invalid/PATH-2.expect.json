@@ -1,0 +1,8 @@
+{
+  "rule": "PATH-2",
+  "category": "malformed",
+  "detail": "path.nfc",
+  "exit": 6,
+  "base": "worked-example",
+  "mutation": "directory 'docs/e\\u0301' added (decomposed, not NFC)"
+}

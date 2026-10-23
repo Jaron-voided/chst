@@ -1,0 +1,8 @@
+{
+  "exit": 6,
+  "base": "worked-example",
+  "mutation": "blob[0].stored_length and raw_length + 2^32",
+  "details": [
+    "blob.layout"
+  ]
+}

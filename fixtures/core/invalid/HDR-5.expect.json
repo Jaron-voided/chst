@@ -1,0 +1,8 @@
+{
+  "rule": "HDR-5",
+  "category": "malformed",
+  "detail": "hdr.reserved",
+  "exit": 6,
+  "base": "worked-example",
+  "mutation": "header reserved byte 14 = 0x01"
+}

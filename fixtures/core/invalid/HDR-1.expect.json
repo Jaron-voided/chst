@@ -1,0 +1,8 @@
+{
+  "rule": "HDR-1",
+  "category": "not-a-container",
+  "detail": "hdr.too-short",
+  "exit": 4,
+  "base": "worked-example",
+  "mutation": "file truncated to its first 87 bytes"
+}

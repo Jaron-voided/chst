@@ -1,0 +1,8 @@
+{
+  "rule": "PATH-3",
+  "category": "malformed",
+  "detail": "path.length",
+  "exit": 6,
+  "base": "worked-example",
+  "mutation": "directory 'docs/' + 256 x 'a' added (segment over 255 bytes)"
+}

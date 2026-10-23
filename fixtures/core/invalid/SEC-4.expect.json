@@ -1,0 +1,8 @@
+{
+  "rule": "SEC-4",
+  "category": "malformed",
+  "detail": "sec.record-size-min",
+  "exit": 6,
+  "base": "worked-example",
+  "mutation": "BLOB_TABLE record_size = 63 (records truncated to 63 bytes)"
+}

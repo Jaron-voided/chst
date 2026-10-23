@@ -1,0 +1,12 @@
+{
+  "rule": "LIM-3",
+  "category": "limit-exceeded",
+  "detail": "limit.entries",
+  "exit": 8,
+  "base": "worked-example",
+  "mutation": "none (5 entries); limit lowered to 4",
+  "args": [
+    "--max-entries",
+    "4"
+  ]
+}

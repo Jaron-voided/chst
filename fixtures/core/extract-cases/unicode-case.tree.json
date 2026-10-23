@@ -1,0 +1,15 @@
+{
+  "schema": "chst-tree/1",
+  "entries": [
+    {
+      "path": "É",
+      "type": "file",
+      "content_b64": "dXBwZXIK"
+    },
+    {
+      "path": "é",
+      "type": "file",
+      "content_b64": "bG93ZXIK"
+    }
+  ]
+}

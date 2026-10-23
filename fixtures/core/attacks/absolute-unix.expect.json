@@ -1,0 +1,10 @@
+{
+  "rule": "PATH-4",
+  "category": "malformed",
+  "exit": 6,
+  "details": [
+    "entry.parent",
+    "path.length",
+    "path.slash"
+  ]
+}

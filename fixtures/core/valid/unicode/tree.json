@@ -1,0 +1,24 @@
+{
+  "schema": "chst-tree/1",
+  "entries": [
+    {
+      "path": "café.txt",
+      "type": "file",
+      "content_b64": "Y2Fmw6kK"
+    },
+    {
+      "path": "日本語",
+      "type": "dir"
+    },
+    {
+      "path": "日本語/テキスト.txt",
+      "type": "file",
+      "content_b64": "bmlob25nbwo="
+    },
+    {
+      "path": "😀.txt",
+      "type": "file",
+      "content_b64": "ZW1vamkK"
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "rule": "SEC-1",
+  "category": "malformed",
+  "detail": "sec.bounds",
+  "exit": 6,
+  "base": "worked-example",
+  "mutation": "PATH_POOL record_count = 44 (payload is 43 bytes)"
+}

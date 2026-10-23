@@ -1,0 +1,8 @@
+{
+  "rule": "SEC-3",
+  "category": "malformed",
+  "detail": "sec.layout",
+  "exit": 6,
+  "base": "worked-example",
+  "mutation": "PATH_POOL placed before ENTRY_TABLE"
+}

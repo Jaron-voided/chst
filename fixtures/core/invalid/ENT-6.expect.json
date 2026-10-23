@@ -1,0 +1,8 @@
+{
+  "rule": "ENT-6",
+  "category": "malformed",
+  "detail": "entry.parent",
+  "exit": 6,
+  "base": "worked-example",
+  "mutation": "directory entry 'docs' removed"
+}

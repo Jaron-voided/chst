@@ -1,0 +1,8 @@
+{
+  "rule": "ZST-3",
+  "category": "malformed",
+  "detail": "zstd.not-smaller",
+  "exit": 6,
+  "base": "zstd-mixed",
+  "mutation": "random.bin stored as a Raw-block frame (encoding 1, stored_length > raw_length)"
+}

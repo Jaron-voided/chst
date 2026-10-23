@@ -1,0 +1,33 @@
+{
+  "schema": "chst-report/1",
+  "command": "list",
+  "ok": true,
+  "error": null,
+  "warnings": [],
+  "entries": [
+    {
+      "path": "random.bin",
+      "type": "file",
+      "size": 4096,
+      "stored_size": 4096,
+      "encoding": "stored",
+      "blob": "f6faa7e04b2c6d52e2163022dc2cccaff7252646f46cf4833aaf82843a740289"
+    },
+    {
+      "path": "tiny.txt",
+      "type": "file",
+      "size": 3,
+      "stored_size": 3,
+      "encoding": "stored",
+      "blob": "98ea6e4f216f2fb4b69fff9b3a44842c38686ca685f3f55dc48c5d3fb1107be4"
+    },
+    {
+      "path": "zeros.bin",
+      "type": "file",
+      "size": 8192,
+      "stored_size": 17,
+      "encoding": "zstd",
+      "blob": "fcf4a2cb1740d5bb7afe8ea2512099df5252f50f366c7f104beda16d3950dcae"
+    }
+  ]
+}

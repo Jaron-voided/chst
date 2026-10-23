@@ -1,0 +1,8 @@
+{
+  "rule": "HDR-3",
+  "category": "unsupported",
+  "detail": "hdr.major-version",
+  "exit": 5,
+  "base": "worked-example",
+  "mutation": "major_version = 2"
+}

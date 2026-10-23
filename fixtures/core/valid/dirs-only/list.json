@@ -1,0 +1,25 @@
+{
+  "schema": "chst-report/1",
+  "command": "list",
+  "ok": true,
+  "error": null,
+  "warnings": [],
+  "entries": [
+    {
+      "path": "a",
+      "type": "dir"
+    },
+    {
+      "path": "a/b",
+      "type": "dir"
+    },
+    {
+      "path": "a/b/c",
+      "type": "dir"
+    },
+    {
+      "path": "d",
+      "type": "dir"
+    }
+  ]
+}

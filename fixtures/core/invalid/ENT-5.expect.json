@@ -1,0 +1,13 @@
+{
+  "rule": "ENT-5",
+  "category": "malformed",
+  "detail": "entry.path-range",
+  "exit": 6,
+  "base": "worked-example",
+  "mutation": "entry[4] path_length = 10 (pool ends one byte earlier)",
+  "details": [
+    "canon.path-pool",
+    "entry.path-range"
+  ],
+  "note": "This change necessarily breaks more than one rule, and FORMAT_SPEC §13 lets steps 8-10 run in any order, so a reader may report any detail listed in 'details'."
+}

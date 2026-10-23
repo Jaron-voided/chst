@@ -1,0 +1,8 @@
+{
+  "rule": "BLB-5",
+  "category": "malformed",
+  "detail": "blob.duplicate-key",
+  "exit": 6,
+  "base": "worked-example",
+  "mutation": "blob[0] record and bytes repeated as a third blob (same key)"
+}

@@ -1,0 +1,51 @@
+{
+  "schema": "chst-tree/1",
+  "entries": [
+    {
+      "path": "docs",
+      "type": "dir",
+      "mtime_seconds": 1700000000,
+      "mtime_nanos": 500000000,
+      "mode": 493
+    },
+    {
+      "path": "docs/a.txt",
+      "type": "file",
+      "content_b64": "aGVsbG8K",
+      "mtime_seconds": 1700000000,
+      "mtime_nanos": 500000000,
+      "mode": 420
+    },
+    {
+      "path": "docs/b.txt",
+      "type": "file",
+      "content_b64": "aGVsbG8K",
+      "mtime_seconds": 1700000000,
+      "mtime_nanos": 500000000,
+      "mode": 420
+    },
+    {
+      "path": "docs/empty",
+      "type": "dir",
+      "mtime_seconds": 1700000000,
+      "mtime_nanos": 500000000,
+      "mode": 493
+    },
+    {
+      "path": "notes.txt",
+      "type": "file",
+      "content_b64": "aGkK",
+      "mtime_seconds": 1700000000,
+      "mtime_nanos": 500000000,
+      "mode": 420
+    },
+    {
+      "path": "run.sh",
+      "type": "file",
+      "content_b64": "IyEvYmluL3NoCmVjaG8gaGkK",
+      "mtime_seconds": 1700000000,
+      "mtime_nanos": 500000000,
+      "mode": 493
+    }
+  ]
+}

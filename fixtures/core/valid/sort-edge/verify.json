@@ -1,0 +1,18 @@
+{
+  "schema": "chst-report/1",
+  "command": "verify",
+  "ok": true,
+  "error": null,
+  "warnings": [],
+  "summary": {
+    "entries": 4,
+    "files": 3,
+    "directories": 1,
+    "blobs": 3,
+    "stored_bytes": 15,
+    "raw_bytes": 15,
+    "extracted_bytes": 15,
+    "required_flags": [],
+    "optional_flags": []
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "rule": "PATH-8",
+  "category": "malformed",
+  "detail": "path.trailing-dot-space",
+  "exit": 6,
+  "base": "worked-example",
+  "mutation": "directory 'docs/x.' added"
+}

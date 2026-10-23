@@ -1,0 +1,8 @@
+{
+  "rule": "ENT-4",
+  "category": "malformed",
+  "detail": "entry.dangling-key",
+  "exit": 6,
+  "base": "worked-example",
+  "mutation": "entry[2] (docs/b.txt) blob_key = SHA-256('missing'), not in the blob table"
+}

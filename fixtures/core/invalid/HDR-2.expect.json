@@ -1,0 +1,8 @@
+{
+  "rule": "HDR-2",
+  "category": "not-a-container",
+  "detail": "hdr.magic",
+  "exit": 4,
+  "base": "worked-example",
+  "mutation": "header magic byte 0 changed from 'C' to 'X'"
+}

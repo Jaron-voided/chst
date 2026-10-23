@@ -1,0 +1,12 @@
+{
+  "rule": "LIM-5",
+  "category": "limit-exceeded",
+  "detail": "limit.total-size",
+  "exit": 8,
+  "base": "worked-example",
+  "mutation": "none (logical size 15 bytes, 9 stored); limit lowered to 14",
+  "args": [
+    "--max-total-bytes",
+    "14"
+  ]
+}

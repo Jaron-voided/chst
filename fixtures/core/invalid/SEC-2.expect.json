@@ -1,0 +1,8 @@
+{
+  "rule": "SEC-2",
+  "category": "unsupported",
+  "detail": "sec.unknown-critical",
+  "exit": 5,
+  "base": "worked-example",
+  "mutation": "extra section type 0xFFFFFFF0 (must-understand, unknown) after PATH_POOL"
+}

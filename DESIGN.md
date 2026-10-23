@@ -690,6 +690,41 @@ Two layers, detailed in `ACCEPTANCE.md`:
 
 Still-open drafting choices, for the reviewer (until `plan-v1`):
 
+- **Found while building the fixtures (planning step 2).** Each comes with a recommendation.
+  1. **LIM-1 and LIM-2 have no single-violation fixture.**
+     - **LIM-1:** an entry count over 2³²−1 can't fit inside the index, so SEC-1 fires
+       first.
+     - **LIM-2:** an index over 2³² bytes needs a file over 4 GiB.
+
+     Options: (a) check LIM-1 on the ENTRY_TABLE header's `record_count` before SEC-1's
+     payload bounds; (b) add a sparse-recipe invalid fixture for LIM-2, with
+     `--max-index-bytes` raised, and teach AC-NEG-1/2 to materialise recipes; (c) drop both
+     hard maxima, since LIM-3 and LIM-4 already bound them in practice. **Recommendation:
+     (a) for LIM-1 and (b) for LIM-2.** Until then, AC-NEG-1 honestly FAILs on both.
+  2. **Rules that overlap by construction**, so no fixture can break only one:
+     - ENT-5 always breaks CAN-3 too;
+     - PATH-4 always breaks PATH-3 (an empty segment) and ENT-6;
+     - PATH-5 always breaks PATH-8 (`.` and `..` end in a dot).
+
+     Their fixtures list every acceptable detail (AC-NEG-2). Option: tighten the spec so
+     each case has one rule, for example "PATH-8 doesn't apply to `.` and `..`" and "CAN-3
+     is checked only when ENT-5 holds". **Recommendation:** tighten them, so each fixture
+     has one exact expected detail.
+  3. **CAN-2 is read as applying only to referenced blobs,** with unreferenced blobs left to
+     BLB-7 (`fixtures/gen/README.md`). **Recommendation:** add that sentence to CAN-2.
+  4. **The `inspect` report shape** in Appendix B was underspecified. The generator's exact
+     shape is documented in `fixtures/gen/README.md`. **Recommendation:** copy it into
+     Appendix B, so the Rust and TypeScript readers have a normative target.
+  5. **`zstandard` isn't needed.** The generator writes its own Raw/RLE-block Zstandard
+     frames, which libzstd 1.5.5 decodes, so it uses the standard library only.
+     **Recommendation:** drop `zstandard` from D15. This needs owner approval, because D15
+     is approved.
+  6. **PATH_MAX.** The `long-names` fixture can't be reached through full path strings on
+     Linux or macOS. AC-SAFE-7 used `test -e "$W/x/$p"`, which can't work there, and now
+     compares trees by walking directory handles instead. Rust pack and extract must also
+     work relative to directory handles. EXT-8 already requires that for extract; pack's
+     directory walk needs the same.
+
 - **Empty container.** Zero entries and zero blobs is valid. Packing an empty directory
   produces one.
 - **Hard links (N2).** Each hard-linked name is packed as an independent regular file, and
@@ -712,9 +747,10 @@ Checkpoints and their order only. Tasks live in TODO.md once it exists.
 
 1. **PLANNING, documents:** this document, FORMAT_SPEC.md and ACCEPTANCE.md, revised through
    review rounds 1 and 2.
-2. **PLANNING, fixtures:** after the owner approves the round 2 changes. Build the generator
-   in `fixtures/gen/` and all fixtures. The worked example is regenerated from the generator
-   and must match FORMAT_SPEC §18 byte for byte (AC-META-6).
+2. **PLANNING, fixtures:** the generator in `fixtures/gen/` and all fixtures are built.
+   The worked example is regenerated from the generator and matches FORMAT_SPEC §18 byte
+   for byte (AC-META-6). The fixture checksum stays unset until the owner approves the
+   fixtures.
 3. **Independent review** of the documents and fixtures.
 4. **`plan-v1`:** the owner tags it. The phase changes to IMPLEMENTATION.
 5. **First implementation tasks:** `check.sh` with its helper scripts, then the CI workflow

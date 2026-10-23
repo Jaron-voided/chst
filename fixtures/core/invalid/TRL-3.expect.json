@@ -1,0 +1,8 @@
+{
+  "rule": "TRL-3",
+  "category": "integrity",
+  "detail": "trl.hash",
+  "exit": 7,
+  "base": "worked-example",
+  "mutation": "first byte of the structure hash XORed with 0x01"
+}

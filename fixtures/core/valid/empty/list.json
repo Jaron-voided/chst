@@ -1,0 +1,8 @@
+{
+  "schema": "chst-report/1",
+  "command": "list",
+  "ok": true,
+  "error": null,
+  "warnings": [],
+  "entries": []
+}

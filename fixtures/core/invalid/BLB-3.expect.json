@@ -1,0 +1,8 @@
+{
+  "rule": "BLB-3",
+  "category": "malformed",
+  "detail": "blob.raw-length",
+  "exit": 6,
+  "base": "worked-example",
+  "mutation": "blob[1] raw_length = 4 (stored_length 3, encoding stored)"
+}

@@ -1,0 +1,8 @@
+{
+  "rule": "CAN-3",
+  "category": "malformed",
+  "detail": "canon.path-pool",
+  "exit": 6,
+  "base": "worked-example",
+  "mutation": "first two paths swapped inside the path pool; their offsets updated to match"
+}

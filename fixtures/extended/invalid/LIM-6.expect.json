@@ -1,0 +1,8 @@
+{
+  "rule": "LIM-6",
+  "category": "limit-exceeded",
+  "detail": "limit.ratio",
+  "exit": 8,
+  "base": "zstd-mixed",
+  "mutation": "zeros.bin enlarged to 2 MiB (ratio about 27000:1, default limit 1000)"
+}

@@ -1,0 +1,8 @@
+{
+  "rule": "PATH-2",
+  "category": "malformed",
+  "exit": 6,
+  "details": [
+    "path.nfc"
+  ]
+}

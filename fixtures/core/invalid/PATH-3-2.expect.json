@@ -1,0 +1,8 @@
+{
+  "rule": "PATH-3",
+  "category": "malformed",
+  "detail": "path.length",
+  "exit": 6,
+  "base": "worked-example",
+  "mutation": "file with a 4097-byte path (16 x 255-byte segments + 'z') added, with its ancestors"
+}

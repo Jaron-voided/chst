@@ -1,0 +1,8 @@
+{
+  "rule": "ENT-2",
+  "category": "malformed",
+  "detail": "entry.reserved",
+  "exit": 6,
+  "base": "worked-example",
+  "mutation": "entry[1] reserved byte 14 = 0x01"
+}

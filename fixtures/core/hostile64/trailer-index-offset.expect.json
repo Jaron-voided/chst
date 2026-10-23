@@ -1,0 +1,8 @@
+{
+  "exit": 6,
+  "base": "worked-example",
+  "mutation": "trailer.index_offset + 2^32",
+  "details": [
+    "trl.index-range"
+  ]
+}

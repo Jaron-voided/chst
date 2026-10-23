@@ -1,0 +1,8 @@
+{
+  "rule": "SEC-5",
+  "category": "malformed",
+  "detail": "sec.record-size",
+  "exit": 6,
+  "base": "worked-example",
+  "mutation": "BLOB_TABLE record_size = 72 (8 zero bytes appended to each record), no flags set"
+}

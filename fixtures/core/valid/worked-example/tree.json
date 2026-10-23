@@ -1,0 +1,28 @@
+{
+  "schema": "chst-tree/1",
+  "entries": [
+    {
+      "path": "docs",
+      "type": "dir"
+    },
+    {
+      "path": "docs/a.txt",
+      "type": "file",
+      "content_b64": "aGVsbG8K"
+    },
+    {
+      "path": "docs/b.txt",
+      "type": "file",
+      "content_b64": "aGVsbG8K"
+    },
+    {
+      "path": "docs/empty",
+      "type": "dir"
+    },
+    {
+      "path": "notes.txt",
+      "type": "file",
+      "content_b64": "aGkK"
+    }
+  ]
+}

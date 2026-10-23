@@ -1,0 +1,8 @@
+{
+  "rule": "HDR-4",
+  "category": "unsupported",
+  "detail": "hdr.hash-alg",
+  "exit": 5,
+  "base": "worked-example",
+  "mutation": "hash_alg = 2"
+}

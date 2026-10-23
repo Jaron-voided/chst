@@ -1,0 +1,8 @@
+{
+  "exit": 6,
+  "base": "worked-example",
+  "mutation": "ENTRY_TABLE record_count = 2^32",
+  "details": [
+    "sec.bounds"
+  ]
+}

@@ -1,0 +1,4 @@
+{
+  "exit": 0,
+  "note": "directories 'ABCDEFGHIJ' (file 'a') and 'ABCDEF~1' (file 'b'); the second can collide with the first's Windows 8.3 short name (AC-SAFE-10)"
+}

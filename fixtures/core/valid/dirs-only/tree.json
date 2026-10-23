@@ -1,0 +1,21 @@
+{
+  "schema": "chst-tree/1",
+  "entries": [
+    {
+      "path": "a",
+      "type": "dir"
+    },
+    {
+      "path": "a/b",
+      "type": "dir"
+    },
+    {
+      "path": "a/b/c",
+      "type": "dir"
+    },
+    {
+      "path": "d",
+      "type": "dir"
+    }
+  ]
+}

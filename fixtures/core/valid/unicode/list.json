@@ -1,0 +1,37 @@
+{
+  "schema": "chst-report/1",
+  "command": "list",
+  "ok": true,
+  "error": null,
+  "warnings": [],
+  "entries": [
+    {
+      "path": "café.txt",
+      "type": "file",
+      "size": 6,
+      "stored_size": 6,
+      "encoding": "stored",
+      "blob": "7b49b9e063bd91a4f9252b413261f5557b9c570aa61516989499f64a62dbcdd6"
+    },
+    {
+      "path": "日本語",
+      "type": "dir"
+    },
+    {
+      "path": "日本語/テキスト.txt",
+      "type": "file",
+      "size": 8,
+      "stored_size": 8,
+      "encoding": "stored",
+      "blob": "8f25aabe30a0e7bd7cb4b72d9d0873db4d63ba0f279b6d1f4335783ee9d7b710"
+    },
+    {
+      "path": "😀.txt",
+      "type": "file",
+      "size": 6,
+      "stored_size": 6,
+      "encoding": "stored",
+      "blob": "5312b0b582d805303c95d7e2b1bc6fad70e04b3dde5413aae758b68767b06ada"
+    }
+  ]
+}

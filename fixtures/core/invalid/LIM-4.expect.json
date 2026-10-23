@@ -1,0 +1,12 @@
+{
+  "rule": "LIM-4",
+  "category": "limit-exceeded",
+  "detail": "limit.index-size",
+  "exit": 8,
+  "base": "worked-example",
+  "mutation": "none (index is 459 bytes); limit lowered to 458",
+  "args": [
+    "--max-index-bytes",
+    "458"
+  ]
+}

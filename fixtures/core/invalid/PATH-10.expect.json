@@ -1,0 +1,8 @@
+{
+  "rule": "PATH-10",
+  "category": "malformed",
+  "detail": "path.depth",
+  "exit": 6,
+  "base": "worked-example",
+  "mutation": "chain of 257 nested directories 'a/a/.../a' added"
+}

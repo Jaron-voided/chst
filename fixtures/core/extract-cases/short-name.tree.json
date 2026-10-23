@@ -1,0 +1,23 @@
+{
+  "schema": "chst-tree/1",
+  "entries": [
+    {
+      "path": "ABCDEFGHIJ",
+      "type": "dir"
+    },
+    {
+      "path": "ABCDEFGHIJ/a",
+      "type": "file",
+      "content_b64": "YQo="
+    },
+    {
+      "path": "ABCDEF~1",
+      "type": "dir"
+    },
+    {
+      "path": "ABCDEF~1/b",
+      "type": "file",
+      "content_b64": "Ygo="
+    }
+  ]
+}

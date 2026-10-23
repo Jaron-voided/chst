@@ -1,0 +1,8 @@
+{
+  "rule": "BLB-4",
+  "category": "malformed",
+  "detail": "blob.layout",
+  "exit": 6,
+  "base": "worked-example",
+  "mutation": "blob[1] offset = 39 (should be 38)"
+}

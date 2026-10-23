@@ -1,0 +1,8 @@
+{
+  "rule": "CAN-1",
+  "category": "malformed",
+  "detail": "canon.entry-order",
+  "exit": 6,
+  "base": "worked-example",
+  "mutation": "entries 'docs/b.txt' and 'docs/empty' swapped (path pool follows the new order)"
+}

@@ -1,0 +1,10 @@
+{
+  "rule": "PATH-5",
+  "category": "malformed",
+  "exit": 6,
+  "details": [
+    "entry.parent",
+    "path.dot-segment",
+    "path.trailing-dot-space"
+  ]
+}

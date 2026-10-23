@@ -1,0 +1,8 @@
+{
+  "rule": "PATH-7",
+  "category": "malformed",
+  "exit": 6,
+  "details": [
+    "path.forbidden-char"
+  ]
+}

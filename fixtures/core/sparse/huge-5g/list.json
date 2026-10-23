@@ -1,0 +1,17 @@
+{
+  "schema": "chst-report/1",
+  "command": "list",
+  "ok": true,
+  "error": null,
+  "warnings": [],
+  "entries": [
+    {
+      "path": "huge.bin",
+      "type": "file",
+      "size": 5368709120,
+      "stored_size": 5368709120,
+      "encoding": "stored",
+      "blob": "7f06c62352aebd8125b2a1841e2b9e1ffcbed602f381c3dcb3200200e383d1d5"
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "rule": "PATH-1",
+  "category": "malformed",
+  "detail": "path.utf8",
+  "exit": 6,
+  "base": "worked-example",
+  "mutation": "file 'notes.txt' renamed to bytes 'notes\\xff.txt' (invalid UTF-8)"
+}

@@ -1,0 +1,8 @@
+{
+  "rule": "PATH-11",
+  "category": "malformed",
+  "exit": 6,
+  "details": [
+    "path.case-collision"
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "rule": "BLB-6",
+  "category": "integrity",
+  "detail": "blob.hash",
+  "exit": 7,
+  "base": "worked-example",
+  "mutation": "blob[1] bytes changed from 'hi\\n' to 'hx\\n' (key unchanged)"
+}

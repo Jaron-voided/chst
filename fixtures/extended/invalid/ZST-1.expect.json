@@ -1,0 +1,8 @@
+{
+  "rule": "ZST-1",
+  "category": "integrity",
+  "detail": "zstd.raw-length",
+  "exit": 7,
+  "base": "zstd-mixed",
+  "mutation": "zeros.bin frame decodes to raw_length + 1 bytes"
+}

@@ -1,0 +1,4170 @@
+{
+  "schema": "chst-report/1",
+  "command": "inspect",
+  "ok": true,
+  "error": null,
+  "warnings": [],
+  "file_length": 6255,
+  "header": {
+    "offset": 0,
+    "length": 32,
+    "fields": [
+      {
+        "name": "magic",
+        "offset": 0,
+        "length": 8,
+        "value": "434853540d0a1a00"
+      },
+      {
+        "name": "major_version",
+        "offset": 8,
+        "length": 2,
+        "value": 1
+      },
+      {
+        "name": "minor_version",
+        "offset": 10,
+        "length": 2,
+        "value": 0
+      },
+      {
+        "name": "hash_alg",
+        "offset": 12,
+        "length": 1,
+        "value": 1
+      },
+      {
+        "name": "reserved",
+        "offset": 13,
+        "length": 3,
+        "value": "000000"
+      },
+      {
+        "name": "required_flags",
+        "offset": 16,
+        "length": 8,
+        "value": 0
+      },
+      {
+        "name": "optional_flags",
+        "offset": 24,
+        "length": 8,
+        "value": 0
+      }
+    ]
+  },
+  "data": {
+    "offset": 32,
+    "length": 18,
+    "fields": [
+      {
+        "name": "blob[0].data",
+        "offset": 32,
+        "length": 0
+      },
+      {
+        "name": "blob[1].data",
+        "offset": 32,
+        "length": 18
+      }
+    ]
+  },
+  "sections": [
+    {
+      "type": "0x80000001",
+      "name": "BLOB_TABLE",
+      "offset": 50,
+      "length": 144,
+      "record_size": 64,
+      "record_count": 2,
+      "fields": [
+        {
+          "name": "type",
+          "offset": 50,
+          "length": 4,
+          "value": 2147483649
+        },
+        {
+          "name": "record_size",
+          "offset": 54,
+          "length": 4,
+          "value": 64
+        },
+        {
+          "name": "record_count",
+          "offset": 58,
+          "length": 8,
+          "value": 2
+        }
+      ],
+      "records": [
+        {
+          "index": 0,
+          "offset": 66,
+          "length": 64,
+          "fields": [
+            {
+              "name": "key",
+              "offset": 66,
+              "length": 32,
+              "value": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            },
+            {
+              "name": "offset",
+              "offset": 98,
+              "length": 8,
+              "value": 32
+            },
+            {
+              "name": "stored_length",
+              "offset": 106,
+              "length": 8,
+              "value": 0
+            },
+            {
+              "name": "raw_length",
+              "offset": 114,
+              "length": 8,
+              "value": 0
+            },
+            {
+              "name": "encoding",
+              "offset": 122,
+              "length": 1,
+              "value": 0
+            },
+            {
+              "name": "reserved",
+              "offset": 123,
+              "length": 7,
+              "value": "00000000000000"
+            }
+          ]
+        },
+        {
+          "index": 1,
+          "offset": 130,
+          "length": 64,
+          "fields": [
+            {
+              "name": "key",
+              "offset": 130,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            },
+            {
+              "name": "offset",
+              "offset": 162,
+              "length": 8,
+              "value": 32
+            },
+            {
+              "name": "stored_length",
+              "offset": 170,
+              "length": 8,
+              "value": 18
+            },
+            {
+              "name": "raw_length",
+              "offset": 178,
+              "length": 8,
+              "value": 18
+            },
+            {
+              "name": "encoding",
+              "offset": 186,
+              "length": 1,
+              "value": 0
+            },
+            {
+              "name": "reserved",
+              "offset": 187,
+              "length": 7,
+              "value": "00000000000000"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "0x80000002",
+      "name": "ENTRY_TABLE",
+      "offset": 194,
+      "length": 5056,
+      "record_size": 48,
+      "record_count": 105,
+      "fields": [
+        {
+          "name": "type",
+          "offset": 194,
+          "length": 4,
+          "value": 2147483650
+        },
+        {
+          "name": "record_size",
+          "offset": 198,
+          "length": 4,
+          "value": 48
+        },
+        {
+          "name": "record_count",
+          "offset": 202,
+          "length": 8,
+          "value": 105
+        }
+      ],
+      "records": [
+        {
+          "index": 0,
+          "offset": 210,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 210,
+              "length": 8,
+              "value": 0
+            },
+            {
+              "name": "path_length",
+              "offset": 218,
+              "length": 4,
+              "value": 5
+            },
+            {
+              "name": "type",
+              "offset": 222,
+              "length": 1,
+              "value": 1
+            },
+            {
+              "name": "reserved",
+              "offset": 223,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 226,
+              "length": 32,
+              "value": "0000000000000000000000000000000000000000000000000000000000000000"
+            }
+          ]
+        },
+        {
+          "index": 1,
+          "offset": 258,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 258,
+              "length": 8,
+              "value": 5
+            },
+            {
+              "name": "path_length",
+              "offset": 266,
+              "length": 4,
+              "value": 8
+            },
+            {
+              "name": "type",
+              "offset": 270,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 271,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 274,
+              "length": 32,
+              "value": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ]
+        },
+        {
+          "index": 2,
+          "offset": 306,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 306,
+              "length": 8,
+              "value": 13
+            },
+            {
+              "name": "path_length",
+              "offset": 314,
+              "length": 4,
+              "value": 8
+            },
+            {
+              "name": "type",
+              "offset": 318,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 319,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 322,
+              "length": 32,
+              "value": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ]
+        },
+        {
+          "index": 3,
+          "offset": 354,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 354,
+              "length": 8,
+              "value": 21
+            },
+            {
+              "name": "path_length",
+              "offset": 362,
+              "length": 4,
+              "value": 8
+            },
+            {
+              "name": "type",
+              "offset": 366,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 367,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 370,
+              "length": 32,
+              "value": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            }
+          ]
+        },
+        {
+          "index": 4,
+          "offset": 402,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 402,
+              "length": 8,
+              "value": 29
+            },
+            {
+              "name": "path_length",
+              "offset": 410,
+              "length": 4,
+              "value": 4
+            },
+            {
+              "name": "type",
+              "offset": 414,
+              "length": 1,
+              "value": 1
+            },
+            {
+              "name": "reserved",
+              "offset": 415,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 418,
+              "length": 32,
+              "value": "0000000000000000000000000000000000000000000000000000000000000000"
+            }
+          ]
+        },
+        {
+          "index": 5,
+          "offset": 450,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 450,
+              "length": 8,
+              "value": 33
+            },
+            {
+              "name": "path_length",
+              "offset": 458,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 462,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 463,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 466,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 6,
+          "offset": 498,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 498,
+              "length": 8,
+              "value": 42
+            },
+            {
+              "name": "path_length",
+              "offset": 506,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 510,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 511,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 514,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 7,
+          "offset": 546,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 546,
+              "length": 8,
+              "value": 51
+            },
+            {
+              "name": "path_length",
+              "offset": 554,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 558,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 559,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 562,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 8,
+          "offset": 594,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 594,
+              "length": 8,
+              "value": 60
+            },
+            {
+              "name": "path_length",
+              "offset": 602,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 606,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 607,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 610,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 9,
+          "offset": 642,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 642,
+              "length": 8,
+              "value": 69
+            },
+            {
+              "name": "path_length",
+              "offset": 650,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 654,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 655,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 658,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 10,
+          "offset": 690,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 690,
+              "length": 8,
+              "value": 78
+            },
+            {
+              "name": "path_length",
+              "offset": 698,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 702,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 703,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 706,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 11,
+          "offset": 738,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 738,
+              "length": 8,
+              "value": 87
+            },
+            {
+              "name": "path_length",
+              "offset": 746,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 750,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 751,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 754,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 12,
+          "offset": 786,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 786,
+              "length": 8,
+              "value": 96
+            },
+            {
+              "name": "path_length",
+              "offset": 794,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 798,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 799,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 802,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 13,
+          "offset": 834,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 834,
+              "length": 8,
+              "value": 105
+            },
+            {
+              "name": "path_length",
+              "offset": 842,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 846,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 847,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 850,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 14,
+          "offset": 882,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 882,
+              "length": 8,
+              "value": 114
+            },
+            {
+              "name": "path_length",
+              "offset": 890,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 894,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 895,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 898,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 15,
+          "offset": 930,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 930,
+              "length": 8,
+              "value": 123
+            },
+            {
+              "name": "path_length",
+              "offset": 938,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 942,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 943,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 946,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 16,
+          "offset": 978,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 978,
+              "length": 8,
+              "value": 132
+            },
+            {
+              "name": "path_length",
+              "offset": 986,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 990,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 991,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 994,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 17,
+          "offset": 1026,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 1026,
+              "length": 8,
+              "value": 141
+            },
+            {
+              "name": "path_length",
+              "offset": 1034,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 1038,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 1039,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 1042,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 18,
+          "offset": 1074,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 1074,
+              "length": 8,
+              "value": 150
+            },
+            {
+              "name": "path_length",
+              "offset": 1082,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 1086,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 1087,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 1090,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 19,
+          "offset": 1122,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 1122,
+              "length": 8,
+              "value": 159
+            },
+            {
+              "name": "path_length",
+              "offset": 1130,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 1134,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 1135,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 1138,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 20,
+          "offset": 1170,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 1170,
+              "length": 8,
+              "value": 168
+            },
+            {
+              "name": "path_length",
+              "offset": 1178,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 1182,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 1183,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 1186,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 21,
+          "offset": 1218,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 1218,
+              "length": 8,
+              "value": 177
+            },
+            {
+              "name": "path_length",
+              "offset": 1226,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 1230,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 1231,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 1234,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 22,
+          "offset": 1266,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 1266,
+              "length": 8,
+              "value": 186
+            },
+            {
+              "name": "path_length",
+              "offset": 1274,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 1278,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 1279,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 1282,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 23,
+          "offset": 1314,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 1314,
+              "length": 8,
+              "value": 195
+            },
+            {
+              "name": "path_length",
+              "offset": 1322,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 1326,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 1327,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 1330,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 24,
+          "offset": 1362,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 1362,
+              "length": 8,
+              "value": 204
+            },
+            {
+              "name": "path_length",
+              "offset": 1370,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 1374,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 1375,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 1378,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 25,
+          "offset": 1410,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 1410,
+              "length": 8,
+              "value": 213
+            },
+            {
+              "name": "path_length",
+              "offset": 1418,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 1422,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 1423,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 1426,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 26,
+          "offset": 1458,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 1458,
+              "length": 8,
+              "value": 222
+            },
+            {
+              "name": "path_length",
+              "offset": 1466,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 1470,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 1471,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 1474,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 27,
+          "offset": 1506,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 1506,
+              "length": 8,
+              "value": 231
+            },
+            {
+              "name": "path_length",
+              "offset": 1514,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 1518,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 1519,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 1522,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 28,
+          "offset": 1554,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 1554,
+              "length": 8,
+              "value": 240
+            },
+            {
+              "name": "path_length",
+              "offset": 1562,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 1566,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 1567,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 1570,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 29,
+          "offset": 1602,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 1602,
+              "length": 8,
+              "value": 249
+            },
+            {
+              "name": "path_length",
+              "offset": 1610,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 1614,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 1615,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 1618,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 30,
+          "offset": 1650,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 1650,
+              "length": 8,
+              "value": 258
+            },
+            {
+              "name": "path_length",
+              "offset": 1658,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 1662,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 1663,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 1666,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 31,
+          "offset": 1698,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 1698,
+              "length": 8,
+              "value": 267
+            },
+            {
+              "name": "path_length",
+              "offset": 1706,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 1710,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 1711,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 1714,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 32,
+          "offset": 1746,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 1746,
+              "length": 8,
+              "value": 276
+            },
+            {
+              "name": "path_length",
+              "offset": 1754,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 1758,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 1759,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 1762,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 33,
+          "offset": 1794,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 1794,
+              "length": 8,
+              "value": 285
+            },
+            {
+              "name": "path_length",
+              "offset": 1802,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 1806,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 1807,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 1810,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 34,
+          "offset": 1842,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 1842,
+              "length": 8,
+              "value": 294
+            },
+            {
+              "name": "path_length",
+              "offset": 1850,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 1854,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 1855,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 1858,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 35,
+          "offset": 1890,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 1890,
+              "length": 8,
+              "value": 303
+            },
+            {
+              "name": "path_length",
+              "offset": 1898,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 1902,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 1903,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 1906,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 36,
+          "offset": 1938,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 1938,
+              "length": 8,
+              "value": 312
+            },
+            {
+              "name": "path_length",
+              "offset": 1946,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 1950,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 1951,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 1954,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 37,
+          "offset": 1986,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 1986,
+              "length": 8,
+              "value": 321
+            },
+            {
+              "name": "path_length",
+              "offset": 1994,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 1998,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 1999,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 2002,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 38,
+          "offset": 2034,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 2034,
+              "length": 8,
+              "value": 330
+            },
+            {
+              "name": "path_length",
+              "offset": 2042,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 2046,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 2047,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 2050,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 39,
+          "offset": 2082,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 2082,
+              "length": 8,
+              "value": 339
+            },
+            {
+              "name": "path_length",
+              "offset": 2090,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 2094,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 2095,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 2098,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 40,
+          "offset": 2130,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 2130,
+              "length": 8,
+              "value": 348
+            },
+            {
+              "name": "path_length",
+              "offset": 2138,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 2142,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 2143,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 2146,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 41,
+          "offset": 2178,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 2178,
+              "length": 8,
+              "value": 357
+            },
+            {
+              "name": "path_length",
+              "offset": 2186,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 2190,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 2191,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 2194,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 42,
+          "offset": 2226,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 2226,
+              "length": 8,
+              "value": 366
+            },
+            {
+              "name": "path_length",
+              "offset": 2234,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 2238,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 2239,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 2242,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 43,
+          "offset": 2274,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 2274,
+              "length": 8,
+              "value": 375
+            },
+            {
+              "name": "path_length",
+              "offset": 2282,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 2286,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 2287,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 2290,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 44,
+          "offset": 2322,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 2322,
+              "length": 8,
+              "value": 384
+            },
+            {
+              "name": "path_length",
+              "offset": 2330,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 2334,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 2335,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 2338,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 45,
+          "offset": 2370,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 2370,
+              "length": 8,
+              "value": 393
+            },
+            {
+              "name": "path_length",
+              "offset": 2378,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 2382,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 2383,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 2386,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 46,
+          "offset": 2418,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 2418,
+              "length": 8,
+              "value": 402
+            },
+            {
+              "name": "path_length",
+              "offset": 2426,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 2430,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 2431,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 2434,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 47,
+          "offset": 2466,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 2466,
+              "length": 8,
+              "value": 411
+            },
+            {
+              "name": "path_length",
+              "offset": 2474,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 2478,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 2479,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 2482,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 48,
+          "offset": 2514,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 2514,
+              "length": 8,
+              "value": 420
+            },
+            {
+              "name": "path_length",
+              "offset": 2522,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 2526,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 2527,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 2530,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 49,
+          "offset": 2562,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 2562,
+              "length": 8,
+              "value": 429
+            },
+            {
+              "name": "path_length",
+              "offset": 2570,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 2574,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 2575,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 2578,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 50,
+          "offset": 2610,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 2610,
+              "length": 8,
+              "value": 438
+            },
+            {
+              "name": "path_length",
+              "offset": 2618,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 2622,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 2623,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 2626,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 51,
+          "offset": 2658,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 2658,
+              "length": 8,
+              "value": 447
+            },
+            {
+              "name": "path_length",
+              "offset": 2666,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 2670,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 2671,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 2674,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 52,
+          "offset": 2706,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 2706,
+              "length": 8,
+              "value": 456
+            },
+            {
+              "name": "path_length",
+              "offset": 2714,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 2718,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 2719,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 2722,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 53,
+          "offset": 2754,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 2754,
+              "length": 8,
+              "value": 465
+            },
+            {
+              "name": "path_length",
+              "offset": 2762,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 2766,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 2767,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 2770,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 54,
+          "offset": 2802,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 2802,
+              "length": 8,
+              "value": 474
+            },
+            {
+              "name": "path_length",
+              "offset": 2810,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 2814,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 2815,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 2818,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 55,
+          "offset": 2850,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 2850,
+              "length": 8,
+              "value": 483
+            },
+            {
+              "name": "path_length",
+              "offset": 2858,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 2862,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 2863,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 2866,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 56,
+          "offset": 2898,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 2898,
+              "length": 8,
+              "value": 492
+            },
+            {
+              "name": "path_length",
+              "offset": 2906,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 2910,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 2911,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 2914,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 57,
+          "offset": 2946,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 2946,
+              "length": 8,
+              "value": 501
+            },
+            {
+              "name": "path_length",
+              "offset": 2954,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 2958,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 2959,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 2962,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 58,
+          "offset": 2994,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 2994,
+              "length": 8,
+              "value": 510
+            },
+            {
+              "name": "path_length",
+              "offset": 3002,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 3006,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 3007,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 3010,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 59,
+          "offset": 3042,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 3042,
+              "length": 8,
+              "value": 519
+            },
+            {
+              "name": "path_length",
+              "offset": 3050,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 3054,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 3055,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 3058,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 60,
+          "offset": 3090,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 3090,
+              "length": 8,
+              "value": 528
+            },
+            {
+              "name": "path_length",
+              "offset": 3098,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 3102,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 3103,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 3106,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 61,
+          "offset": 3138,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 3138,
+              "length": 8,
+              "value": 537
+            },
+            {
+              "name": "path_length",
+              "offset": 3146,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 3150,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 3151,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 3154,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 62,
+          "offset": 3186,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 3186,
+              "length": 8,
+              "value": 546
+            },
+            {
+              "name": "path_length",
+              "offset": 3194,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 3198,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 3199,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 3202,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 63,
+          "offset": 3234,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 3234,
+              "length": 8,
+              "value": 555
+            },
+            {
+              "name": "path_length",
+              "offset": 3242,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 3246,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 3247,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 3250,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 64,
+          "offset": 3282,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 3282,
+              "length": 8,
+              "value": 564
+            },
+            {
+              "name": "path_length",
+              "offset": 3290,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 3294,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 3295,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 3298,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 65,
+          "offset": 3330,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 3330,
+              "length": 8,
+              "value": 573
+            },
+            {
+              "name": "path_length",
+              "offset": 3338,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 3342,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 3343,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 3346,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 66,
+          "offset": 3378,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 3378,
+              "length": 8,
+              "value": 582
+            },
+            {
+              "name": "path_length",
+              "offset": 3386,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 3390,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 3391,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 3394,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 67,
+          "offset": 3426,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 3426,
+              "length": 8,
+              "value": 591
+            },
+            {
+              "name": "path_length",
+              "offset": 3434,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 3438,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 3439,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 3442,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 68,
+          "offset": 3474,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 3474,
+              "length": 8,
+              "value": 600
+            },
+            {
+              "name": "path_length",
+              "offset": 3482,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 3486,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 3487,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 3490,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 69,
+          "offset": 3522,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 3522,
+              "length": 8,
+              "value": 609
+            },
+            {
+              "name": "path_length",
+              "offset": 3530,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 3534,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 3535,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 3538,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 70,
+          "offset": 3570,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 3570,
+              "length": 8,
+              "value": 618
+            },
+            {
+              "name": "path_length",
+              "offset": 3578,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 3582,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 3583,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 3586,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 71,
+          "offset": 3618,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 3618,
+              "length": 8,
+              "value": 627
+            },
+            {
+              "name": "path_length",
+              "offset": 3626,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 3630,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 3631,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 3634,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 72,
+          "offset": 3666,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 3666,
+              "length": 8,
+              "value": 636
+            },
+            {
+              "name": "path_length",
+              "offset": 3674,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 3678,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 3679,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 3682,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 73,
+          "offset": 3714,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 3714,
+              "length": 8,
+              "value": 645
+            },
+            {
+              "name": "path_length",
+              "offset": 3722,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 3726,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 3727,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 3730,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 74,
+          "offset": 3762,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 3762,
+              "length": 8,
+              "value": 654
+            },
+            {
+              "name": "path_length",
+              "offset": 3770,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 3774,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 3775,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 3778,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 75,
+          "offset": 3810,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 3810,
+              "length": 8,
+              "value": 663
+            },
+            {
+              "name": "path_length",
+              "offset": 3818,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 3822,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 3823,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 3826,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 76,
+          "offset": 3858,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 3858,
+              "length": 8,
+              "value": 672
+            },
+            {
+              "name": "path_length",
+              "offset": 3866,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 3870,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 3871,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 3874,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 77,
+          "offset": 3906,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 3906,
+              "length": 8,
+              "value": 681
+            },
+            {
+              "name": "path_length",
+              "offset": 3914,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 3918,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 3919,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 3922,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 78,
+          "offset": 3954,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 3954,
+              "length": 8,
+              "value": 690
+            },
+            {
+              "name": "path_length",
+              "offset": 3962,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 3966,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 3967,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 3970,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 79,
+          "offset": 4002,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 4002,
+              "length": 8,
+              "value": 699
+            },
+            {
+              "name": "path_length",
+              "offset": 4010,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 4014,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 4015,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 4018,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 80,
+          "offset": 4050,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 4050,
+              "length": 8,
+              "value": 708
+            },
+            {
+              "name": "path_length",
+              "offset": 4058,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 4062,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 4063,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 4066,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 81,
+          "offset": 4098,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 4098,
+              "length": 8,
+              "value": 717
+            },
+            {
+              "name": "path_length",
+              "offset": 4106,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 4110,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 4111,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 4114,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 82,
+          "offset": 4146,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 4146,
+              "length": 8,
+              "value": 726
+            },
+            {
+              "name": "path_length",
+              "offset": 4154,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 4158,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 4159,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 4162,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 83,
+          "offset": 4194,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 4194,
+              "length": 8,
+              "value": 735
+            },
+            {
+              "name": "path_length",
+              "offset": 4202,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 4206,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 4207,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 4210,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 84,
+          "offset": 4242,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 4242,
+              "length": 8,
+              "value": 744
+            },
+            {
+              "name": "path_length",
+              "offset": 4250,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 4254,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 4255,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 4258,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 85,
+          "offset": 4290,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 4290,
+              "length": 8,
+              "value": 753
+            },
+            {
+              "name": "path_length",
+              "offset": 4298,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 4302,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 4303,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 4306,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 86,
+          "offset": 4338,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 4338,
+              "length": 8,
+              "value": 762
+            },
+            {
+              "name": "path_length",
+              "offset": 4346,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 4350,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 4351,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 4354,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 87,
+          "offset": 4386,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 4386,
+              "length": 8,
+              "value": 771
+            },
+            {
+              "name": "path_length",
+              "offset": 4394,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 4398,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 4399,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 4402,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 88,
+          "offset": 4434,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 4434,
+              "length": 8,
+              "value": 780
+            },
+            {
+              "name": "path_length",
+              "offset": 4442,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 4446,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 4447,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 4450,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 89,
+          "offset": 4482,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 4482,
+              "length": 8,
+              "value": 789
+            },
+            {
+              "name": "path_length",
+              "offset": 4490,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 4494,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 4495,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 4498,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 90,
+          "offset": 4530,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 4530,
+              "length": 8,
+              "value": 798
+            },
+            {
+              "name": "path_length",
+              "offset": 4538,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 4542,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 4543,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 4546,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 91,
+          "offset": 4578,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 4578,
+              "length": 8,
+              "value": 807
+            },
+            {
+              "name": "path_length",
+              "offset": 4586,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 4590,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 4591,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 4594,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 92,
+          "offset": 4626,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 4626,
+              "length": 8,
+              "value": 816
+            },
+            {
+              "name": "path_length",
+              "offset": 4634,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 4638,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 4639,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 4642,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 93,
+          "offset": 4674,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 4674,
+              "length": 8,
+              "value": 825
+            },
+            {
+              "name": "path_length",
+              "offset": 4682,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 4686,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 4687,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 4690,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 94,
+          "offset": 4722,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 4722,
+              "length": 8,
+              "value": 834
+            },
+            {
+              "name": "path_length",
+              "offset": 4730,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 4734,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 4735,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 4738,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 95,
+          "offset": 4770,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 4770,
+              "length": 8,
+              "value": 843
+            },
+            {
+              "name": "path_length",
+              "offset": 4778,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 4782,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 4783,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 4786,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 96,
+          "offset": 4818,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 4818,
+              "length": 8,
+              "value": 852
+            },
+            {
+              "name": "path_length",
+              "offset": 4826,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 4830,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 4831,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 4834,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 97,
+          "offset": 4866,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 4866,
+              "length": 8,
+              "value": 861
+            },
+            {
+              "name": "path_length",
+              "offset": 4874,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 4878,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 4879,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 4882,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 98,
+          "offset": 4914,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 4914,
+              "length": 8,
+              "value": 870
+            },
+            {
+              "name": "path_length",
+              "offset": 4922,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 4926,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 4927,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 4930,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 99,
+          "offset": 4962,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 4962,
+              "length": 8,
+              "value": 879
+            },
+            {
+              "name": "path_length",
+              "offset": 4970,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 4974,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 4975,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 4978,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 100,
+          "offset": 5010,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 5010,
+              "length": 8,
+              "value": 888
+            },
+            {
+              "name": "path_length",
+              "offset": 5018,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 5022,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 5023,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 5026,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 101,
+          "offset": 5058,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 5058,
+              "length": 8,
+              "value": 897
+            },
+            {
+              "name": "path_length",
+              "offset": 5066,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 5070,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 5071,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 5074,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 102,
+          "offset": 5106,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 5106,
+              "length": 8,
+              "value": 906
+            },
+            {
+              "name": "path_length",
+              "offset": 5114,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 5118,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 5119,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 5122,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 103,
+          "offset": 5154,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 5154,
+              "length": 8,
+              "value": 915
+            },
+            {
+              "name": "path_length",
+              "offset": 5162,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 5166,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 5167,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 5170,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        },
+        {
+          "index": 104,
+          "offset": 5202,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 5202,
+              "length": 8,
+              "value": 924
+            },
+            {
+              "name": "path_length",
+              "offset": 5210,
+              "length": 4,
+              "value": 9
+            },
+            {
+              "name": "type",
+              "offset": 5214,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 5215,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 5218,
+              "length": 32,
+              "value": "3a53eb2e7e612a20164e9971cad552f700a458cd00ade9bec3a28722eca7702c"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "0x80000003",
+      "name": "PATH_POOL",
+      "offset": 5250,
+      "length": 949,
+      "record_size": 1,
+      "record_count": 933,
+      "fields": [
+        {
+          "name": "type",
+          "offset": 5250,
+          "length": 4,
+          "value": 2147483651
+        },
+        {
+          "name": "record_size",
+          "offset": 5254,
+          "length": 4,
+          "value": 1
+        },
+        {
+          "name": "record_count",
+          "offset": 5258,
+          "length": 8,
+          "value": 933
+        },
+        {
+          "name": "payload",
+          "offset": 5266,
+          "length": 933,
+          "value": "emptyempty/e1empty/e2empty/e3samesame/f000same/f001same/f002same/f003same/f004same/f005same/f006same/f007same/f008same/f009same/f010same/f011same/f012same/f013same/f014same/f015same/f016same/f017same/f018same/f019same/f020same/f021same/f022same/f023same/f024same/f025same/f026same/f027same/f028same/f029same/f030same/f031same/f032same/f033same/f034same/f035same/f036same/f037same/f038same/f039same/f040same/f041same/f042same/f043same/f044same/f045same/f046same/f047same/f048same/f049same/f050same/f051same/f052same/f053same/f054same/f055same/f056same/f057same/f058same/f059same/f060same/f061same/f062same/f063same/f064same/f065same/f066same/f067same/f068same/f069same/f070same/f071same/f072same/f073same/f074same/f075same/f076same/f077same/f078same/f079same/f080same/f081same/f082same/f083same/f084same/f085same/f086same/f087same/f088same/f089same/f090same/f091same/f092same/f093same/f094same/f095same/f096same/f097same/f098same/f099"
+        }
+      ],
+      "records": []
+    }
+  ],
+  "trailer": {
+    "offset": 6199,
+    "length": 56,
+    "fields": [
+      {
+        "name": "index_offset",
+        "offset": 6199,
+        "length": 8,
+        "value": 50
+      },
+      {
+        "name": "index_length",
+        "offset": 6207,
+        "length": 8,
+        "value": 6149
+      },
+      {
+        "name": "structure_hash",
+        "offset": 6215,
+        "length": 32,
+        "value": "73b500dfdfff255cafae8161183106bb8acaa4195b14ff872e963dfce4a5fd44"
+      },
+      {
+        "name": "trailer_magic",
+        "offset": 6247,
+        "length": 8,
+        "value": "001a0a0d54534843"
+      }
+    ]
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "rule": "ENT-3",
+  "category": "malformed",
+  "detail": "entry.dir-key",
+  "exit": 6,
+  "base": "worked-example",
+  "mutation": "entry[3] (directory docs/empty) blob_key = blob[1].key"
+}

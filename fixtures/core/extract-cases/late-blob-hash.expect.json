@@ -1,0 +1,7 @@
+{
+  "exit": 7,
+  "note": "worked-example with the last blob's bytes corrupted ('hi\\n' -> 'hx\\n')",
+  "rule": "BLB-6",
+  "category": "integrity",
+  "detail": "blob.hash"
+}

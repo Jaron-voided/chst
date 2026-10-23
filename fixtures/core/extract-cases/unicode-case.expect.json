@@ -1,0 +1,4 @@
+{
+  "exit": 0,
+  "note": "files 'é' and 'É' (both NFC): distinct under PATH-11's ASCII-only folding; collide on case-insensitive filesystems (AC-SAFE-5, AC-SAFE-6)"
+}

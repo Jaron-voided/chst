@@ -1,0 +1,8 @@
+{
+  "rule": "BLB-7",
+  "category": "malformed",
+  "detail": "blob.unreferenced",
+  "exit": 6,
+  "base": "worked-example",
+  "mutation": "extra blob 'orphan\\n' appended, referenced by no entry"
+}

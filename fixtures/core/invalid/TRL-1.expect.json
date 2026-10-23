@@ -1,0 +1,8 @@
+{
+  "rule": "TRL-1",
+  "category": "malformed",
+  "detail": "trl.magic",
+  "exit": 6,
+  "base": "worked-example",
+  "mutation": "last trailer magic byte changed to 'D'"
+}

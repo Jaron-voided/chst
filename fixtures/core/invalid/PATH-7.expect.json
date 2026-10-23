@@ -1,0 +1,8 @@
+{
+  "rule": "PATH-7",
+  "category": "malformed",
+  "detail": "path.forbidden-char",
+  "exit": 6,
+  "base": "worked-example",
+  "mutation": "directory 'docs/a:b' added"
+}

@@ -1,0 +1,8 @@
+{
+  "rule": "CAN-2",
+  "category": "malformed",
+  "detail": "canon.blob-order",
+  "exit": 6,
+  "base": "worked-example",
+  "mutation": "blob table order reversed (data region follows the new order)"
+}

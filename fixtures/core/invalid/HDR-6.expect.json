@@ -1,0 +1,8 @@
+{
+  "rule": "HDR-6",
+  "category": "unsupported",
+  "detail": "hdr.required-flag",
+  "exit": 5,
+  "base": "worked-example",
+  "mutation": "required_flags bit 1 (unassigned) set"
+}

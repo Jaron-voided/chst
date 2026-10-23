@@ -440,7 +440,9 @@ for d in $FX/core/valid/*/; do
   python3.14 -I tools/acceptance/tree_eq.py "$W/t" "$W/x"
 done
 ```
-`tree_eq.py` compares the set of paths, entry types and file bytes, and prints the
+`tree_eq.py` walks both trees one directory handle at a time (never by full path string,
+so paths beyond PATH_MAX work). It compares the set of paths, entry types and file bytes,
+and prints the
 differences.
 
 The valid fixture set MUST include at least the following:
@@ -462,13 +464,21 @@ The valid fixture set MUST include at least the following:
 #### AC-NEG-1 — Every reader rule has at least one negative fixture
 Core · OS all · fast · Traces: G7, D12, all reader rules in FORMAT_SPEC Appendix A
 ```sh
-for r in $(grep -oE '^\| \*\*(HDR|TRL|SEC|BLB|ENT|PATH|CAN|FLG|LIM)-[0-9]+\*\*' FORMAT_SPEC.md | tr -d '|* '); do
-  ls $FX/core/invalid/$r.chst $FX/core/invalid/$r-*.chst 2>/dev/null | grep -q . || { echo "missing $r"; exit 1; }
+for r in $(grep -oE '^\| \*\*(HDR|TRL|SEC|BLB|ENT|PATH|CAN|LIM)-[0-9]+\*\*' FORMAT_SPEC.md | tr -d '|* ' | sort -u); do
+  [ "$r" = LIM-6 ] && continue                                  # Extended-only (encoded blobs)
+  compgen -G "$FX/core/invalid/$r.chst" > /dev/null || compgen -G "$FX/core/invalid/$r-*.chst" > /dev/null \
+    || { echo "missing $r"; exit 1; }
 done
 ```
-For each configurable-limit rule (LIM-3 to LIM-6), the fixture's `expect.json` includes the
-CLI limit flag that triggers it, in an `args` field. Extended rules (ZST, ATT, KV) are
-covered by AC-X-NEG-1.
+- For each configurable-limit rule (LIM-3 to LIM-5), the fixture's `expect.json` carries
+  the CLI limit flag that triggers it, in an `args` field.
+- Rules that can only be broken in a file using Extended features are covered by
+  AC-X-NEG-1:
+  - FLG-1: Core knows no flags, so it has nothing to check;
+  - LIM-6: the ratio limit applies only to encoded blobs;
+  - the ZST, ATT and KV rules.
+- **Known gap:** LIM-1 and LIM-2 have no fixture yet, so this check FAILs on them until the
+  open item in DESIGN.md §9 is decided.
 
 #### AC-NEG-2 — Each negative fixture gives exactly the expected category, detail and exit code
 Core · OS all · fast · Traces: D12, #25, #26
@@ -478,11 +488,16 @@ for e in $FX/core/invalid/*.expect.json; do
   set +e; $CHST verify --json $args "$f" > "$W/r.json" 2> "$W/err"; rc=$?; set -e
   test $rc = "$(jq .exit $e)"
   test "$(jq -r .error.category "$W/r.json")" = "$(jq -r .category $e)"
-  test "$(jq -r .error.detail   "$W/r.json")" = "$(jq -r .detail $e)"
+  det=$(jq -r .error.detail "$W/r.json")
+  jq -e --arg d "$det" '(.details // [.detail]) | index($d) != null' $e > /dev/null   # usually exactly .detail
   test "$(jq -c 'keys' "$W/r.json")" = '["command","error","ok","schema","warnings"]'
-  head -1 "$W/err" | grep -qE "^chst: error\[$(jq -r .category $e)/$(jq -r .detail $e)\]: "
+  head -1 "$W/err" | grep -qF "chst: error[$(jq -r .category $e)/$det]: "
 done
 ```
+Most fixtures break exactly one rule, and the reported detail must equal `.detail`. A few
+changes unavoidably break a second rule, because of how the spec's rules overlap (DESIGN.md
+§9): ENT-5, PATH-4 and PATH-5. For those, `expect.json` lists every acceptable detail in
+`.details`, all in the same category, and the reported detail must be one of them.
 
 #### AC-NEG-3 — `list` and `inspect` also reject structurally invalid files
 Core · OS all · fast · Traces: #2, #5, D12
@@ -757,8 +772,14 @@ test -f "$W/x/é" && test -f "$W/x/É"
 Core · OS all · fast · Traces: D8, FORMAT_SPEC §15 (Windows long paths)
 ```sh
 expect_exit 0 $CHST extract $FX/core/valid/long-names/container.chst -C "$W/x"
-$CHST list --json $FX/core/valid/long-names/container.chst | jq -r '.entries[].path' | while read -r p; do test -e "$W/x/$p"; done
+$GEN materialize $FX/core/valid/long-names/tree.json "$W/t"
+python3.14 -I tools/acceptance/tree_eq.py "$W/t" "$W/x"
 ```
+The fixture's 4096-byte path, plus the temporary-directory prefix, exceeds PATH_MAX on
+Linux (4096) and macOS (1024). So neither this check nor the tools it calls may resolve
+full path strings:
+- `$GEN materialize` and `tree_eq.py` walk one directory handle at a time (`dir_fd`);
+- on Windows they use extended-length paths.
 
 #### AC-SAFE-8 — Links and reparse points swapped in during extraction are never followed
 Core · OS all · fast · Traces: EXT-8, EXT-6, D10
@@ -1039,10 +1060,10 @@ Every criterion in this section is **N/A while `CURRENT_CUT = Core`** (§2). Onc
 owner changes the cut to Extended, every one of them applies, and a missing check is
 FAIL.
 
-#### AC-X-NEG-1 — Extended negative fixtures (ZST, ATT, KV)
-Extended:all · OS all · fast · Traces: ZST-1…3, ATT-1, KV-1, D7
-Same script as AC-NEG-1 and AC-NEG-2, over `$FX/extended/invalid` with prefixes
-`ZST|ATT|KV`.
+#### AC-X-NEG-1 — Extended negative fixtures (ZST, ATT, KV, FLG-1, LIM-6)
+Extended:all · OS all · fast · Traces: ZST-1…3, ATT-1, KV-1, FLG-1, LIM-6, D7
+The same script as AC-NEG-1 and AC-NEG-2, over `$FX/extended/invalid`, for the rules
+ZST-1…3, ATT-1, KV-1, FLG-1 and LIM-6.
 
 #### AC-X-ZSTD-1 — Compressed round-trip; compressed only when smaller
 Extended:#12 · OS all · fast · Traces: #12, D7, ZST-3

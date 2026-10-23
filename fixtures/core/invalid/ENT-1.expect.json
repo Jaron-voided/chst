@@ -1,0 +1,8 @@
+{
+  "rule": "ENT-1",
+  "category": "malformed",
+  "detail": "entry.type",
+  "exit": 6,
+  "base": "worked-example",
+  "mutation": "entry[2] (docs/b.txt) type = 3"
+}

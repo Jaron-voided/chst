@@ -1,0 +1,24 @@
+{
+  "schema": "chst-tree/1",
+  "entries": [
+    {
+      "path": "a",
+      "type": "dir"
+    },
+    {
+      "path": "a-b",
+      "type": "file",
+      "content_b64": "ZGFzaAo="
+    },
+    {
+      "path": "a.b",
+      "type": "file",
+      "content_b64": "ZG90Cg=="
+    },
+    {
+      "path": "a/b",
+      "type": "file",
+      "content_b64": "c2xhc2gK"
+    }
+  ]
+}

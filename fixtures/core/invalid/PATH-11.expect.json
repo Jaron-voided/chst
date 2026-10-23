@@ -1,0 +1,8 @@
+{
+  "rule": "PATH-11",
+  "category": "malformed",
+  "detail": "path.case-collision",
+  "exit": 6,
+  "base": "worked-example",
+  "mutation": "directory 'Docs' added (ASCII case-folds to 'docs')"
+}

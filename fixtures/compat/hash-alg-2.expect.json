@@ -1,0 +1,5 @@
+{
+  "exit": 5,
+  "detail": "hdr.hash-alg",
+  "note": "Expected result for a Core-only reader (built with --no-default-features)."
+}
