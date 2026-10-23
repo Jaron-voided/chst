@@ -37,8 +37,7 @@ for an invalid file.
   offsets, which are relative to the start of the PATH_POOL payload (§9).
 - There is no alignment padding anywhere. Fields can start at any byte offset.
 - `H(x)` denotes the hash function selected by the header's `hash_alg` field. In version
-  1.0 the only defined algorithm is **BLAKE3** with 32-byte output, in the default
-  (unkeyed) hash mode. [D6]
+  1.0 the only defined algorithm is **SHA-256** (FIPS 180-4), with 32-byte output. [D6]
 - `a ‖ b` denotes byte concatenation. Ranges `[s, e)` are half-open.
 - "Zero" for a multi-byte field means every byte is `0x00`.
 
@@ -63,7 +62,7 @@ index and the first 16 bytes of the trailer are covered by the structure hash (�
 | 0 | 8 | `magic` | `43 48 53 54 0D 0A 1A 00` (ASCII `CHST`, CR, LF, SUB, NUL) |
 | 8 | 2 | `major_version` | `1` |
 | 10 | 2 | `minor_version` | `0` for this document. Informational: readers MUST accept any value |
-| 12 | 1 | `hash_alg` | `1` = BLAKE3-256 (§12.4) |
+| 12 | 1 | `hash_alg` | `1` = SHA-256 (§12.4) |
 | 13 | 3 | `reserved` | Zero |
 | 16 | 8 | `required_flags` | Bit set of required features (§12.1). Core files: 0 |
 | 24 | 8 | `optional_flags` | Bit set of optional features (§12.1). Core files: 0 |
@@ -313,7 +312,7 @@ flag) · all others undefined.
 
 ### 12.4 Hash algorithms
 
-`1` = BLAKE3, 32-byte output, unkeyed hash mode. All other values are undefined.
+`1` = SHA-256 (FIPS 180-4), 32-byte output. All other values are undefined.
 
 ### 12.5 Extended: Zstandard blobs (`ZSTD`, required) [D7]
 
@@ -529,10 +528,10 @@ Canonical entry order (CAN-1): `docs`, `docs/a.txt`, `docs/b.txt`, `docs/empty`,
 
 Blob keys:
 
-| Blob | Content | Key = BLAKE3(content) |
+| Blob | Content | Key = SHA-256(content) |
 |---|---|---|
-| 0 | `hello\n` | `8e4c7c1b99dbfd50e7a95185fead5ee1448fa904a2fdd778eaf5f2dbfd629a99` |
-| 1 | `hi\n` | `0b8b60248fad7ac6dfac221b7e01a8b91c772421a15b387dd1fb2d6a94aee438` |
+| 0 | `hello\n` | `5891b5b522d5df086d0ff0b110fbd9d21bb4fc7163af34d08286a2e846f6be03` |
+| 1 | `hi\n` | `98ea6e4f216f2fb4b69fff9b3a44842c38686ca685f3f55dc48c5d3fb1107be4` |
 
 Blob 0 is first referenced by `docs/a.txt` and blob 1 by `notes.txt`, so that is the table
 order (CAN-2). `docs/b.txt` reuses blob 0.
@@ -547,7 +546,7 @@ trailer 56 = **556 bytes**.
 | 0 / 0x000 | 8 | header.magic | `43 48 53 54 0D 0A 1A 00` |
 | 8 / 0x008 | 2 | header.major_version | 1 |
 | 10 / 0x00A | 2 | header.minor_version | 0 |
-| 12 / 0x00C | 1 | header.hash_alg | 1 (BLAKE3) |
+| 12 / 0x00C | 1 | header.hash_alg | 1 (SHA-256) |
 | 13 / 0x00D | 3 | header.reserved | 0 |
 | 16 / 0x010 | 8 | header.required_flags | 0 |
 | 24 / 0x018 | 8 | header.optional_flags | 0 |
@@ -556,13 +555,13 @@ trailer 56 = **556 bytes**.
 | 41 / 0x029 | 4 | BLOB_TABLE.type | `0x80000001` |
 | 45 / 0x02D | 4 | BLOB_TABLE.record_size | 64 |
 | 49 / 0x031 | 8 | BLOB_TABLE.record_count | 2 |
-| 57 / 0x039 | 32 | blob[0].key | `8e4c7c1b…629a99` |
+| 57 / 0x039 | 32 | blob[0].key | `5891b5b5…f6be03` |
 | 89 / 0x059 | 8 | blob[0].offset | 32 |
 | 97 / 0x061 | 8 | blob[0].stored_length | 6 |
 | 105 / 0x069 | 8 | blob[0].raw_length | 6 |
 | 113 / 0x071 | 1 | blob[0].encoding | 0 (stored) |
 | 114 / 0x072 | 7 | blob[0].reserved | 0 |
-| 121 / 0x079 | 32 | blob[1].key | `0b8b6024…aee438` |
+| 121 / 0x079 | 32 | blob[1].key | `98ea6e4f…107be4` |
 | 153 / 0x099 | 8 | blob[1].offset | 38 |
 | 161 / 0x0A1 | 8 | blob[1].stored_length | 3 |
 | 169 / 0x0A9 | 8 | blob[1].raw_length | 3 |
@@ -582,17 +581,17 @@ trailer 56 = **556 bytes**.
 | 457 / 0x1C9 | 43 | PATH_POOL payload | `docsdocs/a.txtdocs/b.txtdocs/emptynotes.txt` |
 | 500 / 0x1F4 | 8 | trailer.index_offset | 41 |
 | 508 / 0x1FC | 8 | trailer.index_length | 459 |
-| 516 / 0x204 | 32 | trailer.structure_hash | `b39e71c89768a90998a7858ea93d3b7806cee7d12c665c051d2f6a782271e2a7` |
+| 516 / 0x204 | 32 | trailer.structure_hash | `13e9dfcb077661f8dcc8b76d922f47bd656c282e62e746e92dfb9f4c16e6fb9a` |
 | 548 / 0x224 | 8 | trailer.trailer_magic | `00 1A 0A 0D 54 53 48 43` |
 
 Each entry record is laid out as `path_offset` (+0, 8 bytes), `path_length` (+8, 4),
 `type` (+12, 1), `reserved` (+13, 3), `blob_key` (+16, 32).
 
-The structure hash is BLAKE3 over 507 bytes: header (0–31), index (41–499) and trailer
+The structure hash is SHA-256 over 507 bytes: header (0–31), index (41–499) and trailer
 bytes 500–515.
 
-BLAKE3 of the whole 556-byte file, for fixture checking only:
-`ea72c78adbd0d0e98ebcdecdc060398796c5b3eebc22136da409e6c602b6876a`.
+SHA-256 of the whole 556-byte file, for fixture checking only:
+`1939236c4b281cf517f7ca1b1746b93b75a0e6afb485107f56d1eea1a7e33332`.
 
 ### 18.3 Hex dump
 
@@ -600,38 +599,38 @@ BLAKE3 of the whole 556-byte file, for fixture checking only:
 00000000  43 48 53 54 0d 0a 1a 00 01 00 00 00 01 00 00 00  |CHST............|
 00000010  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  |................|
 00000020  68 65 6c 6c 6f 0a 68 69 0a 01 00 00 80 40 00 00  |hello.hi.....@..|
-00000030  00 02 00 00 00 00 00 00 00 8e 4c 7c 1b 99 db fd  |..........L|....|
-00000040  50 e7 a9 51 85 fe ad 5e e1 44 8f a9 04 a2 fd d7  |P..Q...^.D......|
-00000050  78 ea f5 f2 db fd 62 9a 99 20 00 00 00 00 00 00  |x.....b.. ......|
+00000030  00 02 00 00 00 00 00 00 00 58 91 b5 b5 22 d5 df  |.........X..."..|
+00000040  08 6d 0f f0 b1 10 fb d9 d2 1b b4 fc 71 63 af 34  |.m..........qc.4|
+00000050  d0 82 86 a2 e8 46 f6 be 03 20 00 00 00 00 00 00  |.....F... ......|
 00000060  00 06 00 00 00 00 00 00 00 06 00 00 00 00 00 00  |................|
-00000070  00 00 00 00 00 00 00 00 00 0b 8b 60 24 8f ad 7a  |...........`$..z|
-00000080  c6 df ac 22 1b 7e 01 a8 b9 1c 77 24 21 a1 5b 38  |...".~....w$!.[8|
-00000090  7d d1 fb 2d 6a 94 ae e4 38 26 00 00 00 00 00 00  |}..-j...8&......|
+00000070  00 00 00 00 00 00 00 00 00 98 ea 6e 4f 21 6f 2f  |...........nO!o/|
+00000080  b4 b6 9f ff 9b 3a 44 84 2c 38 68 6c a6 85 f3 f5  |.....:D.,8hl....|
+00000090  5d c4 8c 5d 3f b1 10 7b e4 26 00 00 00 00 00 00  |]..]?..{.&......|
 000000a0  00 03 00 00 00 00 00 00 00 03 00 00 00 00 00 00  |................|
 000000b0  00 00 00 00 00 00 00 00 00 02 00 00 80 30 00 00  |.............0..|
 000000c0  00 05 00 00 00 00 00 00 00 00 00 00 00 00 00 00  |................|
 000000d0  00 04 00 00 00 01 00 00 00 00 00 00 00 00 00 00  |................|
 000000e0  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  |................|
 000000f0  00 00 00 00 00 00 00 00 00 04 00 00 00 00 00 00  |................|
-00000100  00 0a 00 00 00 02 00 00 00 8e 4c 7c 1b 99 db fd  |..........L|....|
-00000110  50 e7 a9 51 85 fe ad 5e e1 44 8f a9 04 a2 fd d7  |P..Q...^.D......|
-00000120  78 ea f5 f2 db fd 62 9a 99 0e 00 00 00 00 00 00  |x.....b.........|
-00000130  00 0a 00 00 00 02 00 00 00 8e 4c 7c 1b 99 db fd  |..........L|....|
-00000140  50 e7 a9 51 85 fe ad 5e e1 44 8f a9 04 a2 fd d7  |P..Q...^.D......|
-00000150  78 ea f5 f2 db fd 62 9a 99 18 00 00 00 00 00 00  |x.....b.........|
+00000100  00 0a 00 00 00 02 00 00 00 58 91 b5 b5 22 d5 df  |.........X..."..|
+00000110  08 6d 0f f0 b1 10 fb d9 d2 1b b4 fc 71 63 af 34  |.m..........qc.4|
+00000120  d0 82 86 a2 e8 46 f6 be 03 0e 00 00 00 00 00 00  |.....F..........|
+00000130  00 0a 00 00 00 02 00 00 00 58 91 b5 b5 22 d5 df  |.........X..."..|
+00000140  08 6d 0f f0 b1 10 fb d9 d2 1b b4 fc 71 63 af 34  |.m..........qc.4|
+00000150  d0 82 86 a2 e8 46 f6 be 03 18 00 00 00 00 00 00  |.....F..........|
 00000160  00 0a 00 00 00 01 00 00 00 00 00 00 00 00 00 00  |................|
 00000170  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00  |................|
 00000180  00 00 00 00 00 00 00 00 00 22 00 00 00 00 00 00  |........."......|
-00000190  00 09 00 00 00 02 00 00 00 0b 8b 60 24 8f ad 7a  |...........`$..z|
-000001a0  c6 df ac 22 1b 7e 01 a8 b9 1c 77 24 21 a1 5b 38  |...".~....w$!.[8|
-000001b0  7d d1 fb 2d 6a 94 ae e4 38 03 00 00 80 01 00 00  |}..-j...8.......|
+00000190  00 09 00 00 00 02 00 00 00 98 ea 6e 4f 21 6f 2f  |...........nO!o/|
+000001a0  b4 b6 9f ff 9b 3a 44 84 2c 38 68 6c a6 85 f3 f5  |.....:D.,8hl....|
+000001b0  5d c4 8c 5d 3f b1 10 7b e4 03 00 00 80 01 00 00  |]..]?..{........|
 000001c0  00 2b 00 00 00 00 00 00 00 64 6f 63 73 64 6f 63  |.+.......docsdoc|
 000001d0  73 2f 61 2e 74 78 74 64 6f 63 73 2f 62 2e 74 78  |s/a.txtdocs/b.tx|
 000001e0  74 64 6f 63 73 2f 65 6d 70 74 79 6e 6f 74 65 73  |tdocs/emptynotes|
 000001f0  2e 74 78 74 29 00 00 00 00 00 00 00 cb 01 00 00  |.txt)...........|
-00000200  00 00 00 00 b3 9e 71 c8 97 68 a9 09 98 a7 85 8e  |......q..h......|
-00000210  a9 3d 3b 78 06 ce e7 d1 2c 66 5c 05 1d 2f 6a 78  |.=;x....,f\../jx|
-00000220  22 71 e2 a7 00 1a 0a 0d 54 53 48 43              |"q......TSHC|
+00000200  00 00 00 00 13 e9 df cb 07 76 61 f8 dc c8 b7 6d  |.........va....m|
+00000210  92 2f 47 bd 65 6c 28 2e 62 e7 46 e9 2d fb 9f 4c  |./G.el(.b.F.-..L|
+00000220  16 e6 fb 9a 00 1a 0a 0d 54 53 48 43              |........TSHC|
 ```
 
 ### 18.4 Expected `list --json` (Appendix B)
@@ -646,12 +645,12 @@ BLAKE3 of the whole 556-byte file, for fixture checking only:
   "entries": [
     {"path": "docs",       "type": "dir"},
     {"path": "docs/a.txt", "type": "file", "size": 6, "stored_size": 6, "encoding": "stored",
-     "blob": "8e4c7c1b99dbfd50e7a95185fead5ee1448fa904a2fdd778eaf5f2dbfd629a99"},
+     "blob": "5891b5b522d5df086d0ff0b110fbd9d21bb4fc7163af34d08286a2e846f6be03"},
     {"path": "docs/b.txt", "type": "file", "size": 6, "stored_size": 6, "encoding": "stored",
-     "blob": "8e4c7c1b99dbfd50e7a95185fead5ee1448fa904a2fdd778eaf5f2dbfd629a99"},
+     "blob": "5891b5b522d5df086d0ff0b110fbd9d21bb4fc7163af34d08286a2e846f6be03"},
     {"path": "docs/empty", "type": "dir"},
     {"path": "notes.txt",  "type": "file", "size": 3, "stored_size": 3, "encoding": "stored",
-     "blob": "0b8b60248fad7ac6dfac221b7e01a8b91c772421a15b387dd1fb2d6a94aee438"}
+     "blob": "98ea6e4f216f2fb4b69fff9b3a44842c38686ca685f3f55dc48c5d3fb1107be4"}
   ]
 }
 ```

@@ -8,61 +8,84 @@
 
 ## 1. How to run
 
-| Command | Runs | Exit code |
+| Command | Runs | Typical exit |
 |---|---|---|
-| `./check.sh` | Every criterion except the `full-only` ones (AC-ROB-4 fuzzing and the AC-ROB-7 5 GiB round-trip), which are reported as `NOT RUN` | 0 all PASS or N/A · 1 any FAIL · **2 no FAIL, but at least one NOT RUN** |
-| `./check.sh --full` | Every criterion, including the full-only ones | Same |
-| `./check.sh --only AC-POS-1,AC-NEG-2` | Only the named criteria (development aid; never evidence of done) | Same |
-| `./check.sh --list-ids` | Prints every AC ID it implements, one per line | 0 |
-| `./check.sh --done <ci-run-id>` | Only AC-XP-1, the final done check over the CI reports from all three OSes | Same |
+| `./check.sh` | **Fast mode:** every applicable ID except the full-only ones (AC-ROB-4, AC-ROB-4W, AC-ROB-7) and the done-only one (AC-XP-1), which are NOT RUN | 2 |
+| `./check.sh --full` | **Full mode:** also runs the full-only IDs. AC-XP-1 is NOT RUN. | 2 (AC-XP-1 NOT RUN) |
+| `./check.sh --done <ci-run-id>` | **Done mode:** imports every ID's per-OS status from the three CI full-run reports of `<ci-run-id>`, then runs AC-XP-1 | 0 when done |
+| `./check.sh --only ID,ID` | Only the named IDs; every other ID is NOT RUN (development aid) | 2 |
+| `./check.sh --list-ids` | Prints every acceptance ID it implements, one per line | 0 |
+| `./check.sh --self-test` | Runs the harness's built-in self-test IDs (AC-META-7) instead of acceptance IDs | 0 |
 
-So a fast run can never exit 0: it always reports AC-ROB-4 and AC-ROB-7 as NOT RUN, and
-exits 2 if nothing failed. Fast mode still covers 64-bit sizes through AC-ROB-8 (small
-fixtures that declare sizes over 4 GiB) and AC-ROB-9 (a sparse, valid 5 GiB container).
+### 1.1 Statuses and exit codes
+
+| Status | Meaning |
+|---|---|
+| **PASS** | The check ran and its pass condition held |
+| **FAIL** | The check failed, **or** is missing, **or** can't run (a tool is missing, the build fails, the environment is inadequate), **or** ran zero tests |
+| **NOT RUN** | The check needs a mode that wasn't selected: `--full` for full-only IDs, `--done` for AC-XP-1, or `--only` excluded it |
+| **N/A** | Only where this document fixes it in advance: (a) every Extended-tier ID while `CURRENT_CUT = Core` (§2), and (b) an ID whose **OS** line excludes the current OS. `check.sh` never decides N/A on its own; it reads only these two facts. |
+
+| Exit code | When |
+|---|---|
+| 0 | Every applicable ID passes. |
+| 2 | Nothing failed, but something was NOT RUN. |
+| 1 | Any FAIL. |
 
 **Report.** Every run writes `target/acceptance/report.json`:
 
 ```json
 {
   "schema": "chst-acceptance/1",
-  "run": "fast | full | partial",
+  "mode": "fast | full | done | only | self-test",
+  "cut": "core | extended",
   "os": "linux | macos | windows",
   "commit": "<git sha>",
   "dirty": false,
   "results": [
     {"id": "AC-POS-1", "status": "PASS | FAIL | NOT RUN | N/A", "exit_code": 0,
-     "duration_s": 1.2, "log": "target/acceptance/logs/AC-POS-1.log"}
+     "duration_s": 1.2, "command": "./check.sh --only AC-POS-1",
+     "log": "target/acceptance/logs/AC-POS-1.log"}
   ]
 }
 ```
 
-- `N/A` is allowed only for criteria whose **OS** line excludes the current OS, for AC-XP-1
-  outside `--done`, and for Extended criteria whose feature isn't built yet (§3.13).
-- Each check's combined stdout and stderr is saved to its `log` file. The logs are the
-  evidence.
-- `check.sh` runs each check **exactly as written below**, in a fresh empty working
-  directory `$W`, under `bash -euo pipefail`. On Windows CI it runs under the runner's
-  bash (Git Bash, `shell: bash`).
+- Each check's combined stdout and stderr is saved to its `log` file.
+- `check.sh` runs each check **exactly as written below**, under `bash -euo pipefail`. On
+  Windows CI it runs under the runner's bash (Git Bash, `shell: bash`).
 - **Local versus CI evidence.** The owner develops and runs checks locally on Linux (WSL).
-  Run them from the Linux filesystem, not `/mnt/<drive>`, which has Windows filesystem
-  semantics. Local runs count as Linux evidence only. **The only evidence for macOS and
-  Windows is a CI run**, and `EVIDENCE.md` MUST link it (§2).
+  - Run them from the Linux filesystem, not `/mnt/<drive>`, which has Windows filesystem
+    semantics.
+  - Local runs count as Linux evidence only. **The only evidence for macOS and Windows is a
+    CI run,** linked from `EVIDENCE.md` (§2.1).
+- **CI** (DESIGN.md D17) runs fast mode on every push and pull request, and full mode on
+  manual trigger. A job fails on exit 1. A fast job succeeds on exit 2. A full job succeeds
+  on exit 2 only when AC-XP-1 is the sole NOT RUN.
 
-### 1.1 Conventions used by checks
+### 1.2 Conventions used by checks
 
 | Name | Meaning |
 |---|---|
 | `$CHST` | `target/release/chst`, the full build with default features |
 | `$CHST_CORE` | A build with `--no-default-features`. Core only: Extended features are behind Cargo features that are on by default |
+| `$CHST_OS` | `linux`, `macos` or `windows`, as detected by `check.sh` |
 | `$FX` | `fixtures` |
-| `$GEN` | `python3 -I tools/fixturegen/gen.py` |
-| `$W` | A fresh temporary directory per criterion |
+| `python3.14` | Every Python invocation, always by that explicit name (D16). The system `python3` may be older. CI provides `python3.14` on every runner. |
+| `$GEN` | `python3.14 -I fixtures/gen/gen.py` |
+| `$W` | A **fresh temporary directory** that `check.sh` creates for each ID (`mktemp -d`) and removes after the check, whatever its result |
+| `$CHST_BIG_ROOT` | A parent directory on a volume with enough free space, set by the CI workflow per runner (§1.3); locally it defaults to the system temp directory. Checks never write into it directly: they create a fresh `mktemp -d` under it, and remove it on exit. |
 | `jqn FILE` | `jq -S 'walk(if type=="object" then del(.message) else . end)' FILE`: normalised JSON for comparison (FORMAT_SPEC Appendix B) |
 | `expect_exit N CMD…` | Runs CMD and fails unless its exit code is exactly N |
-| `mk_sparse FILE SIZE` | Creates a sparse file of SIZE. On Linux and macOS this is `truncate -s`. On Windows: create the file empty, run `fsutil sparse setflag` on it, then `truncate -s`. |
-| `$CHST_BIG_TMP` | A scratch directory with at least 12 GiB free, set by the CI workflow per runner (§1.2). Locally it defaults to `$W`. |
+| `cargo_test_nonempty ARGS…` | **The zero-test guard.** Runs `cargo test ARGS…`, then sums the `N passed` counts of every `test result:` line. It fails if cargo exits non-zero, if there's no `test result:` line, or if the sum is 0. That last case covers an empty test target, a filter matching nothing, and an all-ignored suite. **Every check that runs cargo tests uses it.** |
+| `sha256 FILE` | Prints the file's lowercase hex SHA-256: `sha256sum`, or `shasum -a 256` on macOS |
+| `mk_sparse FILE SIZE` | Creates a sparse file of SIZE bytes. On Linux and macOS this is `truncate -s`. On Windows: create the file empty, run `fsutil sparse setflag` on it, then `truncate -s`. |
+| `free_bytes DIR` | Free bytes on DIR's volume (`df -Pk`) |
 
-**Fixture layout**, produced only by `$GEN` (V1):
+Rust tests that extract or pack files use only temporary directories (`tempfile`, D15).
+
+**Fixture layout.** Everything under `fixtures/` is produced by the generator in
+`fixtures/gen/` (V1), which builds it directly from FORMAT_SPEC.md. The generator uses only
+the Python standard library, plus `zstandard` for Extended, with SHA-256 from `hashlib`.
 
 - **Valid fixtures:** `fixtures/core/valid/<name>/` holds:
   - `tree.json`: the source tree as data, so empty directories and awkward names survive git;
@@ -70,80 +93,93 @@ fixtures that declare sizes over 4 GiB) and AC-ROB-9 (a sparse, valid 5 GiB cont
   - `list.json`, `verify.json` and `inspect.json`: the expected reports.
 - **Invalid fixtures:** `fixtures/core/invalid/<RULE>[-n].chst` plus `<RULE>[-n].expect.json`
   containing `{"rule", "category", "detail", "exit", "base", "mutation"}`.
-- `fixtures/core/attacks/`, `fixtures/core/hostile/`, `fixtures/compat/` and
+- `fixtures/core/attacks/`, `fixtures/core/extract-cases/`, `fixtures/core/hostile/`,
+  `fixtures/core/hostile64/`, `fixtures/core/sparse/`, `fixtures/compat/` and
   `fixtures/extended/{valid,invalid}/` follow the same pattern.
 - `fixtures/fuzz-regressions/<target>/`: every input that ever crashed a fuzz target.
-- `fixtures/MANIFEST.blake3`: a `b3sum` listing of every other file under `fixtures/`.
+- `fixtures/MANIFEST.sha256`: a `sha256sum`-format listing of every other file under
+  `fixtures/`, including `fixtures/gen/`.
 
-`$GEN materialize TREE.json DIR [--reverse]` creates the tree on disk. `--reverse` creates
-entries in reverse order and sets random mtimes and modes, to stress determinism.
-`$GEN materialize-sparse RECIPE.json FILE` writes a recipe's head bytes at offset 0 and
-its tail bytes at the end of an existing sparse FILE, without filling the hole.
+Generator commands used by checks:
+- `$GEN --out DIR` regenerates everything except `gen/` itself.
+- `$GEN materialize TREE.json DIR [--reverse]` creates a tree on disk. `--reverse` creates
+  entries in reverse order and sets random mtimes and modes, to stress determinism.
+- `$GEN materialize-sparse RECIPE.json FILE` writes a recipe's head bytes at offset 0 and
+  its tail bytes at the end of an existing sparse FILE, without filling the hole.
+- `$GEN synth-entries N FILE` and `$GEN synth-amplify N SIZE FILE` build large synthetic
+  containers on demand.
 
-### 1.2 CI runners and heavy checks
+### 1.3 CI runners and heavy checks
 
-The workflow (an early task; see DESIGN.md §10) runs `./check.sh --full` on
-`ubuntu-latest`, `macos-latest` and `windows-latest`. Two criteria stress the runners.
-Neither is confirmed yet, because the workflow doesn't exist. **The first full CI run is
-the confirmation.**
+These are the decisions for each runner. **Feasibility is unconfirmed until the first full
+CI run.**
 
-| Check | ubuntu-latest (x64) | macos-latest (arm64, M1) | windows-latest (x64) |
+| Check | ubuntu-latest (x64) | macos-latest (arm64) | windows-latest (x64) |
 |---|---|---|---|
-| AC-ROB-4 cargo fuzz (nightly, ASan) | Supported per the cargo-fuzz book | Supported (Apple Silicon is listed) | Supported per the book, via MSVC AddressSanitizer. The least-proven of the three. |
-| AC-ROB-7 5 GiB round-trip, about 10 GiB peak disk (5 GiB container plus 5 GiB extracted; sparse source) | Documented SSD 14 GB, so tight. The workflow frees preinstalled toolchains first and uses the largest volume for `$CHST_BIG_TMP`. | Documented SSD 14 GB and no second volume, so **most at risk** | Documented SSD 14 GB. `$CHST_BIG_TMP` goes on the larger of `C:` and `D:`. |
+| AC-ROB-4: cargo-fuzz, 10 minutes per target | Runs | Runs | Doesn't apply (the OS line excludes it). AC-ROB-4W runs instead: the fallback, **approved provisionally until the first full CI run**. That run also tries cargo-fuzz on Windows, as a non-gating, logged workflow step, so the owner can decide whether to switch. |
+| AC-ROB-7: large-file round-trip | 5 GiB (about 10 GiB peak disk). The workflow frees preinstalled toolchains first. | **4 GiB + 1 MiB** (about 8 GiB peak) | 5 GiB if `$CHST_BIG_ROOT` has at least 12 GiB free, otherwise 4 GiB + 1 MiB. The size used is logged. |
 
-Rules, so no check is dropped silently:
-
-- On every OS these two criteria run in full mode. If one can't run on a runner (the tool is
-  missing, the build fails, or there's too little disk), it reports **FAIL** for that OS,
-  never N/A. Core is then not done.
-- Before AC-ROB-7 runs, the workflow logs free space at `$CHST_BIG_TMP` (`df -h`) and the
-  output of `cargo +nightly fuzz --version`.
-- **Proposed relocation if a runner can't do it.** The owner must approve any relocation by
-  editing that criterion's OS line, in a commit that cites the failing CI run.
-  - AC-ROB-7 on macOS or Windows, if disk is short: run it on that OS's GitHub larger
-    runner, which has more disk but costs money. The cheaper alternative is a
-    4 GiB + 1 MiB file there (about 8 GiB peak). It still puts the high 32 bits into use in
-    every size field.
-  - AC-ROB-4 on Windows, if cargo-fuzz or ASan fails: the format crate has no OS code
-    (AC-ENG-2), so Linux and macOS fuzzing cover its logic. Windows keeps AC-ROB-1, AC-ROB-3
-    and AC-ROB-5 (sweeps and the regression corpus) and adds a 10-minute run of those
-    sweeps with randomised inputs.
+- **No paid runners.**
+- A check that can't run on a runner reports **FAIL**, never N/A.
+- Moving a check to another OS, or changing a variant, is an open item. Until `plan-v1` it
+  goes in DESIGN.md §9; from `plan-v1` on, under "Needs decision" in PROGRESS.md.
+- Either size still puts every size and offset field above 2³².
 
 ## 2. Definition of Done
 
-- **Core v1 is done** when all of the following hold:
-  - `./check.sh --full` passes on Linux, macOS and Windows CI for the same commit, with
-    `dirty: false`, and the three reports are attached to that CI run;
-  - `EVIDENCE.md` has an entry linking that CI run (§2.1);
-  - `./check.sh --done <ci-run-id>` (AC-XP-1) then exits 0.
+**This section is the single definition of done.** `CLAUDE.md` refers to it.
 
-  Every Core criterion must be PASS, or N/A where its OS line excludes that OS.
-- **Each Extended feature is done** when, for one commit, its own criteria (§3.13) pass and
-  every Core criterion still passes, by the same full-run, three-OS rule.
-- **Fuzz findings:** any crash, timeout or out-of-memory found by any fuzz run (including
-  optional longer runs) MUST be minimised and added to `fixtures/fuzz-regressions/`. The
-  fix is not done until AC-ROB-5 passes with it.
-- **Changes to fixtures or this document** require owner approval. AC-META-2 enforces this
-  for fixtures.
+```
+CURRENT_CUT = Core
+```
+
+The cut is **done** when `./check.sh --done <ci-run-id>` exits 0, where `<ci-run-id>` is a
+manually triggered full-mode CI run of one commit on Linux, macOS and Windows. That
+requires all of the following, and AC-XP-1 checks every item:
+
+1. All three reports are for the same commit, with `mode: full` and `dirty: false`, and
+   that commit is the CI run's head commit.
+2. In every report, every ID is PASS, or N/A as fixed in §1.1. The only exception is
+   AC-XP-1, which is NOT RUN in the per-OS reports.
+3. `EVIDENCE.md` has one row per acceptance ID that matches those statuses, with that
+   commit and the CI run link (§2.1).
+
+Changing `CURRENT_CUT` to `Extended` is an owner decision. After that, every Extended ID
+applies, and the same rule defines Extended done.
+
+**Fuzz findings:** any crash, timeout or out-of-memory found by any fuzz run, including
+optional longer runs, MUST be minimised and added to `fixtures/fuzz-regressions/`. The fix
+isn't done until AC-ROB-5 passes with it.
+
+Which files are protected, and who may change them, is defined only in `CLAUDE.md`.
 
 ### 2.1 EVIDENCE.md
 
-`EVIDENCE.md` (repo root) is the ledger of claimed results. Each claim is one table row:
+`EVIDENCE.md` (repo root) has **exactly one row per acceptance ID**, in the order of this
+document:
 
 ```
-| <date> | <commit sha> | <scope: Core | Extended:<feature>> | https://github.com/<owner>/<repo>/actions/runs/<id> | linux: PASS | macos: PASS | windows: PASS |
+| ID | Linux | macOS | Windows | Command | Commit | CI run |
+| AC-POS-1 | PASS | PASS | N/A | ./check.sh --only AC-POS-1 | <sha> | https://github.com/<owner>/<repo>/actions/runs/<id> |
 ```
 
-- macOS and Windows results MUST come from the linked CI run. A local WSL run may be listed
-  for Linux only, with its `report.json` summary and `run: local`, never in place of CI.
-- AC-XP-1 checks the row against the CI run itself.
+- Status cells use exactly PASS, FAIL, NOT RUN or N/A. Rows are updated from
+  `report.json`, and a status is never entered for a check that didn't run.
+- **macOS and Windows statuses MUST come from the CI run in that row's "CI run" column.**
+  The Linux status may come from that run or from a local WSL run. A local run is noted as
+  `local` in the CI column, and a macOS or Windows status can't come from it.
+- The Command column holds the command that reproduces the result.
 
 ## 3. Criteria
 
-Each criterion lists its **tier** (Core, or Extended:<feature>), the **OS** it runs on, its
-**mode** (fast, or full-only), and what it **traces to**. Pass means the shown script exits
-0, unless stated otherwise.
+Each criterion lists four things:
+- its **tier**, either Core or Extended:<feature>;
+- the **OS** it applies to; an OS it excludes gives N/A there;
+- its **mode**: fast, full-only, or done-only;
+- what it **traces to**.
+
+Pass means the shown script exits 0, unless stated otherwise. Each script runs in its own
+fresh `$W`.
 
 ### 3.1 Meta: evidence integrity
 
@@ -158,47 +194,59 @@ Pass: empty diff.
 #### AC-META-2 — Fixtures are untampered and fully listed
 Core · OS all · fast · Traces: V1, #28
 ```sh
-test "$(b3sum --no-names fixtures/MANIFEST.blake3)" = "$PINNED_MANIFEST_HASH"
-(cd fixtures && b3sum --check --quiet MANIFEST.blake3)
-diff <(cd fixtures && find . -type f ! -name MANIFEST.blake3 | sed 's|^\./||' | sort) \
-     <(sed 's/^[0-9a-f]* *//' fixtures/MANIFEST.blake3 | sort)
+test "$(sha256 fixtures/MANIFEST.sha256)" = "$PINNED_MANIFEST_HASH"
+(cd fixtures && { sha256sum --check --quiet MANIFEST.sha256 2>/dev/null || shasum -a 256 -c -s MANIFEST.sha256; })
+diff <(cd fixtures && find . -type f ! -name MANIFEST.sha256 | sed 's|^\./||' | sort) \
+     <(sed 's/^[0-9a-f]* [ *]//' fixtures/MANIFEST.sha256 | sort)
 ```
-`$PINNED_MANIFEST_HASH` is the value in §5. Pass: exit 0.
+`$PINNED_MANIFEST_HASH` is the value in §5. The manifest covers `fixtures/gen/` as well.
+Pass: exit 0.
 
 #### AC-META-3 — Every Core feature, decision and rule is traced
 Core · OS all · fast · Traces: Layer B
 ```sh
-python3 -I tools/acceptance/trace.py DESIGN.md FORMAT_SPEC.md ACCEPTANCE.md
+python3.14 -I tools/acceptance/trace.py DESIGN.md FORMAT_SPEC.md ACCEPTANCE.md
 ```
 Pass: exit 0 and the final line is `untraced: 0`.
 
 `trace.py` MUST fail if any of the following is missing from at least one `Traces:` line:
 - a Core feature ID in DESIGN.md §2.1;
-- a decision `D1`–`D14`;
-- a `W-`, `EXT-` or `SEL-` rule in FORMAT_SPEC Appendix A.
+- every decision `D1`–`D18`;
+- every `W-`, `EXT-` or `SEL-` rule in FORMAT_SPEC Appendix A.
 
 Reader rules are covered collectively by AC-NEG-1.
 
-#### AC-META-4 — The fixture generator is independent of the implementation
-Core · OS all · fast · Traces: V1
+#### AC-META-4 — The fixture generator is independent and uses only approved libraries
+Core · OS all · fast · Traces: V1, D6, D15
 ```sh
-! grep -rnE 'subprocess|os\.system|cargo|chst_|target/' tools/fixturegen
-grep -qxE 'blake3==[0-9.]+' tools/fixturegen/requirements.txt
-! grep -vxE '(blake3|zstandard)==[0-9.]+' tools/fixturegen/requirements.txt
-grep -rqE '^(import blake3|from blake3 import)' tools/fixturegen
-! grep -rniE '0x6a09e667|0xbb67ae85|def (compress|g)\(' tools/fixturegen
+! grep -rnE 'subprocess|os\.system|os\.exec|cargo|chst_|target/|crates/' fixtures/gen
+grep -rqE 'hashlib\.sha256' fixtures/gen
+! grep -rniE '0x6a09e667|0x428a2f98|0xbb67ae85' fixtures/gen       # no hand-written SHA-256
+! grep -vxE '(zstandard==[0-9.]+)?' fixtures/gen/requirements.txt
+python3.14 -I - fixtures/gen <<'PY'
+import ast, pathlib, sys
+root = pathlib.Path(sys.argv[1]); local = {p.stem for p in root.rglob("*.py")}
+ok = set(sys.stdlib_module_names) | {"zstandard"} | local
+bad = []
+for f in root.rglob("*.py"):
+    for n in ast.walk(ast.parse(f.read_text(encoding="utf-8"))):
+        mods = [a.name for a in n.names] if isinstance(n, ast.Import) else \
+               [n.module] if isinstance(n, ast.ImportFrom) and n.level == 0 else []
+        bad += [f"{f}: {m}" for m in mods if m.split(".")[0] not in ok]
+print("\n".join(bad)); sys.exit(1 if bad else 0)
+PY
 ```
 Pass: exit 0.
-- The generator uses only the Python standard library, plus the **official** `blake3`
-  package (pinned), plus pinned `zstandard` for Extended.
-- It contains no hand-written BLAKE3: the last line looks for BLAKE3's IV constants and
-  compression function.
-- It never invokes the Rust code.
+- The generator uses only the Python standard library (SHA-256 from `hashlib`, NFC from
+  `unicodedata`), plus pinned `zstandard` for Extended only.
+- It contains no hand-written SHA-256: the third line looks for SHA-256's initial values
+  and round constants.
+- It never invokes or reads the Rust code.
 
 #### AC-META-5 — Fixtures regenerate exactly
 Core · OS linux · fast · Traces: V1, D9
 ```sh
-$GEN --out "$W/fx" && diff -r "$W/fx" fixtures
+$GEN --out "$W/fx" && diff -r -x gen "$W/fx" fixtures
 ```
 Pass: empty diff.
 
@@ -207,10 +255,34 @@ Core · OS all · fast · Traces: V1, #14, D1, D3, D4, D6
 ```sh
 f=$FX/core/valid/worked-example/container.chst
 test "$(wc -c < $f | tr -d ' ')" = 556
-test "$(b3sum --no-names $f)" = ea72c78adbd0d0e98ebcdecdc060398796c5b3eebc22136da409e6c602b6876a
-python3 -I tools/acceptance/spec_hexdump.py FORMAT_SPEC.md | cmp - $f
+test "$(sha256 $f)" = 1939236c4b281cf517f7ca1b1746b93b75a0e6afb485107f56d1eea1a7e33332
+python3.14 -I tools/acceptance/spec_hexdump.py FORMAT_SPEC.md | cmp - $f
 ```
 `spec_hexdump.py` parses the §18.3 hex dump back into bytes. Pass: exit 0.
+
+#### AC-META-7 — The harness reports FAIL for empty, missing and unrunnable checks
+Core · OS all · fast · Traces: Layer B, D16
+```sh
+./check.sh --self-test > /dev/null || true
+r=target/acceptance/report.json
+jq -e '.mode == "self-test"' $r
+for id in SELFTEST-EMPTY-TARGET SELFTEST-ZERO-FILTER SELFTEST-MISSING-CHECK SELFTEST-CANT-RUN; do
+  jq -e --arg id $id '.results[] | select(.id == $id) | .status == "FAIL"' $r
+done
+jq -e '.results[] | select(.id == "SELFTEST-PASS") | .status == "PASS"' $r
+```
+`--self-test` builds a throwaway cargo crate in a fresh temporary directory and runs five
+synthetic IDs through the same code path as real IDs:
+
+| Self-test ID | Check it runs | Required status |
+|---|---|---|
+| `SELFTEST-EMPTY-TARGET` | `cargo_test_nonempty --test empty`, where the test file is empty | FAIL |
+| `SELFTEST-ZERO-FILTER` | `cargo_test_nonempty --test one -- no_such_filter` | FAIL |
+| `SELFTEST-MISSING-CHECK` | An ID with no check implemented | FAIL |
+| `SELFTEST-CANT-RUN` | A check whose command doesn't exist | FAIL |
+| `SELFTEST-PASS` | `cargo_test_nonempty --test one`, with one passing test | PASS |
+
+The self-test IDs never appear in `--list-ids` or in normal reports. Pass: exit 0.
 
 ### 3.2 Engineering
 
@@ -230,15 +302,15 @@ grep -q '#!\[forbid(unsafe_code)\]' crates/chst-format/src/lib.rs
 ! grep -rnE 'std::fs|std::env|std::process|std::net|unsafe' crates/chst-format/src
 cargo tree -p chst-format -e normal --depth 1 --prefix none --no-default-features \
   | tail -n +2 | awk '{print $1}' | sort -u > "$W/deps"
-diff "$W/deps" <(printf 'blake3\nunicode-normalization\n')
+diff "$W/deps" <(printf 'sha2\nunicode-normalization\n')
 ```
-Pass: exit 0, meaning the Core build's direct dependencies are exactly `blake3` and
+Pass: exit 0, meaning the Core build's direct dependencies are exactly `sha2` and
 `unicode-normalization`.
 
 #### AC-ENG-3 — The CLI is thin
 Core · OS all · fast · Traces: D13, #27
 ```sh
-! cargo tree -p chst-cli -e normal --depth 1 --prefix none | grep -E '^(blake3|unicode-normalization|zstd) '
+! cargo tree -p chst-cli -e normal --depth 1 --prefix none | grep -E '^(sha2|unicode-normalization|zstd) '
 ```
 Pass: exit 0. The CLI reaches hashing, normalisation and compression only through
 `chst-format` and `chst-fs`.
@@ -246,8 +318,60 @@ Pass: exit 0. The CLI reaches hashing, normalisation and compression only throug
 #### AC-ENG-4 — The test suite passes
 Core · OS all · fast · Traces: #27
 ```sh
-cargo test --workspace --locked --release
+cargo_test_nonempty --workspace --locked --release
 ```
+
+#### AC-ENG-5 — Every direct dependency is on the approved list
+Core · OS all · fast · Traces: D15
+```sh
+allow='chst-format|chst-fs|chst-cli|chst-fuzz|sha2|unicode-normalization|rustix|windows-sys|lexopt|serde_json|zstd|tempfile|libfuzzer-sys'
+git ls-files --error-unmatch Cargo.lock fuzz/Cargo.lock > /dev/null       # lockfiles are committed
+for m in Cargo.toml fuzz/Cargo.toml; do
+  cargo tree --manifest-path $m --workspace --target all --all-features -e normal,build,dev \
+    --depth 1 --prefix none | awk 'NF {print $1}' | sort -u > "$W/direct"
+  ! grep -vxE "$allow" "$W/direct"
+done
+```
+Pass: exit 0. Both lockfiles are committed, and every build uses `--locked`, so every
+version, transitive ones included, is pinned. Python dependencies are checked by
+AC-META-4, and TypeScript dependencies by AC-X-TS-3.
+
+#### AC-ENG-6 — The pinned environment is the one in use
+Core · OS all · fast · Traces: D16
+```sh
+grep -qxE 'channel = "1\.99\.1"' rust-toolchain.toml
+test "$(rustc --version | cut -d' ' -f2)" = 1.99.1
+grep -qxE 'channel = "nightly-2026-10-01"' fuzz/rust-toolchain.toml
+command -v python3.14 > /dev/null
+python3.14 -I -c 'import sys, unicodedata
+assert sys.version_info[:2] == (3, 14), sys.version
+assert tuple(map(int, unicodedata.unidata_version.split("."))) >= (15, 1), unicodedata.unidata_version'
+jq --version | grep -qE '^jq-1\.([7-9]|[1-9][0-9])'
+```
+Pass: exit 0. The Node pin is checked by AC-X-TS-3, which applies only to the Extended cut.
+
+#### AC-ENG-7 — No unsafe code outside the Windows filesystem module, and every unsafe block there is justified
+Core · OS all · fast · Traces: D18, #26
+```sh
+for f in crates/chst-format/src/lib.rs crates/chst-cli/src/main.rs $(ls fuzz/fuzz_targets/*.rs); do
+  grep -qx '#!\[forbid(unsafe_code)\]' "$f" || { echo "missing forbid: $f"; exit 1; }
+done
+grep -qx '#!\[deny(unsafe_code)\]' crates/chst-fs/src/lib.rs
+grep -qx '#!\[deny(clippy::undocumented_unsafe_blocks, clippy::missing_safety_doc)\]' crates/chst-fs/src/lib.rs
+test "$(grep -rn 'allow(unsafe_code)' crates fuzz --include='*.rs' | wc -l | tr -d ' ')" = 1
+grep -B1 -A1 'allow(unsafe_code)' crates/chst-fs/src/lib.rs | grep -q 'cfg(windows)'
+grep -A1 'allow(unsafe_code)' crates/chst-fs/src/lib.rs | grep -qE '^\s*mod windows;'
+! grep -rnw 'unsafe' crates fuzz --include='*.rs' | grep -vE '^crates/chst-fs/src/(lib\.rs:.*(deny|allow)\(unsafe_code\)|windows(\.rs|/))'
+```
+Pass: exit 0.
+- `forbid` is in every crate root except `chst-fs`.
+- `chst-fs` denies unsafe code, and the `// SAFETY:` lints, at crate level.
+- Exactly one `allow(unsafe_code)` exists, on `#[cfg(windows)] mod windows;`.
+- The word `unsafe` appears nowhere else, including integration tests.
+- The `// SAFETY:` lints run on the Windows runner through AC-ENG-1's clippy step, because
+  the module only compiles there.
+- Until the test-allocator question in DESIGN.md §9 is decided, this check FAILs if the
+  counting allocator (AC-LIM-1, AC-X-ZSTD-2) is written as planned.
 
 ### 3.3 Positive conformance (V2)
 
@@ -276,7 +400,7 @@ Core · OS all · fast · Traces: #5, #14
 ```sh
 for d in $FX/core/valid/*/; do
   $CHST inspect --json "$d/container.chst" > "$W/i.json"
-  python3 -I tools/acceptance/inspect_check.py "$W/i.json" "$d/container.chst"
+  python3.14 -I tools/acceptance/inspect_check.py "$W/i.json" "$d/container.chst"
 done
 ```
 `inspect_check.py` MUST check four things:
@@ -292,7 +416,7 @@ for d in $FX/core/valid/*/; do
   rm -rf "$W/t" "$W/x"
   $GEN materialize "$d/tree.json" "$W/t"
   expect_exit 0 $CHST extract "$d/container.chst" -C "$W/x"
-  python3 -I tools/acceptance/tree_eq.py "$W/t" "$W/x"
+  python3.14 -I tools/acceptance/tree_eq.py "$W/t" "$W/x"
 done
 ```
 `tree_eq.py` compares the set of paths, entry types and file bytes, and prints the
@@ -382,9 +506,9 @@ Pass: exit 0. That's one blob for the 100 identical files and one shared empty b
 #### AC-DET-3 — Random trees round-trip
 Core · OS all · fast · Traces: #1, #3, #21, D9, D10
 ```sh
-PROPTEST_CASES=256 cargo test --release -p chst-fs --test roundtrip_prop
+CHST_PROP_CASES=256 cargo_test_nonempty --release -p chst-fs --test roundtrip_prop
 ```
-The property test generates random portable trees (empty directories, duplicate contents,
+The property test uses a seeded generator in test code (no `proptest`; see D15) and prints the seed on failure. It generates random portable trees (empty directories, duplicate contents,
 Unicode names) and checks three things: pack then extract gives an identical tree, packing
 twice gives identical bytes, and verify exits 0.
 
@@ -393,7 +517,7 @@ twice gives identical bytes, and verify exits 0.
 #### AC-ROB-1 — Flipping any single byte is always detected (CLI, exhaustive)
 Core · OS all · fast · Traces: #4, #13, D1, D6, #26
 ```sh
-python3 -I tools/acceptance/flip_sweep.py "$CHST" $FX/core/valid/worked-example/container.chst \
+python3.14 -I tools/acceptance/flip_sweep.py "$CHST" $FX/core/valid/worked-example/container.chst \
   $FX/core/valid/empty/container.chst $FX/core/valid/dedup/container.chst
 ```
 For every byte offset, and for each of XOR `0x01` and XOR `0xFF`, `flip_sweep.py` runs
@@ -404,7 +528,7 @@ a histogram of detail codes. Pass: exit 0.
 #### AC-ROB-2 — Truncation and extension are always detected
 Core · OS all · fast · Traces: #4, D1, #26
 ```sh
-python3 -I tools/acceptance/truncate_sweep.py "$CHST" $FX/core/valid/worked-example/container.chst
+python3.14 -I tools/acceptance/truncate_sweep.py "$CHST" $FX/core/valid/worked-example/container.chst
 ```
 - Every prefix length from 0 to N−1 must exit with 4 when the length is below 88, and with 6
   (`trl.magic`) otherwise.
@@ -414,28 +538,47 @@ python3 -I tools/acceptance/truncate_sweep.py "$CHST" $FX/core/valid/worked-exam
 #### AC-ROB-3 — Library damage sweep across every valid fixture
 Core · OS all · fast · Traces: #26, V5
 ```sh
-cargo test --release -p chst-format --test damage_sweep
+cargo_test_nonempty --release -p chst-format --test damage_sweep
 ```
 For every valid fixture up to 64 KiB, at every offset, the test applies single-bit and
 single-byte flips plus all truncations. Each must return an error, never success, with no
 panic.
 
 #### AC-ROB-4 — Fuzzing: 10 crash-free minutes per target
-Core · OS all · **full-only** · Traces: #26, G8, V6
+Core · OS linux, macos · **full-only** · Traces: #26, G8, V6, D16
 ```sh
+tc=$(sed -n 's/^channel = "\(.*\)"$/\1/p' fuzz/rust-toolchain.toml)
 for t in open_verify list inspect; do
-  cargo +nightly fuzz run $t -- -max_total_time=600 -rss_limit_mb=512 -timeout=10 \
+  cargo +"$tc" fuzz run $t -- -max_total_time=600 -rss_limit_mb=512 -timeout=10 \
     fuzz/corpus/$t $FX/core/valid $FX/core/invalid
   test -z "$(ls -A fuzz/artifacts/$t 2>/dev/null)"
 done
 ```
-Pass: exit 0 and no artifacts. In a fast run this criterion is NOT RUN. Runner support
-and the relocation rule are in §1.2.
+Pass: exit 0 and no artifacts. In a fast run this criterion is NOT RUN. Windows runs
+AC-ROB-4W instead (§1.3).
+
+#### AC-ROB-4W — Windows fuzzing fallback: 10 minutes of randomised damage sweeps
+Core · OS windows · **full-only** · *provisional until the first full CI run* · Traces: #26, G8, V6
+```sh
+CHST_SWEEP_SECONDS=600 cargo_test_nonempty --release -p chst-format --test random_sweep -- --include-ignored
+```
+For 600 seconds, a seeded generator in the test mutates the valid, invalid and regression
+fixtures:
+- byte flips, insertions, deletions and truncations;
+- splices between fixtures;
+- field-aware edits that recompute the structure hash, so the mutations reach past TRL-3.
+
+Every input must produce an error or a valid report, with no panic, within 10 seconds per
+input. Any failing input is saved to `fixtures/fuzz-regressions/random_sweep/` (owner
+approval, per `CLAUDE.md`). Each run's seed is logged.
+
+`chst-format` has no OS-specific code (AC-ENG-2), so AC-ROB-4 on Linux and macOS covers
+its logic with coverage-guided fuzzing. This criterion checks the Windows build.
 
 #### AC-ROB-5 — Fuzz regressions stay fixed
 Core · OS all · fast · Traces: #26, V6
 ```sh
-cargo test --release -p chst-format --test fuzz_regressions
+cargo_test_nonempty --release -p chst-format --test fuzz_regressions
 ```
 The test replays every file under `fixtures/fuzz-regressions/`. Each must return an error
 or a valid report, with no panic, and within the target's time and memory limits.
@@ -450,21 +593,28 @@ for cmd in "pack $W/t -o $W/o.chst" "verify $W/o.chst" "extract $W/o.chst -C $W/
 done
 ```
 
-#### AC-ROB-7 — Files over 4 GiB round-trip (64-bit sizes)
-Core · OS all · **full-only** (owner-approved exception) · Traces: #15, D3
+#### AC-ROB-7 — Large files over 4 GiB round-trip (64-bit sizes)
+Core · OS all · **full-only** · Traces: #15, D3
 ```sh
-B="$CHST_BIG_TMP/AC-ROB-7"; rm -rf "$B"; mkdir -p "$B/t"
-df -h "$CHST_BIG_TMP"
-mk_sparse "$B/t/huge.bin" 5G
+case "$CHST_OS" in
+  macos)   size=4296015872 ;;                                   # 4 GiB + 1 MiB
+  windows) size=5368709120                                       # 5 GiB …
+           [ "$(free_bytes "$CHST_BIG_ROOT")" -ge 12884901888 ] || size=4296015872 ;;  # … unless < 12 GiB free
+  *)       size=5368709120 ;;
+esac
+echo "AC-ROB-7 size: $size"; df -h "$CHST_BIG_ROOT"
+B=$(mktemp -d "$CHST_BIG_ROOT/chst-rob7.XXXXXX"); trap 'rm -rf "$B"' EXIT
+mkdir "$B/t"; mk_sparse "$B/t/huge.bin" $size
 $CHST pack "$B/t" -o "$B/o.chst"
-$CHST list --json "$B/o.chst" | jq -e '.entries[0].size == 5368709120'
+$CHST list --json "$B/o.chst" | jq -e --argjson s $size '.entries[0].size == $s'
 $CHST verify "$B/o.chst"
 $CHST extract "$B/o.chst" -C "$B/x"
-test "$(b3sum --no-names "$B/x/huge.bin")" = "$(b3sum --no-names "$B/t/huge.bin")"
-rm -rf "$B"
+test "$(sha256 "$B/x/huge.bin")" = "$(sha256 "$B/t/huge.bin")"
 ```
-The source is sparse. Peak disk is about 10 GiB (the container plus the extracted copy).
-Runner feasibility and the relocation rule are in §1.2.
+- The source file is sparse. Peak disk is about 10 GiB for 5 GiB, or about 8 GiB for
+  4 GiB + 1 MiB.
+- The variant for each OS is fixed in §1.3. No paid runners.
+- `$B` is a fresh temporary directory, always removed afterwards.
 
 #### AC-ROB-8 — Fast 64-bit check: small fixtures that declare sizes over 4 GiB
 Core · OS all · fast · Traces: #15, D3, D11
@@ -592,7 +742,7 @@ $CHST list --json $FX/core/valid/long-names/container.chst | jq -r '.entries[].p
 #### AC-SAFE-8 — Links and reparse points swapped in during extraction are never followed
 Core · OS all · fast · Traces: EXT-8, EXT-6, D10
 ```sh
-cargo test --release -p chst-fs --test swap_race
+cargo_test_nonempty --release -p chst-fs --test swap_race
 ```
 A test hook pauses extraction right after a directory is created in staging. It replaces
 that directory with a symlink (Unix) or a junction (Windows) pointing outside, then
@@ -631,7 +781,7 @@ mkdir -p "$W/t" && echo x > "$W/t/$(printf 'e\xcc\x81')"          # NFD é
 $CHST pack "$W/t" -o "$W/c.chst"
 $CHST list --json "$W/c.chst" | jq -e '[.entries[].path] == ["\u00e9"]'
 $CHST extract "$W/c.chst" -C "$W/x"
-python3 -I tools/acceptance/tree_eq.py --nfc "$W/t" "$W/x"
+python3.14 -I tools/acceptance/tree_eq.py --nfc "$W/t" "$W/x"
 ```
 
 ### 3.8 Pack behaviour
@@ -660,7 +810,7 @@ test "$($CHST list --json "$W/c.chst" | jq -c '[.entries[].path]')" = '["f"]'
 #### AC-PACK-3 — A source changed between hash and copy is refused
 Core · OS all · fast · Traces: D2, W-4
 ```sh
-cargo test --release -p chst-fs --test source_changed
+cargo_test_nonempty --release -p chst-fs --test source_changed
 ```
 The test uses a fault-injecting source that returns different bytes on its second read. It
 asserts `refused/pack.source-changed` and that no output file exists.
@@ -730,14 +880,15 @@ grep -q 'pack.output-in-source' "$W/err" && test ! -e "$W/t/self.chst"
 #### AC-LIM-1 — Hostile declared sizes fail fast with bounded memory
 Core · OS all · fast · Traces: #24, D11, #26
 ```sh
-cargo test --release -p chst-format --test hostile_sizes
+cargo_test_nonempty --release -p chst-format --test hostile_sizes
 for e in $FX/core/hostile/*.expect.json; do
   expect_exit "$(jq .exit $e)" timeout 2 $CHST verify "${e%.expect.json}.chst"
 done
 ```
 The hostile fixtures declare an `index_length` near 2⁶⁴, a `record_count` of 2⁶⁰, 2³²
 entries, and a path length of 2³²−1, all inside files under 1 KiB. `hostile_sizes` uses a
-counting allocator and asserts peak heap under 1 MiB per fixture.
+counting allocator and asserts peak heap under 1 MiB per fixture. That allocator needs
+test-only `unsafe`, which is an open decision (DESIGN.md §9; AC-ENG-7).
 
 #### AC-LIM-2 — Configured limits trigger at exact boundaries
 Core · OS all · fast · Traces: #24, D11, LIM-3…LIM-5
@@ -826,28 +977,46 @@ The compat set MUST include:
 
 ### 3.12 Cross-platform (V10)
 
-#### AC-XP-1 — Full runs pass on all three OSes for one commit, recorded in EVIDENCE.md
-Core · OS any · **done-check** (`./check.sh --done <ci-run-id>`; N/A in other runs) · Traces: V10, Definition of Done
+#### AC-XP-1 — The CI full run of one commit passes on all three OSes, and EVIDENCE.md matches it
+Core · OS all · **done-only** (`./check.sh --done <ci-run-id>`) · Traces: V10, D17, Definition of Done
 ```sh
-gh run download "$CI_RUN_ID" --pattern 'acceptance-report-*' --dir "$W/r"
+gh run download "$CI_RUN_ID" --pattern 'acceptance-report-*' --dir "$W/r"      # gh: read-only use
 test "$(jq -r .os "$W"/r/*/report.json | sort -u | tr '\n' ' ')" = 'linux macos windows '
-test "$(jq -r .commit "$W"/r/*/report.json | sort -u | wc -l)" -eq 1
+test "$(jq -r .commit "$W"/r/*/report.json | sort -u | wc -l | tr -d ' ')" = 1
 sha=$(jq -r .commit "$W"/r/*/report.json | head -1)
 test "$(gh run view "$CI_RUN_ID" --json headSha -q .headSha)" = "$sha"
 for r in "$W"/r/*/report.json; do
-  jq -e '.run == "full" and .dirty == false and all(.results[] | select(.id != "AC-XP-1"); .status == "PASS" or .status == "N/A")' "$r"
+  jq -e '.mode == "full" and .dirty == false and
+         all(.results[]; if .id == "AC-XP-1" then .status == "NOT RUN" else (.status == "PASS" or .status == "N/A") end)' "$r"
+  col=$(case "$(jq -r .os "$r")" in linux) echo 3;; macos) echo 4;; windows) echo 5;; esac)
+  jq -r '.results[] | select(.id != "AC-XP-1") | "\(.id)\t\(.status)"' "$r" | while IFS=$'\t' read -r id st; do
+    row=$(grep -E "^\| $id \|" EVIDENCE.md) || { echo "EVIDENCE.md: no row for $id"; exit 1; }
+    test "$(awk -F'|' -v c=$col '{gsub(/^ +| +$/, "", $c); print $c}' <<< "$row")" = "$st"
+    grep -qF "$sha" <<< "$row" && grep -qF "actions/runs/$CI_RUN_ID" <<< "$row"
+  done
 done
-grep -F "actions/runs/$CI_RUN_ID" EVIDENCE.md | grep -F "$sha" | grep -q 'macos: PASS' 
-grep -F "actions/runs/$CI_RUN_ID" EVIDENCE.md | grep -F "$sha" | grep -q 'windows: PASS'
 ```
-The CI workflow runs `./check.sh --full` on `ubuntu-latest`, `macos-latest` and
-`windows-latest`, and uploads `target/acceptance/report.json` as `acceptance-report-<os>`.
-On Windows it runs under the runner's bash.
+- The CI run must be a manually triggered full-mode run (D17) of one commit on
+  `ubuntu-latest`, `macos-latest` and `windows-latest`.
+- Each per-OS report is uploaded as `acceptance-report-<os>`.
+- In done mode, `check.sh` imports each ID's statuses from those reports and runs this
+  check. It then exits 0 only if this check passes (§2).
+
+#### AC-XP-2 — The CI workflow has the agreed triggers, runners and modes
+Core · OS all · fast · Traces: D17, V10
+```sh
+w=.github/workflows/check.yml
+for k in 'push:' 'pull_request:' 'workflow_dispatch:' ubuntu-latest macos-latest windows-latest 'shell: bash' \
+         './check.sh --full' 'acceptance-report-' 'CHST_BIG_ROOT'; do grep -qF -- "$k" $w; done
+grep -qE '^\s+run: \./check\.sh\s*$' $w     # the fast-mode step
+```
+Pass: exit 0. Whether the workflow actually ran is checked by AC-XP-1, through `gh`.
 
 ### 3.13 Extended criteria
 
-These criteria are reported as `N/A` until their feature's Cargo feature exists. After
-that they are mandatory for that feature's done.
+Every criterion in this section is **N/A while `CURRENT_CUT = Core`** (§2). Once the
+owner changes the cut to Extended, every one of them applies, and a missing check is
+FAIL.
 
 #### AC-X-NEG-1 — Extended negative fixtures (ZST, ATT, KV)
 Extended:all · OS all · fast · Traces: ZST-1…3, ATT-1, KV-1, D7
@@ -862,7 +1031,7 @@ for d in $FX/extended/valid/zstd-*/; do
   $CHST pack --compress zstd "$W/t" -o "$W/c.chst"
   diff <($CHST list --json "$W/c.chst" | jq -S '[.entries[] | {path,type,size,encoding}]') \
        <(jq -S '[.entries[] | {path,type,size,encoding}]' "$d/list.json")
-  $CHST extract "$W/c.chst" -C "$W/x" && python3 -I tools/acceptance/tree_eq.py "$W/t" "$W/x"
+  $CHST extract "$W/c.chst" -C "$W/x" && python3.14 -I tools/acceptance/tree_eq.py "$W/t" "$W/x"
 done
 ```
 The fixtures include incompressible random data, which must list as `encoding: "stored"`.
@@ -871,7 +1040,7 @@ Comparison deliberately excludes compressed sizes and keys (D7).
 #### AC-X-ZSTD-2 — Decompression bombs are contained
 Extended:#12 · OS all · fast · Traces: ZST-1, LIM-6, D11
 ```sh
-cargo test --release -p chst-format --features zstd --test zstd_bombs
+cargo_test_nonempty --release -p chst-format --features zstd --test zstd_bombs
 ```
 The test covers three cases:
 - a frame that decodes to more than `raw_length` gives `integrity/zstd.raw-length`;
@@ -932,7 +1101,7 @@ $CHST pack --exclude '*.log' --exclude 'logs' "$W/t" -o "$W/c.chst"
 test "$($CHST list --json "$W/c.chst" | jq -c '[.entries[].path]')" = '["src","src/a.rs"]'
 ```
 
-#### AC-X-TS-1 — The TypeScript reader matches the Rust reports on valid fixtures
+#### AC-X-TS-1 — The TypeScript reader matches the generator's expected JSON on valid fixtures
 Extended:TS · OS all · fast · Traces: V11, #28, D13
 ```sh
 (cd ts-reader && npm ci && npm run build)
@@ -950,11 +1119,17 @@ The same script as AC-NEG-2 and AC-COMPAT-1, with `node ts-reader/dist/cli.js` i
 feature.
 
 #### AC-X-TS-3 — The TypeScript reader is independent
-Extended:TS · OS all · fast · Traces: V11
+Extended:TS · OS all · fast · Traces: V11, D15, D16
 ```sh
-! grep -rnE 'chst-format|\.rs|target/|wasm' ts-reader/src
-jq -e '.dependencies // {} | keys | all(. == "@noble/hashes" or . == "fzstd")' ts-reader/package.json
+! grep -rnE 'chst-format|\.rs|target/|wasm|fixtures/gen' ts-reader/src
+grep -rqF 'node:crypto' ts-reader/src
+jq -e '(.dependencies // {} | length) == 0' ts-reader/package.json
+jq -e '.devDependencies // {} | keys | all(. == "typescript" or . == "@types/node")' ts-reader/package.json
+node --version | grep -qE '^v24\.'
 ```
+The expected values come from the generator's fixtures, never from the Rust code. The
+reader has no runtime dependencies (D15): it uses `node:crypto` for SHA-256 and
+`node:zlib` for Zstandard. Moving to `fzstd` would need a decision.
 
 ## 4. Traceability matrix (Core)
 
@@ -976,7 +1151,7 @@ jq -e '.dependencies // {} | keys | all(. == "@noble/hashes" or . == "fzstd")' t
 | #23 safe extract | AC-SAFE-1 … AC-SAFE-11 |
 | #24 limits | AC-LIM-1 … AC-LIM-4 |
 | #25 errors | AC-NEG-2, AC-CLI-1 |
-| #26 no panic | AC-ROB-1 … AC-ROB-5, AC-ENG-2 |
+| #26 no panic | AC-ROB-1 … AC-ROB-5, AC-ROB-4W, AC-ENG-2 |
 | #27 lib + CLI | AC-ENG-1 … AC-ENG-4 |
 | #28 fixtures | AC-META-2, AC-META-4, AC-META-5 |
 | G1 / G3 paths and collisions | AC-NEG-1 (PATH-*), AC-PACK-1, AC-SAFE-1 |
@@ -985,14 +1160,14 @@ jq -e '.dependencies // {} | keys | all(. == "@noble/hashes" or . == "fzstd")' t
 | G5 atomic write | AC-PACK-4, AC-PACK-6 |
 | G6 bounded memory | AC-ROB-6, AC-LIM-1 |
 | G7 negative fixtures | AC-NEG-1, AC-NEG-4 |
-| G8 fuzzing | AC-ROB-4 |
+| G8 fuzzing | AC-ROB-4, AC-ROB-4W |
 | G9 JSON schema | AC-POS-2, AC-NEG-2 |
 | D1 | AC-META-6, AC-ROB-2 |
 | D2 | AC-DET-2, AC-PACK-3 |
 | D3 | AC-META-6, AC-ROB-7, AC-ROB-8, AC-ROB-9 |
 | D4 | AC-META-6, AC-POS-3 |
 | D5 | AC-COMPAT-1 |
-| D6 | AC-META-6, AC-ROB-1 |
+| D6 | AC-META-4, AC-META-6, AC-ROB-1 |
 | D7 | AC-X-ZSTD-1, AC-X-ZSTD-2 (Extended) |
 | D8 (incl. platform rules) | AC-NEG-1, AC-PACK-1, AC-PACK-7 … AC-PACK-9, AC-SAFE-5 … AC-SAFE-11 |
 | D9 | AC-POS-1, AC-DET-1, AC-DET-3 |
@@ -1001,6 +1176,10 @@ jq -e '.dependencies // {} | keys | all(. == "@noble/hashes" or . == "fzstd")' t
 | D12 | AC-NEG-2, AC-CLI-1, AC-CLI-2 |
 | D13 | AC-ENG-2, AC-ENG-3 |
 | D14 | AC-PACK-4, AC-PACK-6 |
+| D15 | AC-ENG-5, AC-META-4, AC-X-TS-3 |
+| D16 | AC-ENG-6, AC-META-7 |
+| D17 | AC-XP-1, AC-XP-2 |
+| D18 | AC-ENG-7, AC-ENG-2 |
 
 ## 5. Pinned fixture manifest
 
@@ -1010,20 +1189,3 @@ PINNED_MANIFEST_HASH = <PENDING — set by the owner when the generated fixture 
 
 Until this value is set, AC-META-2 FAILs. That's intentional: fixtures need owner approval
 before any implementation can claim done.
-
-## 6. Review round 1: resolved items
-
-| Item | Resolution |
-|---|---|
-| 5 GiB test full-only | Accepted as a full-only exception (AC-ROB-7). Fast mode covers 64-bit sizes through AC-ROB-8 and AC-ROB-9. |
-| Pack onto an existing output | Refused unless `--force`, which replaces atomically (W-7, D14; AC-PACK-4, AC-PACK-6). |
-| `pack --json` report and `extract.no-match` | Defined in FORMAT_SPEC Appendix B and §12.8 (SEL-1). Selective-extract criteria are Extended:#6. |
-| Helper scripts | `trace.py`, `inspect_check.py`, `tree_eq.py` (including `--nfc`), `flip_sweep.py`, `truncate_sweep.py` and `spec_hexdump.py` are early implementation tasks after `plan-v1`. They're reviewed together with `check.sh` at the `checks-v1` checkpoint, before any Rust format code (DESIGN.md §10). |
-| AC-ROB-6 memory check | Linux only, because it uses GNU `/usr/bin/time`. macOS and Windows memory bounds rest on AC-LIM-1's counting allocator. |
-
-## 7. Open items for review
-
-1. **Runner feasibility (§1.2)** is unconfirmed until the first full CI run. That applies
-   especially to AC-ROB-7 on `macos-latest` (14 GB disk) and AC-ROB-4 on `windows-latest`
-   (MSVC ASan). If either fails, it reports FAIL, and the proposed relocations need owner
-   approval.

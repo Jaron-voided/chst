@@ -1,12 +1,13 @@
 # Chst — Design
 
-> Status: **DRAFT for independent review** (revised after review round 1, see §9).
+> Status: **DRAFT for independent review** (revised after review rounds 1–3; see §9).
 > The format is **Chst**, pronounced "chest". Its magic bytes are `CHST`, its file
 > extension is `.chst`, and the CLI binary is `chst`.
 >
 > Companion documents: [`FORMAT_SPEC.md`](FORMAT_SPEC.md) (normative byte format and rules)
 > and [`ACCEPTANCE.md`](ACCEPTANCE.md) (acceptance criteria with runnable checks).
-> Where this document and `FORMAT_SPEC.md` disagree, `FORMAT_SPEC.md` wins.
+> Precedence between documents, and which files are protected, are defined only in
+> `CLAUDE.md`.
 
 ## 1. Purpose and framing
 
@@ -42,7 +43,7 @@ triage, and `Nn` are non-goals.
 | #4 | `verify` structure and checksums without extracting | |
 | #5 | `inspect`: header and index fields with byte offsets | |
 | #8 | `--json` output for list, verify, inspect | Versioned schema (G9) |
-| #13 | Per-blob content hashes plus a structure hash | BLAKE3 (D6) |
+| #13 | Per-blob content hashes plus a structure hash | SHA-256 (D6) |
 | #14 | Index for random access | Index at end (D1), typed sections (D4) |
 | #15 | 64-bit sizes and offsets | D3 |
 | #17 | Preserve empty directories | Explicit directory entries (D10b) |
@@ -54,7 +55,7 @@ triage, and `Nn` are non-goals.
 | #25 | Stable error categories and exit codes | D12 |
 | #26 | Never panic on malformed input | Fuzzed (V6) |
 | #27 | Library crates with a thin CLI | D13 |
-| #28 | Conformance fixtures with expected JSON | Built by an independent generator (V1) |
+| #28 | Conformance fixtures with expected JSON | Built by an independent generator in `fixtures/gen/` (V1) |
 | G1 | Path encoding and normalisation rules | D8 |
 | G2 | Format version and forward-compatibility policy | D5 |
 | G3 | Duplicate and colliding path rules | D8, D9 |
@@ -131,22 +132,24 @@ offset 0                                                          end of file
 | Crate | Responsibility | Must not |
 |---|---|---|
 | `chst-format` | Encode and decode the byte format, every validation rule in `FORMAT_SPEC.md`, structured reports (list, inspect, verify). Works over any seekable byte source and any byte sink. | Touch the filesystem, walk directories, use `unsafe` |
-| `chst-fs` | Pack: directory walk, path checks, double hashing. Extract: staging, create-new, permissions, Windows long paths. | Re-implement format parsing |
-| `chst-cli` | Argument parsing, text and `--json` rendering, category→exit-code mapping | Contain format or safety logic |
+| `chst-fs` | Pack: directory walk, path checks, double hashing. Extract: staging, create-new, permissions, Windows long paths. | Re-implement format parsing; use `unsafe` anywhere except its Windows module (D18) |
+| `chst-cli` | Argument parsing, text and `--json` rendering, category→exit-code mapping | Contain format or safety logic; use `unsafe` |
 
 All I/O is synchronous and blocking; there is no async runtime.
 
 Planned repository layout, which `ACCEPTANCE.md` commands refer to:
 
 ```
+rust-toolchain.toml           # pinned stable Rust (D16)
 crates/chst-format  crates/chst-fs  crates/chst-cli   # Rust workspace
-fuzz/                         # cargo-fuzz targets over chst-format
-tools/fixturegen/             # independent spec-driven Python generator (V1)
-fixtures/                     # golden + negative fixtures, expected JSON, MANIFEST
+fuzz/                         # cargo-fuzz targets over chst-format; own rust-toolchain.toml (nightly, D16)
+fixtures/                     # golden + negative fixtures, expected JSON, MANIFEST.sha256
+fixtures/gen/                 # independent spec-driven Python generator (V1), stdlib only
+tools/acceptance/             # check.sh helper scripts
 ts-reader/                    # Extended: TypeScript read-only reader
 check.sh                      # acceptance runner
-EVIDENCE.md                   # ledger of claimed results; links CI runs
-.github/workflows/            # CI: ./check.sh --full on Linux, macOS, Windows
+EVIDENCE.md                   # one row per acceptance ID; links CI runs
+.github/workflows/check.yml   # CI (D17)
 ```
 
 ### 3.3 Data flow
@@ -199,6 +202,18 @@ Detailed byte layouts live in `FORMAT_SPEC.md`.
   temp file. Truncation is detected immediately, because the trailer magic or location
   check fails. The header still carries magic, version and flags, so a file can be
   identified from its first bytes.
+- **Prior art (credited; techniques only, not a copied layout):**
+  - **The index at the end, found through a fixed-size record at the very end of the
+    file.** This is a long-standing technique; ZIP's end-of-central-directory record is the
+    best-known example. It was chosen for one-pass writing and to keep append possible.
+    Chst's sections, record layouts, trailer fields and hashing are its own, and unlike ZIP
+    there are no per-entry local headers (option C was rejected).
+  - **The magic's line-ending bytes** (`0D 0A 1A 00` after `CHST`) follow the technique of
+    PNG's file signature. A CR/LF pair detects line-ending translation; SUB (`1A`) stops
+    the DOS `type` command, and NUL catches text-mode tools. They were chosen because
+    archives are often moved through tools that may treat them as text. Only the technique
+    is borrowed: the bytes and their position are Chst's.
+  - The reviewer can still judge whether either goes beyond using a technique.
 
 ### D2 — Entry→data mapping: content-addressed blobs
 - **Options:** (A) each entry owns one data region; (B) entry table plus a numbered blob
@@ -265,18 +280,34 @@ Detailed byte layouts live in `FORMAT_SPEC.md`.
 - **Consequences:** Every compatibility rule needs a negative fixture. See §6 for the
   feature mapping.
 
-### D6 — Hashing
+### D6 — Hashing (amended in review round 2)
 - **D6a options:** SHA-256, BLAKE3, or SHA-512/256, each with or without an algorithm ID.
-  **Choice: BLAKE3-256 with a hash-algorithm ID in the header.** v1 defines only BLAKE3. A
-  new algorithm would be a new ID, gated by a required flag.
+  **Choice: SHA-256 with a hash-algorithm ID in the header** (`hash_alg` = 1). v1 defines
+  only SHA-256. A new algorithm would be a new ID, gated by a required flag.
 - **D6b options:** one trailer hash, or separate checksums per part. **Choice: one
   structure hash** in the trailer, using the same algorithm. It covers the header, the
   whole index, and the trailer's location fields.
-- **Rationale:** Fast, and the hash ID leaves room for change. One structure hash means
-  every non-blob byte is covered exactly once.
-- **Consequences:** The TypeScript reader needs a BLAKE3 library (pure-JS options exist);
-  the Rust side uses the `blake3` crate. Index corruption is reported as `integrity`, not
-  `malformed`, because the hash is checked before structural rules.
+- **History:** round 1 chose BLAKE3. **Round 2 switched to SHA-256**, because of
+  `CLAUDE.md`'s rule that fixture hashes come from an implementation independent of the
+  Rust code:
+  - The official `blake3` Python package and `b3sum` are both built on the same `blake3`
+    Rust crate that `chst-format` would use, so they aren't independent of it.
+  - With SHA-256, the fixture generator uses Python's `hashlib`, the Rust code uses `sha2`
+    (D15), and the TypeScript reader uses `node:crypto`.
+- **Rationale:** Independent implementations, available everywhere. One structure hash
+  covers every non-blob byte exactly once. SHA-256's collision resistance is ample for dedup
+  keys.
+- **Consequences:**
+  - SHA-256 is slower than BLAKE3, and pack hashes each file twice (D2a). That's
+    acceptable at a few GB.
+  - **Rust's standard library has no SHA-256,** so Rust still needs one hash crate (`sha2`;
+    see D15). Python and Node need none.
+  - Python's `hashlib` and `node:crypto` are both normally backed by OpenSSL, so the
+    generator and the TypeScript reader may share a SHA-256 implementation. The Rust code
+    (`sha2`, pure Rust) is independent of both, which is the independence the oracle rule
+    requires.
+  - Index corruption is reported as `integrity`, not `malformed`, because the hash is
+    checked before structural rules.
 
 ### D7 — Compression (Extended #12)
 - **Options:** (A) Zstandard; (B) DEFLATE; (C) LZ4; (D) Zstandard plus DEFLATE.
@@ -291,7 +322,12 @@ Detailed byte layouts live in `FORMAT_SPEC.md`.
     blobs is promised only for the same tool version and settings.
   - Compressed-file fixtures compare decoded content and structure, not compressed bytes.
     Core fixtures stay byte-exact.
-  - The TypeScript reader needs a Zstandard decoder.
+  - The TypeScript reader needs a Zstandard decoder (D15).
+  - **The zstd library is shared, and that's accepted (review round 2).** The Rust `zstd`
+    crate and the generator's Python `zstandard` package both wrap the same C libzstd.
+    That's acceptable because compressed bytes are never compared (only decoded content
+    and structure). Correctness is still pinned independently: blob keys are SHA-256 over
+    the stored bytes, and decoded output must match the original content and length.
 
 ### D8 — Paths
 - **Options:** (A) strict portable rules; (B) portable without normalisation; (C) raw bytes;
@@ -418,6 +454,104 @@ don't change the exit code.
 - **Rationale:** Write-once archives are often the only copy of something. Overwriting
   should be deliberate.
 
+### D15 — Approved dependencies (APPROVED in review round 3)
+- **Principle:** use the smallest set that works. Anything not listed needs a "Needs
+  decision" entry (`CLAUDE.md`). AC-ENG-5, AC-META-4 and AC-X-TS-3 enforce the list.
+- **Round 3 changes:** `serde_json` replaces the hand-written JSON emitter. Paths in a
+  container are attacker-controlled, so string escaping must come from a well-tested
+  library. **`Cargo.lock` is committed** (for the workspace and for `fuzz/`), so every
+  dependency version, transitive ones included, is pinned. AC-ENG-5 checks both.
+- **Rust: runtime**
+
+| Crate (version at proposal) | Used by | Why it's needed | Considered instead |
+|---|---|---|---|
+| `sha2` 0.11 | chst-format | SHA-256 (D6). Rust std has none. It's pure Rust, independent of the OpenSSL used by `hashlib` and `node:crypto`. | Hand-written (crypto risk); `ring` or `openssl` (C/asm, may share code with the oracle) |
+| `unicode-normalization` 0.1 | chst-format, chst-fs | The NFC check (PATH-2) and pack's NFC conversion (W-3). Rust std has none. | ICU4X (far larger) |
+| `rustix` 1.x | chst-fs, Unix only | Handle-relative, no-follow `openat`/`mkdirat` for EXT-2 and EXT-8. Rust std has no `openat`, and `rustix` is a safe API, so no `unsafe` is needed. | `libc` (needs `unsafe`); `cap-std` (bigger, less direct control) |
+| `windows-sys` 0.61 | chst-fs, Windows only | Handle-relative opens with `FILE_FLAG_OPEN_REPARSE_POINT`, reparse-point checks and extended-length paths (W-8, EXT-8). | The `windows` crate (heavier) |
+| `lexopt` 0.3 | chst-cli | Argument parsing with no transitive dependencies | `clap` (large dependency tree) |
+| `serde_json` 1.x | chst-cli | JSON reports (FORMAT_SPEC Appendix B). Entry paths are attacker-controlled, so string escaping must come from a well-tested library. It's used through `serde_json::Value`, with no derive macros; `serde` comes in transitively only. | Hand-written emitter (rejected in round 3) |
+
+- **Rust: Extended**
+
+| Crate | Used by | Why |
+|---|---|---|
+| `zstd` 0.14 | chst-format (feature `zstd`) | Zstandard encode and decode (D7). Wraps C libzstd, which is accepted (D7). |
+
+- **Rust: dev and test only**
+
+| Crate | Used by | Why |
+|---|---|---|
+| `tempfile` 3 | Tests in chst-fs and chst-cli | Rust extraction tests must use temporary directories only |
+| `libfuzzer-sys` 0.4 | `fuzz/` crate only | Required by cargo-fuzz |
+
+  No `proptest`: AC-DET-3 uses a small seeded generator in test code and prints the seed on
+  failure. The counting allocator in AC-LIM-1 is written in test code.
+- **Python:**
+  - The fixture generator (`fixtures/gen/`) and the helper scripts (`tools/acceptance/`)
+    use the **standard library only** (`hashlib`, `struct`, `json`, `unicodedata`,
+    `pathlib`, `argparse`).
+  - Extended adds `zstandard` (pinned), which only the generator uses to build compressed
+    fixtures.
+- **TypeScript reader (Extended):**
+  - **No runtime dependencies.** It uses `node:crypto` (SHA-256),
+    `String.prototype.normalize` (NFC) and `node:zlib` Zstandard decoding.
+  - Node's documentation marks `node:zlib` zstd as **Experimental** (added in v23.8.0 and
+    v22.15.0). If it's still experimental when Extended starts, the fallback is `fzstd`,
+    which would need its own decision then.
+  - Dev only: `typescript` and `@types/node`, for type-checking.
+- **Tools:**
+  - **Everywhere:** bash, git, coreutils (`sha256sum`, or `shasum -a 256` on macOS), `jq`,
+    Python, and `rustup`/`cargo`.
+  - **Fuzzing:** `cargo-fuzz` 0.13.2, installed with `--locked`.
+  - **The done check:** `gh`, read-only.
+  - **Linux only:** GNU `time`, for AC-ROB-6.
+  - **Windows built-ins:** `fsutil`, `powershell` and `cmd`.
+  - `b3sum` is no longer needed.
+
+### D16 — Environment pins (APPROVED in review round 3)
+
+| Item | Pin | Reason |
+|---|---|---|
+| Rust stable | `rust-toolchain.toml` with `channel = "1.99.1"` and components `rustfmt`, `clippy`; `rust-version = "1.99"`; edition 2024 | 1.99.1 is the current stable (released 2026-10-13) and is what's installed on the owner's WSL machine |
+| Rust nightly (fuzzing only) | `fuzz/rust-toolchain.toml` with `channel = "nightly-2026-10-01"`, invoked as `cargo +<that> fuzz` | A dated nightly, so fuzz builds are reproducible. Not yet confirmed to have every component on all three runners; the first full CI run confirms it. If it doesn't, the fallback is the nearest earlier date that does. |
+| cargo-fuzz | 0.13.2 (`cargo install --locked`) | Latest release at proposal time |
+| Python | **3.14, always invoked explicitly as `python3.14`** | Its `unicodedata` is Unicode 16.0, which meets PATH-2's 15.1 minimum. The system `python3` on the owner's WSL machine is 3.12.3 (Unicode 15.0.0, below the spec minimum), so no check or document may call plain `python3`. The owner has installed 3.14 locally. The CI workflow must provide a `python3.14` command on every runner; on Windows that's a shim to the interpreter `setup-python` installs. |
+| Node (Extended TypeScript reader only) | **24 LTS** | Active LTS. It has `node:zlib` zstd and TypeScript type stripping. |
+| jq | 1.7 or later | Has `walk`, which `jqn` uses |
+
+Python 3.14 and `jq` are now installed on the owner's WSL machine. Still missing there: a
+nightly toolchain, `cargo-fuzz`, and Node (needed only for Extended).
+
+### D17 — CI triggers (review round 2)
+- **Choice:** CI runs **fast mode on every push and pull request**, and **full mode on
+  manual trigger** (`workflow_dispatch`). The final done run is a manually triggered full
+  run.
+- **Mechanics:** each job's result follows `check.sh`'s exit code.
+  - A fast job succeeds on exit 2, which is expected because full-only checks are NOT RUN.
+  - A full job succeeds on exit 2 only if AC-XP-1 is the sole NOT RUN.
+  - Any exit 1 fails the job.
+- The owner creates the GitHub repository and pushes. Claude uses `gh` read-only to inspect
+  runs.
+
+### D18 — Unsafe code policy (review round 3)
+- **Choice:**
+  - Every Chst crate root (`chst-format`, `chst-cli`, each fuzz target) has
+    `#![forbid(unsafe_code)]`.
+  - `chst-fs` has `#![deny(unsafe_code)]`. Its one exception is its Windows module
+    (`#[cfg(windows)] #[allow(unsafe_code)] mod windows;`), which calls `windows-sys`.
+    `forbid` can't be relaxed for a single module, so `chst-fs` uses `deny` plus that one
+    `allow`.
+  - Every `unsafe` block in that module has a `// SAFETY:` comment explaining why it's
+    sound, enforced by `clippy::undocumented_unsafe_blocks` and `clippy::missing_safety_doc`
+    at `deny` level.
+- **Rationale:** the format parser handles hostile input and must be memory-safe by
+  construction. The Windows module is the only place that needs raw OS calls (D15), and
+  keeping it in one module keeps it reviewable.
+- **Enforcement:** AC-ENG-7. The clippy lints run on the Windows CI runner through AC-ENG-1,
+  because the module only compiles there.
+- **Open follow-up:** test-only `unsafe` for the counting allocator (§9).
+
 ## 5. Implementation requirements that aren't byte format
 
 These are normative for the Rust implementation and checked in `ACCEPTANCE.md`:
@@ -427,8 +561,9 @@ These are normative for the Rust implementation and checked in `ACCEPTANCE.md`:
   file remains (W-2, W-7).
 - **G6** Memory use during pack, verify and extract is bounded by the index size plus a
   fixed buffer. Blob data is streamed and never fully buffered.
-- **#26** No panic, abort or unbounded allocation on any input. `chst-format` contains no
-  `unsafe`.
+- **#26** No panic, abort or unbounded allocation on any input.
+- **D18** No `unsafe` code in any Chst crate except `chst-fs`'s Windows module. Each
+  `unsafe` block there carries a `// SAFETY:` comment.
 - **D13** `chst-format` has no filesystem access (enforced by its dependency list and API
   review; see AC-ENG-2).
 - Pack refuses an output path inside the source tree (`refused` / `pack.output-in-source`).
@@ -450,7 +585,8 @@ These are normative for the Rust implementation and checked in `ACCEPTANCE.md`:
 Two layers, detailed in `ACCEPTANCE.md`:
 
 - **Layer A: proving the format and implementation work.**
-  - V1 independent golden fixtures from a spec-driven Python generator.
+  - V1 independent golden fixtures from a spec-driven Python generator in `fixtures/gen/`
+    (standard library only, with SHA-256 from `hashlib`).
   - V2 positive conformance (exact JSON).
   - V3 negative conformance (one fixture per reader rule).
   - V4 properties: round-trip, determinism, dedup.
@@ -464,17 +600,16 @@ Two layers, detailed in `ACCEPTANCE.md`:
   - V11 TypeScript reader (Extended).
 - **Layer B: evidence of success.**
   - Every acceptance criterion has a runnable command and an observable pass condition.
-  - `./check.sh` writes a machine-readable report. It exits 0 only when every criterion
-    passed, fuzzing included (`--full`).
-  - Done means a passing full run on Linux, macOS and Windows CI for the same commit,
-    recorded in `EVIDENCE.md`.
+  - `./check.sh` writes a machine-readable report with statuses PASS, FAIL, NOT RUN and
+    N/A, and exits 0, 2 or 1 (ACCEPTANCE.md §1).
+  - The definition of done is ACCEPTANCE.md §2, and only there.
 
 ## 8. Glossary
 
 - **Entry:** a path in the archive, either a file or a directory.
 - **Blob:** a stored byte sequence, identified by its key.
-- **Key:** the BLAKE3-256 hash of a blob's stored bytes.
-- **Structure hash:** the BLAKE3-256 hash over the header, the index, and the trailer's
+- **Key:** the SHA-256 hash of a blob's stored bytes.
+- **Structure hash:** the SHA-256 hash over the header, the index, and the trailer's
   location fields.
 - **Canonical form:** the single valid encoding of a given input tree (D9).
 - **Staging directory:** the temporary sibling directory that extraction writes into.
@@ -491,12 +626,45 @@ Two layers, detailed in `ACCEPTANCE.md`:
 | 6 | Existing output file | Refuse unless `--force`, then replace atomically (D14). |
 | 7 | `pack --json` report and `extract.no-match` | Defined in FORMAT_SPEC Appendix B and §12.8. Selective-extract criteria are Extended. |
 | 8 | Fixture checksum pinned by the owner | Accepted. |
-| 9 | Helper scripts | Early tasks after `plan-v1`, reviewed together with `check.sh` at `checks-v1` (§10). |
-| 10 | BLAKE3 in the generator | Must be the official `blake3` Python package (or `b3sum`), never hand-written (AC-META-4). The worked example was re-verified with official `b3sum` 1.8.7. |
+| 9 | Helper scripts | Written with `check.sh` as the first implementation task, and reviewed at `checks-v1` (§10). *Timing amended in round 2.* |
+| 10 | BLAKE3 in the generator | *Superseded in round 2:* the format now uses SHA-256, and the generator uses `hashlib`. |
 | 11 | Platforms | Linux, macOS and Windows are all v1. Done means a passing full run on all three in CI for the same commit. macOS and Windows evidence comes only from CI, linked in `EVIDENCE.md`. |
 | 12 | Platform rule completeness | D8 amendment; FORMAT_SPEC §15.1. |
 
-Still-open drafting choices, for the reviewer:
+## 9b. Review round 2 decisions
+
+| # | Item | Owner decision |
+|---|---|---|
+| 1 | Hash | D6 switched to **SHA-256**. The generator uses `hashlib`, Rust uses `sha2`, and the TypeScript reader uses `node:crypto`. Dedup keys, criteria and the worked example are updated. |
+| 2 | zstd in Extended | The shared C library is accepted, because compressed bytes aren't compared (D7). |
+| 3 | Generator location | `fixtures/gen/`, so it's protected together with the fixtures. |
+| 4 | Generator timing | The generator and all fixtures are built during PLANNING, and the worked example is regenerated from the generator. This replaces round 1 #9's "after `plan-v1`". |
+| 5 | First implementation tasks | `check.sh` and its helper scripts, then the CI workflow file. Then stop for the `checks-v1` review. The owner creates the GitHub repository and pushes; Claude uses `gh` read-only. |
+| 6 | Check statuses and exit codes | PASS, FAIL, NOT RUN and N/A, with exit codes 0, 2 and 1. N/A only where ACCEPTANCE.md fixes it in advance (ACCEPTANCE.md §1). |
+| 7 | Definition of done | ACCEPTANCE.md §2 only. `CLAUDE.md` points to it. |
+| 8 | EVIDENCE.md | One row per acceptance ID: a status per OS, the command, the commit, and the CI run link for macOS and Windows. |
+| 9 | Conformance mechanism | The CLI-based fixture comparisons are enough. There's no separate cargo conformance suite. |
+| 10 | Zero-test guard | Every cargo test check must see at least one test run. AC-META-7 proves the harness reports FAIL for an empty test target. |
+| 11 | Dependencies and environment | Proposed as D15 and D16, awaiting approval. |
+| 12 | Open items | Kept in §9 until `plan-v1`. From then on, under "Needs decision" in PROGRESS.md, including moving a check to another OS. |
+| 13 | Protection and precedence | Defined only in `CLAUDE.md`. From `checks-v1` on, the helper scripts and the CI workflow file are protected too. |
+| 14 | Temporary directories | Every check creates and removes its own fresh temporary directory, including the large-file one. Rust extraction tests use temporary directories only. |
+| 15 | §10 | Lists only checkpoints and their order. Tasks go in TODO.md. |
+| 16 | Prior art | The index at the end and the magic's line-ending bytes are credited in D1. |
+| 17 | Large-file test | 4 GiB + 1 MiB on macOS, and on Windows if needed (ACCEPTANCE.md AC-ROB-7). No paid runners. |
+| 18 | Windows fuzzing | The fallback (AC-ROB-4W) is approved provisionally, until the first full CI run. |
+| 19 | CI triggers | Fast on push and pull request, full on manual trigger and for the final done run (D17). |
+
+## 9c. Review round 3 decisions
+
+| # | Item | Owner decision |
+|---|---|---|
+| 1 | `CLAUDE.md` changes | Approved and applied. **DESIGN.md is protected from `plan-v1` on,** and may be edited only to record decisions the owner has approved. Otherwise D15 and D16, and the list AC-ENG-5 checks against, could change without the owner. |
+| 2 | D15 | Approved, plus `serde_json` for JSON output (attacker-controlled paths need well-tested escaping) and a committed `Cargo.lock`. |
+| 3 | Unsafe code | `#![forbid(unsafe_code)]` in every crate except `chst-fs`'s Windows module, which calls `windows-sys`. Each `unsafe` block there has a comment explaining why it's sound (D18, AC-ENG-7). |
+| 4 | D16 | Approved as proposed. Python is called as `python3.14` everywhere, because the system `python3` is 3.12. |
+
+Still-open drafting choices, for the reviewer (until `plan-v1`):
 
 - **Empty container.** Zero entries and zero blobs is valid. Packing an empty directory
   produces one.
@@ -507,33 +675,39 @@ Still-open drafting choices, for the reviewer:
 - **Windows reparse points.** Skipping every reparse point also skips cloud placeholder
   files, such as OneDrive files not stored locally. That's acceptable for v1, and pack
   warns about each one.
-- **Runner feasibility** for AC-ROB-4 (fuzzing) and AC-ROB-7 (5 GiB) is unconfirmed until
-  the first CI run. ACCEPTANCE.md §1.2 gives each runner's expected status, the FAIL-not-N/A
-  rule, and proposed relocations that need owner approval.
+- **Runner feasibility** is unconfirmed until the first full CI run:
+  - AC-ROB-4 on Windows (the provisional fallback is in place);
+  - the dated nightly (D16);
+  - disk for AC-ROB-7 (ACCEPTANCE.md §1.3).
+- **Test-only `unsafe` (round 3 follow-up).** AC-LIM-1 and AC-X-ZSTD-2 measure peak heap
+  with a counting global allocator in test code. Writing one requires `unsafe impl
+  GlobalAlloc`, and integration tests are crates too, so this conflicts with D18 as
+  written. AC-ENG-7 will report FAIL until it's resolved. Options:
+  - **(a)** Allow a second, test-only exception: one support file implementing the counting
+    allocator, with `// SAFETY:` comments. This is what I recommend.
+  - **(b)** Measure memory externally per OS instead, losing the precise heap cap.
+  - **(c)** Add an allocator-statistics crate, which is a new dependency.
+- **`fuzz_target!` and the unsafe lint (unverified).** cargo-fuzz's macro expands to an
+  exported `#[no_mangle]` function, which the `unsafe_code` lint can flag. It isn't yet
+  confirmed whether `#![forbid(unsafe_code)]` compiles in the fuzz targets. AC-ENG-1 and
+  AC-ENG-7 will show it. If it fails, a fuzz-target exception would need a decision.
+- **`node:zlib` zstd** is marked experimental in Node's documentation (D15). The `fzstd`
+  fallback would need a decision when Extended starts.
 
-## 10. Checkpoints and early tasks
+## 10. Checkpoints
 
-This is not a task list. It records the checkpoints the owner named, and the work that
-must come before any Rust format code.
+Checkpoints and their order only. Tasks live in TODO.md once it exists.
 
-- **`plan-v1`:** the owner tags it after the independent review approves these three
-  documents.
-- **Early tasks after `plan-v1`:**
-  1. **GitHub repository and Actions workflow.**
-     - A matrix of `ubuntu-latest`, `macos-latest` and `windows-latest`, each running
-       `./check.sh --full`. On Windows it uses the runner's bash (`shell: bash`).
-     - Install pinned Python plus the official `blake3`, `b3sum`, `jq`, stable and nightly
-       Rust, and `cargo-fuzz`.
-     - Set `$CHST_BIG_TMP` per runner, and free disk on Linux.
-     - Log `df -h` and `cargo +nightly fuzz --version`.
-     - Upload `target/acceptance/report.json` as `acceptance-report-<os>`.
-
-     Its first run is what confirms (or refutes) runner feasibility (ACCEPTANCE.md §1.2).
-  2. **`check.sh` and the six helper scripts:** `trace.py`, `inspect_check.py`,
-     `tree_eq.py` (including `--nfc`), `flip_sweep.py`, `truncate_sweep.py` and
-     `spec_hexdump.py`.
-  3. **The fixture generator** (`tools/fixturegen`, official `blake3` only) and the first
-     fixture set, for the owner to approve and pin (ACCEPTANCE.md §5).
-  4. **`EVIDENCE.md`,** kept current from the first CI run onward.
-- **`checks-v1`:** the owner reviews `check.sh`, the helper scripts, the workflow and the
-  fixtures together, before implementation of `chst-format` begins.
+1. **PLANNING, documents:** this document, FORMAT_SPEC.md and ACCEPTANCE.md, revised through
+   review rounds 1 and 2.
+2. **PLANNING, fixtures:** after the owner approves the round 2 changes. Build the generator
+   in `fixtures/gen/` and all fixtures. The worked example is regenerated from the generator
+   and must match FORMAT_SPEC §18 byte for byte (AC-META-6).
+3. **Independent review** of the documents and fixtures.
+4. **`plan-v1`:** the owner tags it. The phase changes to IMPLEMENTATION.
+5. **First implementation tasks:** `check.sh` with its helper scripts, then the CI workflow
+   file. Stop.
+6. **`checks-v1`:** the owner reviews `check.sh`, the helper scripts and the workflow. The
+   first full CI run confirms runner feasibility.
+7. **Core implementation,** task by task from TODO.md, until Core is done (ACCEPTANCE.md §2).
+8. **Extended,** after the owner changes the cut to Extended.
