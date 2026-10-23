@@ -1,0 +1,8 @@
+{
+  "rule": "KV-1",
+  "category": "malformed",
+  "detail": "kv.format",
+  "exit": 6,
+  "base": "kv",
+  "mutation": "KV_METADATA section with zero pairs (empty payload)"
+}

@@ -1,8 +1,6 @@
 {
   "rule": "PATH-9",
   "category": "malformed",
-  "exit": 6,
-  "details": [
-    "path.reserved-name"
-  ]
+  "detail": "path.reserved-name",
+  "exit": 6
 }

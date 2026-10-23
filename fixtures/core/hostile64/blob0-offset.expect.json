@@ -1,4 +1,7 @@
 {
+  "rule": "BLB-4",
+  "category": "malformed",
+  "detail": "blob.layout",
   "exit": 6,
   "base": "worked-example",
   "mutation": "blob[0].offset + 2^32",

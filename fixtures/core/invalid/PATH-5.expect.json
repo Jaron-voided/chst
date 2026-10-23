@@ -4,10 +4,5 @@
   "detail": "path.dot-segment",
   "exit": 6,
   "base": "worked-example",
-  "mutation": "directory 'docs/..' added",
-  "details": [
-    "path.dot-segment",
-    "path.trailing-dot-space"
-  ],
-  "note": "This change necessarily breaks more than one rule, and FORMAT_SPEC §13 lets steps 8-10 run in any order, so a reader may report any detail listed in 'details'."
+  "mutation": "directory 'docs/..' added"
 }

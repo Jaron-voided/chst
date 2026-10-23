@@ -1,0 +1,8 @@
+{
+  "rule": "PATH-2",
+  "category": "malformed",
+  "detail": "path.nfc",
+  "exit": 6,
+  "base": "worked-example",
+  "mutation": "directory 'docs/x𑏎́' added: NFC under Unicode 15.x, not NFC under 16.0 (U+113CE has ccc 9). Documents that PATH-2 is judged with Unicode 16.0 tables exactly (F12)."
+}

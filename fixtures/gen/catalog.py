@@ -77,6 +77,8 @@ VALID_CORE = {
     "deep": deep_entries,
     "long-names": long_names_entries,
     "sort-edge": lambda: [d("a"), f("a/b", b"slash\n"), f("a-b", b"dash\n"), f("a.b", b"dot\n")],
+    # F42: an allowed non-printing character (U+200B ZERO WIDTH SPACE), for list's text escaping
+    "nonprinting": lambda: [f("zero\u200bwidth.txt", b"zwsp\n")],
 }
 
 ATTRS = {"mtime_seconds": 1_700_000_000, "mtime_nanos": 500_000_000}
@@ -94,10 +96,39 @@ def zstd_mixed_entries(zeros=8192):
 
 KV_PAIRS = [("comment", "example archive"), ("creator", "chst fixture generator")]
 
+# A real Zstandard frame with one Compressed block and a content checksum (F39). It was produced
+# once by libzstd (level 19, checksum on) and is kept here as fixed bytes, so the build never
+# depends on a compressor. Its content is COMPRESSED_TEXT; readers must decode it to exactly that.
+COMPRESSED_TEXT = b"".join(b"line %04d: the quick brown fox jumps over the lazy dog\n" % i for i in range(160))
+COMPRESSED_FRAME = bytes.fromhex(
+    "28b52ffd6460211d0a000696351a6037a4030f253d94f450620641e49a947bcb9412032710a974053e002700"
+    "2900456221e1f0344b72acd1cac8669fd7710008100587c68640c384c105c44111e160b17064401c1c0f1810"
+    "13030703818285c461905071046cdb61f0a0d01064ee72a486a60c99998fa7c3d9d4e9e5e4f3dfeff9bd4c2e"
+    "261edf764dcf556a29e9f4755b760dc3d32cc9b1462b239b7d5ec76d5c15552952532f578bb52a222a4468e8"
+    "642a7154850a99bb5c292a01353465c8cc7c3c1dcea64e2f279fff7ecfef657231f1f8b66b7aae524b49a7af"
+    "dbb26b9158481880a1a81180f06163ff0ce037031248104010f8ff7f0401fe4b2a4924a9a412a94822492595"
+    "a492442229a92495249254d224a492442495a4922a23c8f33ccff3bc591bc7e5388ee38ca49244924a2a4945"
+    "24925452492a49245149455249224925f15dabd3548d00a42a30d919c1")
+
+
+def with_frame(entries, path, frame):
+    """layout() the entries, then store `path` as the given Zstandard frame (encoding 1)."""
+    p = layout(entries)
+    key = next(e["blob_key"] for e in p["entries"] if e["path"] == path.encode())
+    i = next(i for i, b in enumerate(p["blobs"]) if b["key"] == key)
+    replace_blob_data(p, i, frame, encoding=ENC_ZSTD)
+    p["header"]["required_flags"] |= chst.REQ_ZSTD
+    return p
+
+
+def compressed_entries():
+    return [f("text.txt", COMPRESSED_TEXT), f("tiny.txt", b"hi\n")]
+
 VALID_EXTENDED = {
     "zstd-mixed": (zstd_mixed_entries, {"compress": True}),
     "attrs": (attrs_entries, {"attrs": True}),
     "kv": (worked_example_entries, {"kv": KV_PAIRS}),
+    "zstd-compressed": (compressed_entries, {"frame": ("text.txt", COMPRESSED_FRAME)}),
 }
 
 
@@ -228,7 +259,7 @@ def core_invalid():
         ("ENT-4", "", WE_MUTATION, "entry[2] (docs/b.txt) blob_key = SHA-256('missing'), not in the blob table",
          lambda: m(lambda p: set_(p["entries"][2], blob_key=sha256(b"missing")))(we()), {}),
         ("ENT-5", "", WE_MUTATION, "entry[4] path_length = 10 (pool ends one byte earlier)",
-         lambda: m(lambda p: set_(p["entries"][4], path_length=10))(we()), {"allow": ["CAN-3"]}),
+         lambda: m(lambda p: set_(p["entries"][4], path_length=10))(we()), {}),
         ("ENT-6", "", WE_MUTATION, "directory entry 'docs' removed",
          lambda: plan_from([e for e in WE if e["path"] != b"docs"]), {}),
         ("ENT-6", "-2", "synthetic: file 'f'", "file 'f/g' added under the file 'f'",
@@ -242,9 +273,9 @@ def core_invalid():
         ("PATH-3", "-2", WE_MUTATION, "file with a 4097-byte path (16 x 255-byte segments + 'z') added, with its ancestors",
          lambda: plan_from(WE + with_ancestors([f("/".join(["c" * 255] * 16 + ["z"]), b"z\n")])), {}),
         ("PATH-4", "", WE_MUTATION, "directory 'docs//x' added (empty segment)",
-         lambda: plan_from(WE + [d("docs//x")]), {"allow": ["PATH-3", "ENT-6"]}),
+         lambda: plan_from(WE + [d("docs//x")]), {}),
         ("PATH-5", "", WE_MUTATION, "directory 'docs/..' added",
-         lambda: plan_from(WE + [d("docs/..")]), {"allow": ["PATH-8"]}),
+         lambda: plan_from(WE + [d("docs/..")]), {}),
         ("PATH-6", "", WE_MUTATION, "directory 'docs/a\\x01' added",
          lambda: plan_from(WE + [d("docs/a\x01")]), {}),
         ("PATH-7", "", WE_MUTATION, "directory 'docs/a:b' added",
@@ -267,6 +298,43 @@ def core_invalid():
          lambda: m(swap_blobs)(we()), {}),
         ("CAN-3", "", WE_MUTATION, "first two paths swapped inside the path pool; their offsets updated to match",
          lambda: m(scramble_pool)(we()), {}),
+        # ---- sub-conditions (F35) and review round 6 additions
+        ("TRL-2", "-low", WE_MUTATION, "trailer index_offset = 16 (below the 32-byte header)",
+         lambda: m(lambda p: set_(p["trailer"], index_offset=16))(we()), {}),
+        ("TRL-2", "-overflow", WE_MUTATION, "trailer index_length = 2^64 - 100 (offset + length overflows)",
+         lambda: m(lambda p: set_(p["trailer"], index_length=2 ** 64 - 100))(we()), {}),
+        ("SEC-1", "-straddle", WE_MUTATION, "8 bytes appended to the index: a section header cut off by the index end",
+         lambda: m(lambda p: set_(p, index_append=b"\x00" * 8))(we()), {}),
+        ("SEC-3", "-repeat", WE_MUTATION, "a second BLOB_TABLE section (type 0x80000001, zero records) after PATH_POOL",
+         lambda: m(lambda p: p["extra_sections"].append({"type": chst.SEC_BLOB_TABLE, "record_size": 64, "payload": b""}))(we()), {}),
+        ("SEC-5", "-entry", WE_MUTATION, "ENTRY_TABLE record_size = 64 (zero tails), no flags set",
+         lambda: m(lambda p: set_(p["entry_section"], record_size=64))(we()), {}),
+        ("BLB-4", "-zero-blobs", "dirs-only", "one stray data byte added: no blobs, but index_offset = 33",
+         lambda: m(lambda p: set_(p, data_override=b"x"))(layout(VALID_CORE["dirs-only"]())), {}),
+        ("BLB-4", "-short-last", WE_MUTATION, "one stray byte after the last blob (last blob ends at 41, index at 42)",
+         lambda: m(lambda p: set_(p, data_override=b"hello\nhi\n\x00"))(we()), {}),
+        ("ENT-1", "-type0", WE_MUTATION, "entry[2] (docs/b.txt) type = 0",
+         lambda: m(lambda p: set_(p["entries"][2], type=0))(we()), {}),
+        ("PATH-2", "-unicode16", WE_MUTATION,
+         "directory 'docs/x\u0301\U000113ce' added: NFC under Unicode 15.x, not NFC under 16.0 "
+         "(U+113CE has ccc 9). Documents that PATH-2 is judged with Unicode 16.0 tables exactly (F12).",
+         lambda: plan_from(WE + [d("docs/x\u0301\U000113ce")]), {}),
+        ("PATH-3", "-empty", WE_MUTATION, "directory with the empty path (path_length 0) added",
+         lambda: plan_from(WE + [d(b"")]), {}),
+        ("PATH-6", "-c1", WE_MUTATION, "directory 'docs/a\u0085b' added (C1 control NEL)",
+         lambda: plan_from(WE + [d("docs/a\u0085b")]), {}),
+        ("PATH-6", "-bidi", WE_MUTATION, "directory 'docs/a\u202eb' added (RIGHT-TO-LEFT OVERRIDE)",
+         lambda: plan_from(WE + [d("docs/a\u202eb")]), {}),
+        ("PATH-6", "-isolate", WE_MUTATION, "directory 'docs/a\u2066b' added (LEFT-TO-RIGHT ISOLATE)",
+         lambda: plan_from(WE + [d("docs/a\u2066b")]), {}),
+        ("PATH-9", "-com0", WE_MUTATION, "directory 'docs/COM0' added",
+         lambda: plan_from(WE + [d("docs/COM0")]), {}),
+        ("PATH-9", "-com1sup", WE_MUTATION, "directory 'docs/COM\u00b9' added", lambda: plan_from(WE + [d("docs/COM\u00b9")]), {}),
+        ("PATH-9", "-com2sup", WE_MUTATION, "directory 'docs/COM\u00b2' added", lambda: plan_from(WE + [d("docs/COM\u00b2")]), {}),
+        ("PATH-9", "-com3sup", WE_MUTATION, "directory 'docs/COM\u00b3' added", lambda: plan_from(WE + [d("docs/COM\u00b3")]), {}),
+        ("PATH-9", "-lpt1sup", WE_MUTATION, "directory 'docs/lpt\u00b9.txt' added", lambda: plan_from(WE + [d("docs/lpt\u00b9.txt")]), {}),
+        ("PATH-9", "-lpt2sup", WE_MUTATION, "directory 'docs/LPT\u00b2' added", lambda: plan_from(WE + [d("docs/LPT\u00b2")]), {}),
+        ("PATH-9", "-lpt3sup", WE_MUTATION, "directory 'docs/LPT\u00b3' added", lambda: plan_from(WE + [d("docs/LPT\u00b3")]), {}),
         ("LIM-3", "", WE_MUTATION, "none (5 entries); limit lowered to 4",
          lambda: we(), {"args": ["--max-entries", "4"], "limits": {"entries": 4}}),
         ("LIM-4", "", WE_MUTATION, "none (index is 459 bytes); limit lowered to 458",
@@ -313,7 +381,47 @@ def extended_invalid():
              layout(worked_example_entries(), kv=KV_PAIRS)), {}),
         ("FLG-1", "", WE_MUTATION, "optional flag KV_METADATA set, no KV_METADATA section",
          lambda: m(lambda p: set_(p["header"], optional_flags=chst.OPT_KV_METADATA))(we()), {}),
+        # ---- sub-conditions (F35) and review round 6 additions
+        ("FLG-1", "-kv-section-no-flag", "kv", "KV_METADATA section present, optional flag KV_METADATA cleared",
+         lambda: m(lambda p: set_(p["header"], optional_flags=0))(layout(worked_example_entries(), kv=KV_PAIRS)), {}),
+        ("FLG-1", "-zstd-unused", WE_MUTATION, "required flag ZSTD set, but every blob is stored",
+         lambda: m(lambda p: set_(p["header"], required_flags=chst.REQ_ZSTD))(we()), {}),
+        ("ATT-1", "-mode", "attrs", "entry[1] mode = 0o1000 (above 0o777)",
+         lambda: m(lambda p: set_(p["entries"][1], tail=struct.pack("<qIH2x", ATTRS["mtime_seconds"], 0, 0o1000)))(
+             layout(attrs_entries(), attrs=True)), {}),
+        ("ATT-1", "-reserved", "attrs", "entry[1] attribute reserved bytes = 01 00",
+         lambda: m(lambda p: set_(p["entries"][1], tail=struct.pack("<qIH", ATTRS["mtime_seconds"], 0, 0o644) + b"\x01\x00"))(
+             layout(attrs_entries(), attrs=True)), {}),
+        ("KV-1", "-empty", "kv", "KV_METADATA section with zero pairs (empty payload)", lambda: kv_raw(b""), {}),
+        ("KV-1", "-utf8", "kv", "value bytes 'ab\\xff' (invalid UTF-8)", lambda: kv_raw(kv_pair(b"comment", b"ab\xff")), {}),
+        ("KV-1", "-keylen0", "kv", "a pair with an empty key", lambda: kv_raw(kv_pair(b"", b"x")), {}),
+        ("KV-1", "-keylen256", "kv", "a pair with a 256-byte key", lambda: kv_raw(kv_pair(b"k" * 256, b"x")), {}),
+        ("KV-1", "-value-too-long", "kv", "a pair with a 65537-byte value", lambda: kv_raw(kv_pair(b"comment", b"v" * 65537)), {}),
+        ("KV-1", "-truncated", "kv", "last pair cut off inside its value", lambda: kv_raw(kv_pair(b"comment", b"hello")[:-2]), {}),
+        ("KV-1", "-duplicate", "kv", "key 'comment' twice", lambda: kv_raw(kv_pair(b"comment", b"a") + kv_pair(b"comment", b"b")), {}),
+        ("SEC-4", "-kv", "kv", "KV_METADATA record_size = 2 (must be exactly 1)",
+         lambda: m(lambda p: set_(p["extra_sections"][0], record_size=2))(
+             layout(worked_example_entries(), kv=[("comment", "ab"), ("creator", "cd")])), {}),
+        ("ZST-2", "-window", "zstd-mixed", "zeros.bin as a frame declaring a 2 GiB window (limit 8 MiB)",
+         lambda: m(lambda p: replace_blob_data(p, blob_index(p, ENC_ZSTD), chst.zstd_frame_custom(b"\x00" * 8192, window_log=31)))(zstd_plan()), {}),
+        ("ZST-2", "-dictid", "zstd-mixed", "zeros.bin as a frame naming Dictionary_ID 1",
+         lambda: m(lambda p: replace_blob_data(p, blob_index(p, ENC_ZSTD), chst.zstd_frame_custom(b"\x00" * 8192, window_log=13, dict_id=1)))(zstd_plan()), {}),
+        ("ZST-2", "-short", "zstd-mixed", "zeros.bin stored as 3 bytes with encoding 1 (shorter than any frame)",
+         lambda: m(lambda p: replace_blob_data(p, blob_index(p, ENC_ZSTD), chst.ZSTD_MAGIC[:3]))(zstd_plan()), {}),
+        ("ZST-2", "-checksum", "zstd-compressed", "last byte of the frame's content checksum XORed with 0x01",
+         lambda: with_frame(compressed_entries(), "text.txt", COMPRESSED_FRAME[:-1] + bytes([COMPRESSED_FRAME[-1] ^ 1])), {}),
     ]
+
+
+def kv_pair(k, v):
+    return struct.pack("<H", len(k)) + k + struct.pack("<I", len(v)) + v
+
+
+def kv_raw(payload):
+    """worked-example with a KV_METADATA section holding exactly `payload`."""
+    p = layout(worked_example_entries(), kv=KV_PAIRS)
+    p["extra_sections"][0]["payload"] = payload
+    return p
 
 
 # ---------------------------------------------------------------- attacks, hostile, compat
@@ -339,6 +447,8 @@ def attacks():
         ("trailing-space", "PATH-8", one("x ")),
         ("nul-char", "PATH-6", one("a\x00b")),
         ("control-char", "PATH-6", one("a\x1fb")),
+        ("c1-control", "PATH-6", one("a\u0085b")),
+        ("bidi-override", "PATH-6", one("invoice\u202efdp.exe")),
         ("case-collision", "PATH-11", lambda: layout([f("A", b"upper\n"), f("a", b"lower\n")])),
         ("file-as-parent", "ENT-6", lambda: layout([f("f", b"x\n"), f("f/g", b"y\n")])),
         ("missing-parent", "ENT-6", lambda: layout([f("d/x", b"x\n")])),
@@ -351,13 +461,13 @@ TWO32 = 2 ** 32
 
 def hostile():
     return [
-        ("index-length-huge", "trailer index_length = 2^64 - 100",
+        ("index-length-huge", "TRL-2", "trailer index_length = 2^64 - 100",
          lambda: m(lambda p: set_(p["trailer"], index_length=2 ** 64 - 100))(we())),
-        ("record-count-2e60", "BLOB_TABLE record_count = 2^60",
+        ("record-count-2e60", "SEC-1", "BLOB_TABLE record_count = 2^60",
          lambda: m(lambda p: set_(p["blob_section"], record_count=2 ** 60))(we())),
-        ("entries-2e32", "ENTRY_TABLE record_count = 2^32",
+        ("entries-2e32", "SEC-1", "ENTRY_TABLE record_count = 2^32",
          lambda: m(lambda p: set_(p["entry_section"], record_count=TWO32))(we())),
-        ("path-length-max", "entry[4] path_length = 2^32 - 1",
+        ("path-length-max", "ENT-5", "entry[4] path_length = 2^32 - 1",
          lambda: m(lambda p: set_(p["entries"][4], path_length=TWO32 - 1))(we())),
     ]
 
@@ -374,7 +484,7 @@ def hostile64():
         ("blob0-stored-and-raw", "blob[0].stored_length and raw_length + 2^32", ["BLB-4"],
          m(plus(lambda p: p["blobs"][0], "stored_length", "raw_length"))),
         ("blob0-raw", "blob[0].raw_length + 2^32", ["BLB-3"], m(plus(lambda p: p["blobs"][0], "raw_length"))),
-        ("entry1-path-offset", "entry[1].path_offset + 2^32", ["ENT-5", "CAN-3"],
+        ("entry1-path-offset", "entry[1].path_offset + 2^32", ["ENT-5"],
          m(plus(lambda p: p["entries"][1], "path_offset"))),
         ("blob-table-count", "BLOB_TABLE record_count + 2^32", ["SEC-1"],
          m(lambda p: set_(p["blob_section"], record_count=len(p["blobs"]) + TWO32))),

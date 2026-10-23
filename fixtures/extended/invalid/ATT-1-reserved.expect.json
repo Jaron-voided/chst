@@ -1,0 +1,8 @@
+{
+  "rule": "ATT-1",
+  "category": "malformed",
+  "detail": "attrs.range",
+  "exit": 6,
+  "base": "attrs",
+  "mutation": "entry[1] attribute reserved bytes = 01 00"
+}

@@ -25,43 +25,47 @@ python3.14 -I fixtures/gen/gen.py worked-example-hexdump
 
 ## Guarantees checked on every build
 
-- **Valid fixtures:** the checker finds no violation.
-- **Bad fixtures:** each one changes one thing in a valid base, and the checker finds the
-  targeted rule and nothing else. The only exceptions are where the spec makes a second
-  violation unavoidable; those list every acceptable detail in `details`.
+- **Valid fixtures:** the checker finds no violation, with an Extended reader and, for
+  `core/valid`, with a Core-only reader too.
+- **Bad fixtures:** each one changes one thing in a valid base. The **first** violation in
+  FORMAT_SPEC §13's total order must be the targeted rule. That's the only one a conforming
+  reader may report, so each `expect.json` has exactly one `detail`. Later violations, if
+  any, are recorded in `also_violates` for information only.
+- **No early stopping:** the checker evaluates every step-8 to step-11 rule it can, instead
+  of stopping at the first one, so such co-violations are visible. A file that hits HDR-6
+  or SEC-2 is the exception: nothing further is evaluated for it (§13).
+- **Expected values come from the catalog:** for attacks and hostile fixtures, the expected
+  rule is written in `catalog.py`, never taken from the checker's output.
+- **Compatibility:** compat expectations are proven by running the checker as a Core-only
+  reader (`reader="core"`). Their reports are that reader's view (Appendix B).
 - **Reaching the rule:** the structure hash is recomputed after every mutation, so the reader
   reaches the targeted rule (TRL-3's own fixture excepted). Blob keys and entry references
   are recomputed whenever stored bytes change.
 - **Worked example:** `core/valid/worked-example/container.chst` must equal the hex dump in
   FORMAT_SPEC §18.3 byte for byte, or the build fails.
 - **Reproducible output:** no timestamps, no unseeded randomness. Pseudo-random file content
-  comes from SHA-256 in counter mode.
+  comes from SHA-256 in counter mode. `materialize --reverse` is seeded from
+  `CHST_DET_SEED` (default `chst-det-1`) and prints the seed.
 - **`MANIFEST.sha256`** lists every file under `fixtures/`, including this directory.
 
-## Choices the spec left open
+## Zstandard
 
-The independent review should confirm or reject each of these.
+- **The generator's own frames:** it writes Raw and RLE blocks only, independent of any
+  zstd library.
+- **One real Compressed-block frame:** `catalog.COMPRESSED_FRAME`, with a content checksum,
+  was produced once by libzstd and is embedded as fixed bytes. It proves readers handle real
+  compressed frames.
+- **Checking frames:** the checker parses frame headers itself (RFC 8878: window, dictionary
+  ID, content size). To decode Compressed blocks and verify checksums it uses the standard
+  library's `compression.zstd`. That's decoding only; the generator never compresses with
+  it.
 
-1. **inspect report shape.** *Resolved in review round 5:* FORMAT_SPEC Appendix B now
-   defines it exactly, and the generator follows that definition.
-2. **CAN-2 and unreferenced blobs.** CAN-2 is read as applying to referenced blobs, which
-   must come first and in first-reference order. Unreferenced blobs are BLB-7's concern
-   only. With that reading, the BLB-5 (duplicate key) and BLB-7 fixtures each break one rule.
-3. **Zstandard frames** are written with Raw and RLE blocks only, by the generator itself;
-   no zstd package is used. They're valid RFC 8878
-   frames (libzstd decodes them), deterministic, and independent of libzstd. Fixture trees
-   are chosen so both this writer and a real compressor make the same stored-or-compressed
-   decision: long zero runs compress, while random data and tiny files stay stored.
-4. **Unavoidable double violations** (recorded in each fixture's `details`):
-   - ENT-5 together with CAN-3;
-   - PATH-4 together with PATH-3 (an empty segment) and ENT-6;
-   - PATH-5 together with PATH-8 (`.` and `..` end in a dot);
-   - the hostile64 path-offset trap (ENT-5 together with CAN-3).
-5. **Rules with no small single-violation fixture.**
-   - **LIM-1:** an entry count over 2³²−1 can't fit within SEC-1's bounds in a small file,
-     and SEC-1 is checked first.
-   - **LIM-2:** an index over 2³² bytes needs a file of over 4 GiB.
+## Readings recorded for review
 
-   Both are reported as open items instead of being faked.
-6. **FLG-1 and LIM-6** concern Extended features (flags, encoded blobs), so their fixtures
-   live under `extended/invalid/`.
+- **Conditions no fixture can reach**, because an earlier rule always fires first (listed in
+  ACCEPTANCE AC-NEG-1):
+  - FLG-1 for an encoded blob without the `ZSTD` flag (BLB-2 fires first);
+  - FLG-1 for `ENTRY_ATTRS` in either direction (SEC-5 fires first).
+- **LIM-2's fixture** is a sparse recipe (`core/invalid/LIM-2.recipe.json`), because the
+  index has to exceed 2³² bytes. The generator proves it against steps 1–6, using only the
+  header, the trailer and the file length.

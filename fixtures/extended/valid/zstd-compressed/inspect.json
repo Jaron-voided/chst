@@ -1,0 +1,359 @@
+{
+  "schema": "chst-report/1",
+  "command": "inspect",
+  "ok": true,
+  "error": null,
+  "warnings": [],
+  "file_length": 716,
+  "header": {
+    "offset": 0,
+    "length": 32,
+    "fields": [
+      {
+        "name": "magic",
+        "offset": 0,
+        "length": 8,
+        "value": "434853540d0a1a00"
+      },
+      {
+        "name": "major_version",
+        "offset": 8,
+        "length": 2,
+        "value": 1
+      },
+      {
+        "name": "minor_version",
+        "offset": 10,
+        "length": 2,
+        "value": 0
+      },
+      {
+        "name": "hash_alg",
+        "offset": 12,
+        "length": 1,
+        "value": 1
+      },
+      {
+        "name": "reserved",
+        "offset": 13,
+        "length": 3,
+        "value": "000000"
+      },
+      {
+        "name": "required_flags",
+        "offset": 16,
+        "length": 8,
+        "value": 1
+      },
+      {
+        "name": "optional_flags",
+        "offset": 24,
+        "length": 8,
+        "value": 0
+      }
+    ]
+  },
+  "data": {
+    "offset": 32,
+    "length": 340,
+    "fields": [
+      {
+        "name": "blob[0].data",
+        "offset": 32,
+        "length": 337
+      },
+      {
+        "name": "blob[1].data",
+        "offset": 369,
+        "length": 3
+      }
+    ]
+  },
+  "sections": [
+    {
+      "type": "0x80000001",
+      "name": "BLOB_TABLE",
+      "offset": 372,
+      "length": 144,
+      "record_size": 64,
+      "record_count": 2,
+      "fields": [
+        {
+          "name": "type",
+          "offset": 372,
+          "length": 4,
+          "value": 2147483649
+        },
+        {
+          "name": "record_size",
+          "offset": 376,
+          "length": 4,
+          "value": 64
+        },
+        {
+          "name": "record_count",
+          "offset": 380,
+          "length": 8,
+          "value": 2
+        }
+      ],
+      "records": [
+        {
+          "index": 0,
+          "offset": 388,
+          "length": 64,
+          "fields": [
+            {
+              "name": "key",
+              "offset": 388,
+              "length": 32,
+              "value": "dbc89ef79f50fffa61fc7d0dba04e01796f49b59a38b7a9dbaef975817011c1d"
+            },
+            {
+              "name": "offset",
+              "offset": 420,
+              "length": 8,
+              "value": 32
+            },
+            {
+              "name": "stored_length",
+              "offset": 428,
+              "length": 8,
+              "value": 337
+            },
+            {
+              "name": "raw_length",
+              "offset": 436,
+              "length": 8,
+              "value": 8800
+            },
+            {
+              "name": "encoding",
+              "offset": 444,
+              "length": 1,
+              "value": 1
+            },
+            {
+              "name": "reserved",
+              "offset": 445,
+              "length": 7,
+              "value": "00000000000000"
+            }
+          ]
+        },
+        {
+          "index": 1,
+          "offset": 452,
+          "length": 64,
+          "fields": [
+            {
+              "name": "key",
+              "offset": 452,
+              "length": 32,
+              "value": "98ea6e4f216f2fb4b69fff9b3a44842c38686ca685f3f55dc48c5d3fb1107be4"
+            },
+            {
+              "name": "offset",
+              "offset": 484,
+              "length": 8,
+              "value": 369
+            },
+            {
+              "name": "stored_length",
+              "offset": 492,
+              "length": 8,
+              "value": 3
+            },
+            {
+              "name": "raw_length",
+              "offset": 500,
+              "length": 8,
+              "value": 3
+            },
+            {
+              "name": "encoding",
+              "offset": 508,
+              "length": 1,
+              "value": 0
+            },
+            {
+              "name": "reserved",
+              "offset": 509,
+              "length": 7,
+              "value": "00000000000000"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "0x80000002",
+      "name": "ENTRY_TABLE",
+      "offset": 516,
+      "length": 112,
+      "record_size": 48,
+      "record_count": 2,
+      "fields": [
+        {
+          "name": "type",
+          "offset": 516,
+          "length": 4,
+          "value": 2147483650
+        },
+        {
+          "name": "record_size",
+          "offset": 520,
+          "length": 4,
+          "value": 48
+        },
+        {
+          "name": "record_count",
+          "offset": 524,
+          "length": 8,
+          "value": 2
+        }
+      ],
+      "records": [
+        {
+          "index": 0,
+          "offset": 532,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 532,
+              "length": 8,
+              "value": 0
+            },
+            {
+              "name": "path_length",
+              "offset": 540,
+              "length": 4,
+              "value": 8
+            },
+            {
+              "name": "type",
+              "offset": 544,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 545,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 548,
+              "length": 32,
+              "value": "dbc89ef79f50fffa61fc7d0dba04e01796f49b59a38b7a9dbaef975817011c1d"
+            }
+          ]
+        },
+        {
+          "index": 1,
+          "offset": 580,
+          "length": 48,
+          "fields": [
+            {
+              "name": "path_offset",
+              "offset": 580,
+              "length": 8,
+              "value": 8
+            },
+            {
+              "name": "path_length",
+              "offset": 588,
+              "length": 4,
+              "value": 8
+            },
+            {
+              "name": "type",
+              "offset": 592,
+              "length": 1,
+              "value": 2
+            },
+            {
+              "name": "reserved",
+              "offset": 593,
+              "length": 3,
+              "value": "000000"
+            },
+            {
+              "name": "blob_key",
+              "offset": 596,
+              "length": 32,
+              "value": "98ea6e4f216f2fb4b69fff9b3a44842c38686ca685f3f55dc48c5d3fb1107be4"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "0x80000003",
+      "name": "PATH_POOL",
+      "offset": 628,
+      "length": 32,
+      "record_size": 1,
+      "record_count": 16,
+      "fields": [
+        {
+          "name": "type",
+          "offset": 628,
+          "length": 4,
+          "value": 2147483651
+        },
+        {
+          "name": "record_size",
+          "offset": 632,
+          "length": 4,
+          "value": 1
+        },
+        {
+          "name": "record_count",
+          "offset": 636,
+          "length": 8,
+          "value": 16
+        },
+        {
+          "name": "payload",
+          "offset": 644,
+          "length": 16,
+          "value": "text.txttiny.txt"
+        }
+      ],
+      "records": []
+    }
+  ],
+  "trailer": {
+    "offset": 660,
+    "length": 56,
+    "fields": [
+      {
+        "name": "index_offset",
+        "offset": 660,
+        "length": 8,
+        "value": 372
+      },
+      {
+        "name": "index_length",
+        "offset": 668,
+        "length": 8,
+        "value": 288
+      },
+      {
+        "name": "structure_hash",
+        "offset": 676,
+        "length": 32,
+        "value": "94fd0a1f2b9be1d07c372f778bf51a760977714ff280598aaaef9dc64dea27a8"
+      },
+      {
+        "name": "trailer_magic",
+        "offset": 708,
+        "length": 8,
+        "value": "001a0a0d54534843"
+      }
+    ]
+  }
+}

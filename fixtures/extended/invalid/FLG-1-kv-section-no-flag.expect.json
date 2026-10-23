@@ -1,0 +1,8 @@
+{
+  "rule": "FLG-1",
+  "category": "malformed",
+  "detail": "flag.mismatch",
+  "exit": 6,
+  "base": "kv",
+  "mutation": "KV_METADATA section present, optional flag KV_METADATA cleared"
+}

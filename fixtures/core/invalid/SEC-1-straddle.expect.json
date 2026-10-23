@@ -1,0 +1,8 @@
+{
+  "rule": "SEC-1",
+  "category": "malformed",
+  "detail": "sec.bounds",
+  "exit": 6,
+  "base": "worked-example",
+  "mutation": "8 bytes appended to the index: a section header cut off by the index end"
+}

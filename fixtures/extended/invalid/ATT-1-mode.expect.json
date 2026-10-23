@@ -1,0 +1,8 @@
+{
+  "rule": "ATT-1",
+  "category": "malformed",
+  "detail": "attrs.range",
+  "exit": 6,
+  "base": "attrs",
+  "mutation": "entry[1] mode = 0o1000 (above 0o777)"
+}

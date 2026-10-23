@@ -61,7 +61,7 @@ index and the first 16 bytes of the trailer are covered by the structure hash (�
 |---|---|---|---|
 | 0 | 8 | `magic` | `43 48 53 54 0D 0A 1A 00` (ASCII `CHST`, CR, LF, SUB, NUL) |
 | 8 | 2 | `major_version` | `1` |
-| 10 | 2 | `minor_version` | `0` for this document. Informational: readers MUST accept any value |
+| 10 | 2 | `minor_version` | `0`. Writers MUST write 0 unless a later revision of this specification changes the encoding. Readers MUST accept any value (F32) |
 | 12 | 1 | `hash_alg` | `1` = SHA-256 (§12.4) |
 | 13 | 3 | `reserved` | Zero |
 | 16 | 8 | `required_flags` | Bit set of required features (§12.1). Core files: 0 |
@@ -73,7 +73,9 @@ Rules:
 - **HDR-2** `magic` MUST equal the value above.
 - **HDR-3** `major_version` MUST be 1. A reader MUST reject any other value without
   interpreting the rest of the file.
-- **HDR-4** `hash_alg` MUST be an algorithm the reader implements.
+- **HDR-4** `hash_alg` MUST be an algorithm the reader implements. Every `hash_alg` value
+  has a 32-byte output, because keys are 32 bytes in every record. A different width needs a
+  new major version.
 - **HDR-5** `reserved` MUST be zero.
 - **HDR-6** Every bit set in `required_flags` MUST be a feature the reader implements.
 - Bits set in `optional_flags` that the reader does not know MUST be ignored. That is not
@@ -118,13 +120,15 @@ Rules:
 - **SEC-2** A section whose `type` is unknown to the reader and has the must-understand
   bit set makes the file unsupported. An unknown section without that bit MUST be skipped.
 - **SEC-3** The first three sections MUST be `BLOB_TABLE`, `ENTRY_TABLE` and `PATH_POOL`,
-  each exactly once, in that order. Any further sections MUST follow in strictly ascending
-  order of their `type` value, so each type appears at most once.
-- **SEC-4** `record_size` MUST be at least the base size for the section type (§12.3).
-  For `PATH_POOL` it MUST be exactly 1.
-- **SEC-5** If the reader knows every flag set in the header, each known section's
-  `record_size` MUST equal the size defined for those flags (§12.3). Otherwise a reader
-  MUST accept a larger `record_size` and ignore the extra bytes in each record.
+  in that order. Sections after the first three MUST have strictly ascending `type` values,
+  compared as u32 among themselves, and none of them may have one of the first three types.
+- **SEC-4** For each section type the reader implements, `record_size` MUST be at least the
+  base size for that type (§12.3). For `PATH_POOL` and `KV_METADATA` it MUST be exactly 1,
+  because their payloads are byte streams.
+- **SEC-5** If `record_size` satisfies SEC-4 and the reader knows every flag set in the
+  header, each known section's `record_size` MUST equal the size defined for those flags
+  (§12.3). Otherwise a reader MUST accept a larger `record_size` for BLOB_TABLE and
+  ENTRY_TABLE, and ignore the extra bytes in each record.
 
 Sections defined in 1.0 (registry in §12.3):
 
@@ -151,8 +155,9 @@ Each BLOB_TABLE record (base size 64) describes one stored byte sequence. [D2]
 Rules:
 
 - **BLB-1** `reserved` MUST be zero.
-- **BLB-2** `encoding` MUST be 0, or 1 when the `ZSTD` required flag is set. No other
-  value is defined.
+- **BLB-2** `encoding` MUST be 0, or 1 when the `ZSTD` required flag is set and the reader
+  implements `ZSTD`. No other value is defined. (A reader that doesn't implement `ZSTD`
+  never reaches this rule for such a file: HDR-6 stops it first, §13.)
 - **BLB-3** If `encoding` is 0, then `stored_length` MUST equal `raw_length`.
 - **BLB-4** The blobs MUST tile the data region in table order. Blob 0 has `offset` 32.
   Each next blob's `offset` is the previous `offset + stored_length`. The last blob ends
@@ -203,15 +208,28 @@ maximal substring between `/` characters.
 
 - **PATH-1** The path MUST be valid UTF-8 (no overlong forms, surrogates or values above
   U+10FFFF).
-- **PATH-2** The path MUST be in Unicode Normalization Form C (NFC). It must be unchanged
-  by NFC normalisation under the implementation's Unicode tables, which MUST be Unicode
-  15.1 or later.
+- **PATH-2** The path MUST be in Unicode Normalization Form C (NFC): unchanged by NFC
+  normalisation using **exactly the Unicode 16.0 tables**. Every reader and writer MUST use
+  those tables, so conforming tools agree on every path. Tools outside this specification
+  (operating systems, file managers, newer libraries) may judge code points added after
+  Unicode 16.0 differently. The fixture `core/invalid/PATH-2-unicode16` holds a path that
+  Unicode 15.x and 16.0 judge differently: `x` U+0301 U+113CE is NFC under 15.x, but not
+  under 16.0.
 - **PATH-3** The path length MUST be 1–4096 bytes, and every segment 1–255 bytes.
 - **PATH-4** The path MUST NOT begin or end with `/`, and MUST NOT contain `//`.
 - **PATH-5** No segment may be `.` or `..`.
-- **PATH-6** No code point in U+0000–U+001F or U+007F.
+- **PATH-6** No control or directional-formatting code point:
+  - U+0000–U+001F, U+007F and the C1 controls U+0080–U+009F;
+  - the bidirectional embedding, override and isolate characters U+202A–U+202E and
+    U+2066–U+2069.
+
+  The bidirectional characters can make an extracted name display as something else in
+  every file manager (for example `invoice` + U+202E + `fdp.exe` displays as `invoiceexe.pdf`). Ordinary right-to-left names use
+  right-to-left letters, not these characters, so they're unaffected. (For bytes that aren't
+  valid UTF-8, PATH-1 applies first.)
 - **PATH-7** None of the characters `\ < > : " | ? *`.
-- **PATH-8** No segment may end in `.` or ` ` (U+0020).
+- **PATH-8** No segment other than `.` and `..` may end in `.` or ` ` (U+0020). (`.` and
+  `..` are PATH-5's concern.)
 - **PATH-9** No segment's **stem** may be a Windows reserved device name. The stem is the
   part before the first `.` (or the whole segment if it has none), with any trailing
   spaces removed, so `CON .txt` counts as `CON`. The comparison is ASCII-case-insensitive,
@@ -233,12 +251,14 @@ the per-platform consequences.
 
 | Rule | Quantity | Maximum |
 |---|---|---|
-| **LIM-1** | ENTRY_TABLE `record_count` | 2³² − 1 |
 | **LIM-2** | `index_length` | 2³² bytes |
 | PATH-3 | Path length / segment length | 4096 / 255 bytes |
 | PATH-10 | Path depth | 256 |
 
 Blob lengths are bounded only by u64 and TRL-2/BLB-4.
+
+**LIM-1 is retired (F7).** The entry count is already bounded by LIM-2 together with SEC-4:
+at most ⌊2³² / 48⌋ = 89,478,485 entries fit in an index. The rule ID isn't reused.
 
 ### 10.2 Configurable limits (violation → `limit-exceeded`)
 
@@ -249,8 +269,10 @@ the values shown, so every conforming reader accepts files within the defaults.
 |---|---|---|---|
 | **LIM-3** | Number of entries | 1,048,576 | all |
 | **LIM-4** | `index_length` | 268,435,456 (256 MiB) | all |
-| **LIM-5** | Total logical size: the sum, over **every file entry**, of the `raw_length` of the blob it references | 68,719,476,736 (64 GiB) | verify, extract |
-| **LIM-6** | `raw_length / stored_length` for an encoded blob (Extended) | 1000 | all |
+| **LIM-5** | Total logical size: the sum, over **every file entry**, of the `raw_length` of the blob it references, computed without overflow (a sum of 2⁶⁴ or more exceeds every limit) | 68,719,476,736 (64 GiB) | verify, extract |
+| **LIM-6** | Compression ratio of an encoded blob (Extended): violated if and only if `raw_length > limit × stored_length`, computed without overflow (an overflow is a violation) | 1000 | all |
+
+The CLI flag for each limit is in Appendix C.
 
 **LIM-5 counts each reference again.** If 1,000 file entries share one 1 MiB blob, they
 contribute 1,000 MiB, not 1 MiB, even though the blob is stored once. This is the only
@@ -272,8 +294,10 @@ A writer MUST produce, and a reader MUST require, exactly one encoding per input
   unsigned bytes. A shorter prefix sorts first. Strictness forbids duplicates. Because a
   parent's path is a prefix of its children's paths, parents always precede their
   descendants.
-- **CAN-2** Blobs MUST appear in first-reference order. Walking file entries in entry
-  order, the first reference to each not-yet-seen key gives the next blob.
+- **CAN-2** Let K be the distinct keys referenced by file entries, in order of first
+  reference (walking entries in entry order). The first |K| blob records MUST have exactly
+  the keys K, in that order. Any further records are unreferenced (BLB-7) or have duplicate
+  keys (BLB-5), and aren't CAN-2 violations.
 - **CAN-3** Each entry's `path_offset` MUST equal the sum of the `path_length`s of all
   preceding entries. The PATH_POOL payload length MUST equal the sum of all `path_length`s.
 - **FLG-1** A writer MUST set a known flag if and only if the file uses the corresponding
@@ -319,9 +343,18 @@ flag) · all others undefined.
 - A blob with `encoding` 1 contains exactly one complete Zstandard frame (RFC 8878),
   consuming exactly `stored_length` bytes. Skippable frames and trailing bytes are not
   allowed.
-- **ZST-1** Decoding MUST produce exactly `raw_length` bytes. A decoder MUST stop as soon
-  as output would exceed `raw_length`.
-- **ZST-2** The stored bytes MUST form exactly one valid complete frame as above.
+- **ZST-1** If the frame header has a Frame_Content_Size, it MUST equal `raw_length`.
+  Decoding MUST produce exactly `raw_length` bytes. A decoder MUST stop as soon as output
+  would exceed `raw_length`.
+- **ZST-2** The stored bytes MUST form exactly one valid, complete frame as above. In
+  addition:
+  - `stored_length` ≥ 4. This is checked in step 10, so no decoder ever sees a shorter blob.
+  - Window_Size MUST be ≤ 8 MiB (8,388,608 bytes). With Single_Segment_Flag set, the window
+    is Frame_Content_Size.
+  - Dictionary_ID MUST be absent or 0.
+  - If Content_Checksum_Flag is set, the checksum MUST match.
+  - Decoders MUST be configured to refuse larger windows (libzstd `ZSTD_d_windowLogMax` =
+    23), so memory is bounded whatever the header claims.
 - **ZST-3** For `encoding` 1, `stored_length < raw_length` MUST hold. A writer stores a blob
   compressed only if the result is strictly smaller.
 - The key still hashes the stored (compressed) bytes, so BLB-6 is checked without decoding.
@@ -340,62 +373,108 @@ The ENTRY_TABLE record size becomes 64. Bytes 0–47 are unchanged, followed by:
 - **ATT-1** `mtime_nanos` MUST be < 1,000,000,000. `mode` MUST be ≤ `0o777`. `reserved`
   MUST be zero.
 - Extractors MUST NOT set setuid, setgid or sticky bits.
+- **Applying attributes (F27).** An extractor applies each file's `mode` with `fchmod` on the
+  open handle, after writing its content. It applies directory modes, and every mtime
+  (files and directories), only after all entries are written, in reverse canonical order,
+  so creating children can't change a parent's mtime and a read-only directory can't block
+  its own children. Stored modes are applied as stored, masked with 0o777, and are **not**
+  subject to the umask. On Windows, modes are ignored and mtimes are applied.
 
 ### 12.7 Extended: KV metadata (`KV_METADATA`, optional)
 
 The KV_METADATA payload (record size 1) is a sequence of pairs. Each pair is
 `key_length` (u16) ‖ key (UTF-8) ‖ `value_length` (u32) ‖ value (UTF-8).
 
-- **KV-1** Each key MUST be 1–255 bytes of valid UTF-8, and each value at most 65,536 bytes
-  of valid UTF-8. Pairs MUST be in strictly ascending bytewise key order, which forbids
-  duplicates. The pairs MUST exactly fill the payload.
+- **KV-1** The payload MUST contain at least one pair: an empty section would be a second
+  encoding of "no metadata". Each key MUST be 1–255 bytes of valid UTF-8, and each value at
+  most 65,536 bytes of valid UTF-8. Pairs MUST be in strictly ascending bytewise key order,
+  which forbids duplicates. The pairs MUST exactly fill the payload.
 - Defined keys: `creator`, `comment`. Others MAY be used.
 
 ### 12.8 Extended: selective extract (#6) and exclude patterns (#7)
 
 These features change no bytes of the format. They define tool behaviour only.
 
-- **Patterns.** A pattern is matched against whole NFC entry paths.
-  - `*` matches any run of characters except `/`.
-  - `**` as a complete segment matches zero or more whole segments.
-  - `?` matches one character other than `/`.
-  - `[...]` is a character class.
+- **Patterns.** A pattern is converted to NFC, then matched against whole entry paths, which
+  are NFC. Matching works on code points and is case-sensitive.
+  - `*` matches any run of code points (possibly none) other than `/`.
+  - `?` matches exactly one code point other than `/`.
+  - `[...]` matches one code point from a set of literal code points and `x-y` ranges,
+    ordered by code point. A leading `!` negates the set. A class never matches `/`.
+  - `**` as a complete segment matches zero or more whole segments, so `a/**` matches `a`
+    and everything under it.
   - A pattern with no wildcard matches exactly that path.
-  - Matching is case-sensitive, byte-for-byte on the NFC form.
-- **Selective extract.** The selected entries are those matched by at least one pattern,
-  together with every entry under a selected directory and every ancestor directory of a
-  selected entry. EXT-1 … EXT-9 apply unchanged, including the fresh-destination rule.
-  LIM-5 counts only the selected file entries.
+  - There's no escape character. A pattern containing `\` is `usage` / `usage.pattern`.
+- **Selective extract.** An entry is **selected** if a pattern matches it, or if it's under a
+  selected directory. Ancestor directories of selected entries are also created, so
+  selected entries have their parents, but an ancestor added this way **isn't itself
+  selected**, so its other children aren't included. EXT-1 … EXT-10 apply unchanged,
+  including the fresh-destination rule. LIM-5 counts only the selected file entries.
 - **SEL-1** If any given pattern matches no entry, the extractor MUST fail with
   `refused` / `extract.no-match` before creating anything. The message names the first
   unmatched pattern in command-line order.
 - **Exclude.** Pack drops every source path that matches any exclude pattern, along with
-  everything under an excluded directory. The remaining tree is packed canonically. An
-  exclude pattern that matches nothing is not an error.
+  everything under an excluded directory. Exclusion is applied during the walk, before W-3:
+  an excluded name is never checked for portability, and an excluded directory is never
+  opened or descended. The remaining tree is packed canonically. An exclude pattern that
+  matches nothing is not an error.
 
 ## 13. Reader algorithm
 
-A reader MUST perform steps 1–7 **in this order**, so that corruption is classified
-consistently. Steps 8–10 MAY be performed in any order. Step 11 is required for verify
-and extract, and for listing or inspecting is optional.
+**A reader MUST evaluate the rules in exactly the order below, and report only the first
+violation it finds** (F2). This makes every failure's category and detail code
+deterministic, so two conforming readers report the same error for the same file.
+
+- **Order inside an item:** for an item marked *per record*, records are scanned in table
+  order. For each record, the listed rules are checked in the listed order before moving to
+  the next record.
+- **Stop at unsupported files:** a reader that finds HDR-6 or SEC-2 reports it and evaluates
+  nothing further. A file it can't interpret is never reported as `malformed` (F1).
+- **Step 11:** verify and extract perform all steps. List and inspect perform steps 1–10
+  and **MUST NOT** perform step 11 (F34).
 
 1. HDR-1 (length).
 2. HDR-2 (magic).
 3. HDR-3 (major version).
 4. HDR-4 (hash algorithm).
 5. TRL-1 (trailer magic).
-6. TRL-2, LIM-2, LIM-4: the index location and size, before reading the index.
+6. TRL-2, then LIM-2, then LIM-4: the index's location and size, before the index is read.
 7. Read the index and check TRL-3 (structure hash).
-8. HDR-5, HDR-6.
-9. SEC-1 … SEC-5. Then LIM-1, LIM-3 on the entry count before allocating per-entry state.
-10. BLB-1 … BLB-5, BLB-7. ENT-1 … ENT-6. PATH-1 … PATH-11. CAN-1 … CAN-3. FLG-1. LIM-6.
-    LIM-5 for verify and extract only: over all file entries, or over the selected entries
-    for a selective extract (§12.8). Extended: ATT-1, KV-1.
-11. For each blob in table order, stream its stored bytes and check BLB-6. Extended: check
-    ZST-1 and ZST-2 when decoding.
+8. HDR-6, then HDR-5.
+9. In order:
+   - SEC-1, for each section header in turn, framing the whole index;
+   - SEC-2, over every section;
+   - SEC-3;
+   - SEC-4, then SEC-5, each for every section in file order;
+   - LIM-3, on the entry count, before allocating per-entry state.
+10. In order:
+    - (a) *Per blob record:* BLB-1, BLB-2, BLB-3, ZST-2 (only its `stored_length` ≥ 4
+      condition), ZST-3, LIM-6.
+    - (b) BLB-4.
+    - (c) BLB-5.
+    - (d) *Per entry:* ENT-1, ENT-2, ENT-3, ENT-4.
+    - (e) *Per entry:* ENT-5.
+    - (f) CAN-3.
+    - (g) *Per entry:* PATH-1, PATH-2, PATH-4, PATH-3, PATH-5, PATH-6, PATH-7, PATH-8,
+      PATH-9, PATH-10. PATH-4 comes before PATH-3, so an empty segment (`a//b`, `/a`, `a/`)
+      is reported as the more specific PATH-4.
+    - (h) CAN-1.
+    - (i) *Per entry:* ENT-6.
+    - (j) PATH-11.
+    - (k) BLB-7.
+    - (l) CAN-2.
+    - (m) FLG-1, for `ZSTD`, then `ENTRY_ATTRS`, then `KV_METADATA`, each only if the reader
+      knows it.
+    - (n) *Per entry:* ATT-1.
+    - (o) KV-1.
+    - (p) LIM-5, for verify and extract only: over all file entries, or over the selected
+      entries for a selective extract (§12.8).
+11. *Per blob record, in table order:* BLB-6. Then, for an encoded blob: ZST-2 (frame
+    structure and header limits, §12.5), then ZST-1.
 
-Because step 7 precedes all structural checks, any modification to header bytes 10–11 or 13–31, or to
-the index, is reported as `integrity` (TRL-3), unless it also breaks an earlier step.
+Because step 7 comes before every structural check, any change to header bytes 10–11 or
+13–31, or to the index, is reported as `integrity` (TRL-3), unless it also breaks an earlier
+step.
 
 ## 14. Writer requirements
 
@@ -412,8 +491,18 @@ the index, is reported as `integrity` (TRL-3), unless it also breaks an earlier 
 - **W-5** Pack tools MUST NOT follow symlinks. Symlinks and special files (devices, FIFOs,
   sockets) are skipped with warning `pack.skipped`. Hard-linked names are packed as
   independent regular files.
-- **W-6** Pack tools MUST refuse an output path located inside the source tree.
-  (`refused` / `pack.output-in-source`)
+  - **The walk is handle-relative (F23):** each directory and file is opened relative to an
+    already-open handle of its parent, with no-follow semantics, never through a full path
+    string. A directory swapped for a link during the walk is then never followed, and paths
+    beyond PATH_MAX work.
+  - **Pass 2 must see the same file:** it MUST check that the opened file has the same
+    identity as in pass 1 (device and inode, or the Windows volume serial number and file
+    ID). Otherwise the result is `refused` / `pack.source-changed`.
+- **W-6** Pack tools MUST refuse an output path located inside the source tree
+  (`refused` / `pack.output-in-source`). "Inside" is decided by file identity, not by path
+  strings (F22): compare the identity of the output's parent directory, and of each of its
+  ancestors, with the source root's identity. That catches symlinked, `..`, bind-mounted
+  and case-aliased routes to the same directory.
 - **W-7** If the output path already exists, pack MUST refuse
   (`refused` / `pack.output-exists`) and leave it untouched, unless `--force` is given.
   With `--force`, the existing file is replaced atomically through W-2's rename. It stays
@@ -422,16 +511,30 @@ the index, is reported as `integrity` (TRL-3), unless it also breaks an earlier 
 - **W-8** Pack tools MUST NOT traverse reparse points. On Windows, any directory or file with
   the reparse-point attribute (symbolic links, junctions, mount points and other reparse
   tags) is skipped with warning `pack.skipped`, the same as a symlink under W-5.
+  Cloud-file placeholders, such as OneDrive files not stored locally, are skipped with the
+  distinct warning `pack.skipped-placeholder`, so whole folders can't vanish unnoticed
+  behind the generic warning (F46). The pack report counts every skip in
+  `summary.skipped`.
   Alternate data streams, extended attributes and ACLs of source files are not stored.
   Only a file's unnamed main data stream is packed.
 - **W-9** Pack tools MUST read each source file through the name the operating system
   returned, and store its NFC form (W-3). On macOS, names may come back decomposed (HFS+
   stores a decomposed form; APFS preserves whatever form was used to create the file).
+- **W-10** Pack MUST refuse to write a container that a reader with the same limit settings
+  would reject under LIM-3 … LIM-5 (F24). The error is `limit-exceeded`, with the same
+  detail codes. Pack accepts the same `--max-*` flags as the readers (Appendix C), and no
+  output file is written.
 
 ## 15. Extractor requirements [D10]
 
-- **EXT-1** The destination path MUST NOT exist when extraction starts. Otherwise
-  `refused` / `extract.dest-exists`, and nothing is written.
+**Threat model (F17).** These rules defend against two things: a hostile container, and
+other local principals who can write to the destination's parent directory and race the
+extractor. They don't defend against a principal who can already write to the destination
+itself, or who has the extractor's own privileges.
+
+- **EXT-1** The destination path MUST NOT exist when extraction starts. The check doesn't
+  follow a final symlink, so a dangling symlink also counts as existing. Otherwise the
+  result is `refused` / `extract.dest-exists`, and nothing is written.
 - **EXT-2** Every directory and file MUST be created with create-new semantics, failing if
   the name already exists. Failure is `refused` / `extract.collision`. This also catches
   collisions PATH-11 cannot see:
@@ -440,16 +543,34 @@ the index, is reported as `integrity` (TRL-3), unless it also breaks an earlier 
   - an entry equal to the Windows 8.3 short name generated for an earlier entry (for
     example, `ABCDEFGHIJ` followed by `ABCDEF~1`).
 - **EXT-3** Steps 1–10 of §13, plus LIM-5, MUST pass before anything is created.
-- **EXT-4** Entries MUST be created inside a new staging directory, which is a sibling of
-  the destination on the same filesystem. On success the staging directory is renamed to
-  the destination. On any error (including integrity), the staging directory and all its
-  contents MUST be removed, and the destination MUST NOT exist afterwards.
+- **EXT-4** Entries MUST be created inside a new staging directory, in the destination's
+  parent directory (so on the same filesystem).
+  - **Creating it (F17):** create-new semantics, with an unpredictable name of the form
+    `.<destination name>.chst-<32 lowercase hex digits from a cryptographically secure
+    random source>`. Its mode is 0700 (on Windows, a DACL granting access only to the
+    current user). The staging directory's final mode is set just before the rename.
+  - **Finishing (F16):** on success, the staging directory is renamed to the destination
+    with a rename that **MUST NOT replace an existing object**: `renameat2(RENAME_NOREPLACE)`
+    on Linux, `renameatx_np(RENAME_EXCL)` on macOS, and
+    `SetFileInformationByHandle(FileRenameInfo)` with `ReplaceIfExists = FALSE` on Windows.
+    - If the destination exists by then (for example, created after the EXT-1 check), the
+      result is `refused` / `extract.dest-exists`, and cleanup applies.
+    - If the filesystem doesn't support a no-replace rename, the result is `io` /
+      `extract.no-atomic-rename`, and cleanup applies.
+  - **Cleanup (F18):** on any error, including integrity, the staging directory and all its
+    contents MUST be removed, and the destination MUST NOT exist afterwards. Cleanup removes
+    entries relative to open directory handles (`unlinkat`, or Windows handle-relative
+    deletion). It never follows a link or reparse point, and never re-resolves a full path.
+  - **After a crash (F43):** a crash can leave a staging directory behind. It's recognised
+    by the name pattern above, and can be deleted by hand.
 - **EXT-5** In Core, files are created with mode 0644 and directories with 0755, both
   subject to the process umask. Modes are ignored on Windows. setuid, setgid and sticky
   bits MUST NOT be set.
-- **EXT-6** No filesystem object outside the staging directory may be created or modified.
-- **EXT-7** Each file's content MUST be checked against its key (BLB-6) while it is
-  written. On mismatch the error is `integrity` / `blob.hash`, and EXT-4 cleanup applies.
+- **EXT-6** No filesystem object outside the staging directory may be created or modified,
+  except the destination created by EXT-4's final rename (F20).
+- **EXT-7** Each file's content MUST be checked against its key (BLB-6) **while it is
+  written, not in a separate pass before writing** (F14). On mismatch the error is
+  `integrity` / `blob.hash`, and EXT-4 cleanup applies.
 - **EXT-8** Extractors MUST NOT follow a symlink, junction or other reparse point anywhere
   under the staging directory, even one that appears during extraction (for example,
   through a concurrent swap).
@@ -460,8 +581,14 @@ the index, is reported as `integrity` (TRL-3), unless it also breaks an earlier 
     that the opened object has no `FILE_ATTRIBUTE_REPARSE_POINT`.
   - Finding a link or reparse point is `refused` / `extract.unsafe-object`, and EXT-4
     cleanup applies.
+  - **Reopening (F21):** canonical order isn't depth-first (`a`, `a-b`, `a.b`, `a/b`), so an
+    extractor may need a directory it created earlier. It MAY reopen one only by walking
+    from the staging root's handle one segment at a time, with no-follow directory opens,
+    checking each opened object as above.
 - **EXT-9** Extractors MUST write file content only to the unnamed main data stream, and
   MUST NOT create alternate data streams.
+- **EXT-10** Entries MUST be created in canonical order, so parents exist before their
+  children. Attributes (Extended) are applied as in §12.6.
 
 ### 15.1 Platform notes (normative)
 
@@ -475,13 +602,14 @@ the index, is reported as `integrity` (TRL-3), unless it also breaks an earlier 
 | Windows | Long paths | Extractors MUST use extended-length paths (`\\?\` prefix) or an equivalent, for any length up to PATH-3's 4096 bytes plus the destination prefix. A 255-byte UTF-8 segment never exceeds NTFS's 255 UTF-16 code-unit limit. |
 | macOS | Case-insensitive APFS/HFS+ (default) | PATH-11 for ASCII; EXT-2 for everything else |
 | macOS | NFC vs NFD names | PATH-2 stores NFC only. W-9 handles decomposed source names. On extract, names are created in NFC; HFS+ may then list them decomposed, which is expected, not an error. Any tool comparing an extracted tree with an archive on macOS MUST compare NFC-normalised names. Since stored paths are unique NFC strings, normalisation-insensitive filesystems cannot produce a normalisation-only collision. |
-| Linux | Case-sensitive, no normalisation | No special handling. A tree can hold both `é` and `É`. |
-| WSL | Windows drives mounted under `/mnt/<drive>` follow Windows semantics | Use the Windows rows. Run checks from the Linux filesystem. |
+| macOS | HFS+ limits names to 255 UTF-16 units **after** decomposition (F40) | A valid segment can exceed that once decomposed: 127 × U+0390 is 254 bytes in NFC and 381 UTF-16 units in NFD. Extracting it onto HFS+ fails with `io`. That's a documented limitation, not a format rule. APFS has no such limit. |
+| Linux | Depends on the filesystem (F41) | Most Linux filesystems are case-sensitive with no normalisation, so a tree can hold both `é` and `É`. ext4 casefold directories and vfat, ntfs3 and CIFS mounts are case-insensitive, and EXT-2 catches collisions there. |
+| WSL | Windows drives under `/mnt/<drive>` (F41) | The Linux build applies the Unix rules only. The format's portability rules (PATH-7, PATH-9 and others) already make archives safe there. Run checks from the Linux filesystem. |
 
 ## 16. Error model [D12]
 
 Every failure is reported as one **category** and one **detail code**. When a file violates
-several rules, a reader MAY report any one of them, subject to §13's ordering of steps 1–7.
+several rules, a reader MUST report the first one in §13's order, and only that one.
 
 | Category | Meaning | CLI exit code |
 |---|---|---|
@@ -491,8 +619,8 @@ several rules, a reader MAY report any one of them, subject to §13's ordering o
 | `unsupported` | HDR-3, HDR-4, HDR-6, SEC-2 | 5 |
 | `malformed` | A structural, path, canonical or hard-limit rule | 6 |
 | `integrity` | TRL-3, BLB-6, ZST-1 | 7 |
-| `limit-exceeded` | LIM-3 … LIM-6 | 8 |
-| `refused` | A policy refusal on otherwise valid input (EXT-1, EXT-2, EXT-8, W-3, W-4, W-6, W-7, SEL-1) | 9 |
+| `limit-exceeded` | LIM-3 … LIM-6, W-10 | 8 |
+| `refused` | A policy refusal on otherwise valid input (EXT-1, EXT-2, EXT-4, EXT-8, W-3, W-4, W-6, W-7, SEL-1) | 9 |
 | `internal` | An implementation bug; MUST NOT occur | 70 |
 
 Success is exit code 0. Warnings never change the exit code. The full mapping is in
@@ -701,7 +829,6 @@ SHA-256 of the whole 556-byte file, for fixture checking only:
 | **CAN-2** | malformed | `canon.blob-order` |
 | **CAN-3** | malformed | `canon.path-pool` |
 | **FLG-1** | malformed | `flag.mismatch` |
-| **LIM-1** | malformed | `lim.entries` |
 | **LIM-2** | malformed | `lim.index-size` |
 | **LIM-3** | limit-exceeded | `limit.entries` |
 | **LIM-4** | limit-exceeded | `limit.index-size` |
@@ -717,13 +844,16 @@ SHA-256 of the whole 556-byte file, for fixture checking only:
 | **W-5** | (warning) | `pack.skipped` |
 | **W-6** | refused | `pack.output-in-source` |
 | **W-7** | refused | `pack.output-exists` |
-| **W-8** | (warning) | `pack.skipped` |
+| **W-8** | (warning) | `pack.skipped`, or `pack.skipped-placeholder` for cloud-file placeholders |
+| **W-10** | limit-exceeded | the LIM-3 … LIM-5 detail codes (`limit.entries`, `limit.index-size`, `limit.total-size`) |
 | **SEL-1** | refused | `extract.no-match` |
 | **EXT-1** | refused | `extract.dest-exists` |
 | **EXT-2** | refused | `extract.collision` |
 | **EXT-7** | integrity | `blob.hash` |
 | **EXT-8** | refused | `extract.unsafe-object` |
-| **W-1**, **W-2**, **W-9**, **EXT-3**, **EXT-4**, **EXT-5**, **EXT-6**, **EXT-9** | (requirement; no error of its own) | — |
+| **EXT-4** | refused | `extract.dest-exists` (at the final rename); `io` / `extract.no-atomic-rename` |
+| **W-1**, **W-2**, **W-9**, **EXT-3**, **EXT-5**, **EXT-6**, **EXT-9**, **EXT-10** | (requirement; no error of its own) | — |
+| *(retired)* LIM-1 | — | — (§10.1) |
 
 Reader rules are those with prefixes HDR, TRL, SEC, BLB, ENT, PATH, CAN, FLG, LIM, ZST,
 ATT and KV. Each has a negative fixture (`ACCEPTANCE.md`, AC-NEG-1 and AC-X-NEG-1). W,
@@ -747,11 +877,21 @@ Common fields of every `--json` report (stdout, a single JSON object):
 On failure, a report contains only the common fields.
 
 Encoding conventions:
-- Integers are JSON numbers when ≤ 2⁵³ − 1, and decimal strings otherwise.
+- Integers are JSON numbers when they lie within ±(2⁵³ − 1), and decimal strings otherwise.
+  That applies to `summary.*_bytes` too, which can exceed 2⁵³ (F9).
 - Hashes and keys are lowercase hex.
 - Raw byte fields such as magic and reserved bytes are lowercase hex strings.
 - Object key order is not significant. Array order is significant.
 - `message` fields are free text and are excluded from conformance comparison.
+- **What the reader implements shapes its report (F33):**
+  - `name` is `"unknown"` for any section type the reader doesn't implement. A Core-only
+    reader names KV_METADATA `unknown`.
+  - Flag names in `summary.required_flags` and `summary.optional_flags` come from §12.1.
+    Any set bit the reader doesn't implement is named `bit<N>`, where N is the bit number,
+    for example `bit63`; a Core-only reader names `ENTRY_ATTRS` `bit0`.
+  - Attribute fields (`mtime_seconds`, `mtime_nanos`, `mode`, and inspect's
+    `attrs_reserved`) appear only if the reader implements `ENTRY_ATTRS`. Otherwise inspect
+    shows those bytes as `extra`.
 
 Command-specific fields:
 
@@ -761,7 +901,8 @@ Command-specific fields:
     (`"stored"` | `"zstd"`) and `blob` (the key).
   - With `ENTRY_ATTRS`, every entry adds `mtime_seconds`, `mtime_nanos` and `mode`.
 - **pack:** `output` (the output path as given on the command line), plus `summary` with
-  the same fields as verify's, describing the container just written. Warnings such as
+  the same fields as verify's, describing the container just written. Pack's `summary` also
+  has `skipped`: the number of source objects skipped with a `pack.skipped*` warning (F46). Warnings such as
   `pack.skipped` carry a `path` field with the source-relative path (as UTF-8, with any
   undecodable bytes escaped as `\xHH`). When pack fails (for example,
   `pack.output-exists`), the report has only the common fields, as for any other failure.
@@ -805,6 +946,40 @@ Command-specific fields:
   | `data` | A region with `offset` 32 and `length` `index_offset − 32`. One field per blob record, in blob-table order, named `blob[i].data`, with that blob's `offset` and `stored_length` and no `value`. |
   | `sections[]` | One object per section, in file order. Keys: `type` (the type as an 8-digit lowercase hex string such as `"0x80000001"`), `name` (`BLOB_TABLE`, `ENTRY_TABLE`, `PATH_POOL`, `KV_METADATA`, or `"unknown"`), `offset` (of the section header), `length` (`16 + record_size × record_count`), `record_size`, `record_count`, `fields` and `records`. Its `fields` are the section header, `type` (4, int), `record_size` (4, int) and `record_count` (8, int), followed for sections without records by one `payload` field covering the whole payload. That field is omitted when the payload is empty. The payload's `value` is text for PATH_POOL and hex for KV_METADATA and unknown sections. |
   | BLOB_TABLE `records[]` | `{"index", "offset", "length" (= record_size), "fields"}`. Fields: `key` (32, hex), `offset` (8, int), `stored_length` (8, int), `raw_length` (8, int), `encoding` (1, int), `reserved` (7, hex). If `record_size` > 64, they're followed by `extra` (`record_size − 64`, hex). |
-  | ENTRY_TABLE `records[]` | The same record shape. Fields: `path_offset` (8, int), `path_length` (4, int), `type` (1, int), `reserved` (3, hex), `blob_key` (32, hex). If `ENTRY_ATTRS` is set and `record_size` ≥ 64, they're followed by `mtime_seconds` (8, int, signed), `mtime_nanos` (4, int), `mode` (2, int) and `attrs_reserved` (2, hex), then `extra` (hex) for any bytes beyond 64. Otherwise, if `record_size` > 48, they're followed by `extra` (`record_size − 48`, hex). |
+  | ENTRY_TABLE `records[]` | The same record shape. Fields: `path_offset` (8, int), `path_length` (4, int), `type` (1, int), `reserved` (3, hex), `blob_key` (32, hex). If `ENTRY_ATTRS` is set, the reader implements it, and `record_size` ≥ 64, they're followed by `mtime_seconds` (8, int, signed), `mtime_nanos` (4, int), `mode` (2, int) and `attrs_reserved` (2, hex), then `extra` (hex) for any bytes beyond 64. Otherwise, if `record_size` > 48, they're followed by `extra` (`record_size − 48`, hex). |
   | Other sections | `records` is `[]`. The payload appears as the `payload` field above. |
   | `trailer` | A region with `offset` `file_length − 56` and `length` 56. Fields: `index_offset` (8, int), `index_length` (8, int), `structure_hash` (32, hex), `trailer_magic` (8, hex). |
+
+## Appendix C — Command-line interface (normative for the `chst` tool) [F45]
+
+This appendix defines the CLI that ACCEPTANCE.md exercises. Other tools may expose the same
+behaviour differently, but must keep the limits configurable (§10.2).
+
+| Command | Synopsis |
+|---|---|
+| pack | `chst pack SRC -o OUT [--force] [--json] [limits]`; Extended adds `[--compress zstd] [--attrs] [--deterministic] [--mtime N] [--meta KEY=VALUE]… [--exclude PATTERN]…` |
+| list | `chst list FILE [--json] [limits]` |
+| verify | `chst verify FILE [--json] [limits]` |
+| inspect | `chst inspect FILE [--json] [limits]` |
+| extract | `chst extract FILE -C DEST [limits]`; Extended adds `[PATTERN]…` (§12.8) |
+
+**Limit flags**, accepted by every command, decimal integers:
+
+| Flag | Sets | Default |
+|---|---|---|
+| `--max-entries N` | LIM-3 | 1,048,576 |
+| `--max-index-bytes N` | LIM-4 | 268,435,456 |
+| `--max-total-bytes N` | LIM-5 | 68,719,476,736 |
+| `--max-ratio N` | LIM-6 | 1000 |
+
+**Errors and exit codes.**
+- The first line of stderr on failure is `chst: error[<category>/<detail>]: <message>`.
+- Exit codes are those of §16.
+- Usage errors use detail codes beginning `usage.`, for example `usage.pattern` (§12.8).
+
+**Text output.** Without `--json`, `list` prints one entry per line.
+- Before printing a path, it MUST escape every code point that PATH-6 allows but that isn't
+  printable (F42): General_Category Cc, Cf, Zl, Zp, Co, Cn or Zs other than U+0020. Each is
+  written as `\u{X}`, with X in lowercase hex and no leading zeros.
+- `\` itself is written as `\\`.
+- So U+200B ZERO WIDTH SPACE appears as `\u{200b}`.

@@ -81,31 +81,45 @@
 | `sha256 FILE` | Prints the file's lowercase hex SHA-256: `sha256sum`, or `shasum -a 256` on macOS |
 | `mk_sparse FILE SIZE` | Creates a sparse file of SIZE bytes. On Linux and macOS this is `truncate -s`. On Windows: create the file empty, run `fsutil sparse setflag` on it, then `truncate -s`. |
 | `free_bytes DIR` | Free bytes on DIR's volume (`df -Pk`) |
+| `fixture_file EXPECT.json` | Prints the path of the container an `expect.json` describes: the sibling `.chst`, or, if only a sibling `.recipe.json` exists (sparse recipes, such as `core/invalid/LIM-2`), a sparse file materialised from it under `$W` (`mk_sparse` + `$GEN materialize-sparse`) |
+| `$CHST_DET_SEED` | Seed for `$GEN materialize --reverse`. The default is fixed (`chst-det-1`), and it's printed to stderr, so a failing determinism run can be reproduced. |
 
 Rust tests that extract or pack files use only temporary directories (`tempfile`, D15).
 
 **Fixture layout.** Everything under `fixtures/` is produced by the generator in
 `fixtures/gen/` (V1), which builds it directly from FORMAT_SPEC.md. The generator uses only
-the Python standard library only, for Extended too. SHA-256 comes from `hashlib`, and it
-writes its own Zstandard frames (D15).
+the Python standard library, for Extended too. SHA-256 comes from `hashlib`, and it writes
+its own Zstandard frames (D15).
 
 - **Valid fixtures:** `fixtures/core/valid/<name>/` holds:
   - `tree.json`: the source tree as data, so empty directories and awkward names survive git;
   - `container.chst`;
   - `list.json`, `verify.json` and `inspect.json`: the expected reports.
-- **Invalid fixtures:** `fixtures/core/invalid/<RULE>[-n].chst` plus `<RULE>[-n].expect.json`
-  containing `{"rule", "category", "detail", "exit", "base", "mutation"}`.
-- `fixtures/core/attacks/`, `fixtures/core/extract-cases/`, `fixtures/core/hostile/`,
-  `fixtures/core/hostile64/`, `fixtures/core/sparse/`, `fixtures/compat/` and
-  `fixtures/extended/{valid,invalid}/` follow the same pattern.
+- **Invalid fixtures:** `fixtures/core/invalid/<RULE>[-<sub>].chst` (or `.recipe.json` for a
+  sparse one) plus `<RULE>[-<sub>].expect.json`.
+- **Each directory's `expect.json` schema (F44).** In every schema, `detail` is the exact
+  detail code that a reader reporting in FORMAT_SPEC §13's order must give.
+
+  | Directory | Fields |
+  |---|---|
+  | `core/invalid/`, `extended/invalid/` | `rule`, `category`, `detail`, `exit`, `base`, `mutation`; optionally `args` (CLI limit flags) and `also_violates` (detail codes of rules also broken but reported later in §13's order; informational only, never compared) |
+  | `core/attacks/` | `rule`, `category`, `detail`, `exit` |
+  | `core/hostile/` | `rule`, `category`, `detail`, `exit`, `base`, `mutation` |
+  | `core/hostile64/` | as hostile, plus `details`: a one-element list for AC-ROB-8 |
+  | `core/extract-cases/` | `exit`, `note`; plus `rule`, `category`, `detail` when the case fails. A sibling `<name>.tree.json` describes valid trees. |
+  | `compat/` | `exit`, `detail` (`null` when the exit is 0), `note`. Exit-0 fixtures also have `<name>.list.json`, `.verify.json` and `.inspect.json`: the **Core-only reader's** reports (FORMAT_SPEC Appendix B, "What the reader implements shapes its report"). |
+- `fixtures/core/valid/`, `fixtures/core/sparse/` and `fixtures/extended/valid/` hold
+  directories, as above (sparse: `recipe.json` instead of `container.chst` and `tree.json`).
 - `fixtures/fuzz-regressions/<target>/`: every input that ever crashed a fuzz target.
 - `fixtures/MANIFEST.sha256`: a `sha256sum`-format listing of every other file under
   `fixtures/`, including `fixtures/gen/`.
 
 Generator commands used by checks:
 - `$GEN --out DIR` regenerates everything except `gen/` itself.
-- `$GEN materialize TREE.json DIR [--reverse]` creates a tree on disk. `--reverse` creates
-  entries in reverse order and sets random mtimes and modes, to stress determinism.
+- `$GEN materialize TREE.json DIR [--reverse]` creates a tree on disk. It never merges two
+  entries: a name that already exists is an error. `--reverse` creates directories
+  deepest-first and files in reverse order, and sets seeded random mtimes and modes
+  (`$CHST_DET_SEED`), to stress determinism.
 - `$GEN materialize-sparse RECIPE.json FILE` writes a recipe's head bytes at offset 0 and
   its tail bytes at the end of an existing sparse FILE, without filling the hole.
 - `$GEN synth-entries N FILE` and `$GEN synth-amplify N SIZE FILE` build large synthetic
@@ -349,10 +363,20 @@ grep -qxE 'channel = "nightly-2026-10-01"' fuzz/rust-toolchain.toml
 command -v python3.14 > /dev/null
 python3.14 -I -c 'import sys, unicodedata
 assert sys.version_info[:2] == (3, 14), sys.version
-assert tuple(map(int, unicodedata.unidata_version.split("."))) >= (15, 1), unicodedata.unidata_version'
+assert unicodedata.unidata_version == "16.0.0", unicodedata.unidata_version'
 jq --version | grep -qE '^jq-1\.([7-9]|[1-9][0-9])'
 ```
 Pass: exit 0. The Node pin is checked by AC-X-TS-3, which applies only to the Extended cut.
+
+#### AC-ENG-8 — Every reader uses exactly the Unicode 16.0 tables
+Core · OS all · fast · Traces: D8, D16, PATH-2
+```sh
+cargo_test_nonempty --release -p chst-format --test unicode_tables
+```
+The test asserts that `unicode_normalization::UNICODE_VERSION` is `(16, 0, 0)`, and that
+the path from `core/invalid/PATH-2-unicode16` is judged not NFC (F12). The Python side is
+checked by AC-ENG-6 and the TypeScript side by AC-X-TS-3. AC-NEG-2 then checks the fixture
+end to end.
 
 #### AC-ENG-7 — Unsafe code only where D18 allows it, and justified there
 Core · OS all · fast · Traces: D18, #26
@@ -432,7 +456,7 @@ done
 - each integer or hex `value` equals the bytes at its offset, decoded little-endian.
 
 #### AC-POS-4 — Extract reproduces the tree, including empty directories
-Core · OS all · fast · Traces: #3, #17, D10
+Core · OS all · fast · Traces: #3, #17, D10, EXT-10
 ```sh
 for d in $FX/core/valid/*/; do
   rm -rf "$W/t" "$W/x"
@@ -459,6 +483,7 @@ The valid fixture set MUST include at least the following:
 | `deep` | Depth 256 |
 | `long-names` | A 255-byte segment and a 4096-byte path |
 | `sort-edge` | `a`, `a-b`, `a/b`, `a.b`, which exercises bytewise order |
+| `nonprinting` | A name containing U+200B, which is allowed but doesn't print (AC-CLI-3) |
 
 ### 3.4 Negative conformance (V3, G7)
 
@@ -467,8 +492,13 @@ Core · OS all · fast · Traces: G7, D12, all reader rules in FORMAT_SPEC Appen
 ```sh
 for r in $(grep -oE '^\| \*\*(HDR|TRL|SEC|BLB|ENT|PATH|CAN|LIM)-[0-9]+\*\*' FORMAT_SPEC.md | tr -d '|* ' | sort -u); do
   [ "$r" = LIM-6 ] && continue                                  # Extended-only (encoded blobs)
-  compgen -G "$FX/core/invalid/$r.chst" > /dev/null || compgen -G "$FX/core/invalid/$r-*.chst" > /dev/null \
+  compgen -G "$FX/core/invalid/$r.*" > /dev/null || compgen -G "$FX/core/invalid/$r-*.chst" > /dev/null \
     || { echo "missing $r"; exit 1; }
+done
+for n in TRL-2-low TRL-2-overflow SEC-1-straddle SEC-3-repeat SEC-5-entry BLB-4-zero-blobs BLB-4-short-last \
+         ENT-1-type0 PATH-2-unicode16 PATH-3-empty PATH-3-2 PATH-6-c1 PATH-6-bidi PATH-6-isolate PATH-9-2 PATH-9-3 \
+         PATH-9-com0 PATH-9-com1sup PATH-9-com2sup PATH-9-com3sup PATH-9-lpt1sup PATH-9-lpt2sup PATH-9-lpt3sup ENT-6-2; do
+  test -f "$FX/core/invalid/$n.expect.json" || { echo "missing sub-condition fixture $n"; exit 1; }
 done
 ```
 - For each configurable-limit rule (LIM-3 to LIM-5), the fixture's `expect.json` carries
@@ -478,36 +508,44 @@ done
   - FLG-1: Core knows no flags, so it has nothing to check;
   - LIM-6: the ratio limit applies only to encoded blobs;
   - the ZST, ATT and KV rules.
-- **Known gap:** LIM-1 and LIM-2 have no fixture yet, so this check FAILs on them until the
-  open item in DESIGN.md §9 is decided.
+- LIM-1 is retired (FORMAT_SPEC §10.1), so it's no longer in Appendix A. LIM-2 is a sparse
+  recipe, `core/invalid/LIM-2.recipe.json`.
+- **Sub-conditions (F35).** A rule with several independent conditions needs one fixture
+  per condition. The required Core names are listed in the second loop above; AC-X-NEG-1
+  lists the Extended ones.
+- **Conditions that no fixture can reach** (all because an earlier rule in §13's order
+  always fires first):
+  - FLG-1 for an `encoding` 1 blob without the `ZSTD` flag (BLB-2 fires first);
+  - FLG-1 for `ENTRY_ATTRS` in either direction (SEC-5 fires first, because the reader
+    knows the flag).
 
 #### AC-NEG-2 — Each negative fixture gives exactly the expected category, detail and exit code
 Core · OS all · fast · Traces: D12, #25, #26
 ```sh
 for e in $FX/core/invalid/*.expect.json; do
-  f=${e%.expect.json}.chst; args=$(jq -r '.args // [] | join(" ")' $e)
+  f=$(fixture_file $e); args=$(jq -r '.args // [] | join(" ")' $e)
   set +e; $CHST verify --json $args "$f" > "$W/r.json" 2> "$W/err"; rc=$?; set -e
   test $rc = "$(jq .exit $e)"
   test "$(jq -r .error.category "$W/r.json")" = "$(jq -r .category $e)"
-  det=$(jq -r .error.detail "$W/r.json")
-  jq -e --arg d "$det" '(.details // [.detail]) | index($d) != null' $e > /dev/null   # usually exactly .detail
+  test "$(jq -r .error.detail "$W/r.json")" = "$(jq -r .detail $e)"
   test "$(jq -c 'keys' "$W/r.json")" = '["command","error","ok","schema","warnings"]'
-  head -1 "$W/err" | grep -qF "chst: error[$(jq -r .category $e)/$det]: "
+  head -1 "$W/err" | grep -qF "chst: error[$(jq -r .category $e)/$(jq -r .detail $e)]: "
 done
 ```
-Most fixtures break exactly one rule, and the reported detail must equal `.detail`. A few
-changes unavoidably break a second rule, because of how the spec's rules overlap (DESIGN.md
-§9): ENT-5, PATH-4 and PATH-5. For those, `expect.json` lists every acceptable detail in
-`.details`, all in the same category, and the reported detail must be one of them.
+Readers report the first violation in FORMAT_SPEC §13's total order (F2), so every fixture
+has exactly one expected `detail`. Where a fixture also breaks later rules,
+`also_violates` records them for information only.
 
 #### AC-NEG-3 — `list` and `inspect` also reject structurally invalid files
 Core · OS all · fast · Traces: #2, #5, D12
 ```sh
 for e in $FX/core/invalid/*.expect.json; do
-  case "$(jq -r .rule $e)" in BLB-6|LIM-5) continue;; esac   # need blob data / verify+extract only
-  f=${e%.expect.json}.chst; args=$(jq -r '.args // [] | join(" ")' $e)
+  case "$(jq -r .rule $e)" in BLB-6|LIM-5) continue;; esac   # step 11 / verify+extract only
+  f=$(fixture_file $e); args=$(jq -r '.args // [] | join(" ")' $e)
   for c in list inspect; do expect_exit "$(jq .exit $e)" $CHST $c --json $args "$f" >/dev/null; done
 done
+# F34: list and inspect MUST NOT perform step 11, so a blob-hash error is invisible to them
+for c in list inspect; do expect_exit 0 $CHST $c --json $FX/core/invalid/BLB-6.chst > /dev/null; done
 ```
 
 #### AC-NEG-4 — Negative fixtures are documented single mutations
@@ -557,10 +595,29 @@ Core · OS all · fast · Traces: #4, #13, D1, D6, #26
 python3.14 -I tools/acceptance/flip_sweep.py "$CHST" $FX/core/valid/worked-example/container.chst \
   $FX/core/valid/empty/container.chst $FX/core/valid/dedup/container.chst
 ```
+```sh
+python3.14 -I tools/acceptance/flip_sweep.py --rehash --min-distinct 15 "$CHST" \
+  $FX/core/valid/worked-example/container.chst
+```
 For every byte offset, and for each of XOR `0x01` and XOR `0xFF`, `flip_sweep.py` runs
-`verify` on the mutated file. It asserts that the exit code is one of 4, 5, 6 or 7, never 0,
-70 or 101, that stderr has no `panicked`, and that each run takes under 5 seconds. It prints
-a histogram of detail codes. Pass: exit 0.
+`verify` on the mutated file.
+
+**Plain mode** (first command). It asserts four things:
+- the exit code is one of 4, 5, 6 or 7, never 0, 70 or 101;
+- stderr has no `panicked`;
+- each run takes under 5 seconds;
+- it prints a histogram of detail codes.
+
+**`--rehash` mode** (second command, F13). After each flip it recomputes the structure
+hash, so the damage reaches the section, entry, path and canonical rules instead of
+stopping at TRL-3. It asserts:
+- no exit 70 or 101, and no panic;
+- at least 15 distinct detail codes occur (the generator's checker finds 26);
+- exit 0 occurs only for flips that create a different **valid** container. That means
+  only flips in `minor_version`, in unknown optional-flag bits, or in path-pool bytes that
+  turn one valid name into another. Any other accepted flip fails the check.
+
+Pass: exit 0 for both.
 
 #### AC-ROB-2 — Truncation and extension are always detected
 Core · OS all · fast · Traces: #4, D1, #26
@@ -579,13 +636,15 @@ cargo_test_nonempty --release -p chst-format --test damage_sweep
 ```
 For every valid fixture up to 64 KiB, at every offset, the test applies single-bit and
 single-byte flips plus all truncations. Each must return an error, never success, with no
-panic.
+panic. It then repeats the flips **with the structure hash recomputed** (F13), so the
+structural parser is exercised. Those runs must never panic, and any success must be a
+fully valid container.
 
 #### AC-ROB-4 — Fuzzing: 10 crash-free minutes per target
 Core · OS linux, macos · **full-only** · Traces: #26, G8, V6, D16
 ```sh
 tc=$(sed -n 's/^channel = "\(.*\)"$/\1/p' fuzz/rust-toolchain.toml)
-for t in open_verify list inspect; do
+for t in open_verify open_verify_rehash list inspect; do
   cargo +"$tc" fuzz run $t -- -max_total_time=600 -rss_limit_mb=512 -timeout=10 \
     fuzz/corpus/$t $FX/core/valid $FX/core/invalid
   test -z "$(ls -A fuzz/artifacts/$t 2>/dev/null)"
@@ -593,6 +652,11 @@ done
 ```
 Pass: exit 0 and no artifacts. In a fast run this criterion is NOT RUN. Windows runs
 AC-ROB-4W instead (§1.3).
+
+`open_verify_rehash` (F13) treats its input as an index body. It builds the header, the
+trailer and the correct structure hash around that body, then calls the reader, so
+coverage-guided fuzzing reaches the section, record, path and canonical rules, which
+libFuzzer can't reach through SHA-256. The other targets take raw files.
 
 #### AC-ROB-4W — Windows fuzzing fallback: 10 minutes of randomised damage sweeps
 Core · OS windows · **full-only** · *provisional until the first full CI run* · Traces: #26, G8, V6
@@ -665,15 +729,15 @@ done
 Each fixture is a copy of `worked-example`, under 1 KiB, with 2³² added to the u64
 value(s) in one row of the table below. The structure hash is recomputed, so only that
 change is wrong. A reader that truncated sizes to 32 bits would see the original, valid
-values and wrongly accept the file. Each `expect.json` lists the acceptable `details`.
-Where one change necessarily breaks two rules, either is accepted. The set MUST cover:
+values and wrongly accept the file. Each `expect.json` gives the one expected detail (§13's
+order) in `details`. The set MUST cover:
 
-| Value(s) + 2³² | Acceptable details |
+| Value(s) + 2³² | Expected detail |
 |---|---|
 | `blob[0].offset` | `blob.layout` |
 | `blob[0].stored_length` and `blob[0].raw_length` together (keeps BLB-3 true) | `blob.layout` |
 | `blob[0].raw_length` | `blob.raw-length` |
-| `entry[1].path_offset` | `entry.path-range`, `canon.path-pool` |
+| `entry[1].path_offset` | `entry.path-range` |
 | BLOB_TABLE `record_count` | `sec.bounds` |
 | `trailer.index_offset` | `trl.index-range` |
 
@@ -728,6 +792,11 @@ mkdir -p "$W/out" && echo keep > "$W/out/k"
 expect_exit 9 $CHST extract $FX/core/valid/worked-example/container.chst -C "$W/out" 2> "$W/err"
 grep -q 'error\[refused/extract.dest-exists\]' "$W/err"
 test "$(ls -A "$W/out")" = k && test "$(cat "$W/out/k")" = keep
+if [ "$CHST_OS" != windows ]; then                       # F16: a dangling symlink also "exists"
+  ln -s "$W/nowhere" "$W/link"
+  expect_exit 9 $CHST extract $FX/core/valid/worked-example/container.chst -C "$W/link"
+  test -L "$W/link" && test ! -e "$W/nowhere"
+fi
 ```
 
 #### AC-SAFE-3 — A hash failure mid-extract leaves no destination and no staging directory
@@ -737,7 +806,12 @@ mkdir -p "$W/p"
 expect_exit 7 $CHST extract $FX/core/extract-cases/late-blob-hash.chst -C "$W/p/out" 2> "$W/err"
 grep -q 'error\[integrity/blob.hash\]' "$W/err"
 test -z "$(ls -A "$W/p")"
+cargo_test_nonempty --release -p chst-fs --features test-hooks --test late_failure
 ```
+The `late_failure` test (F14) uses the `test-hooks` hook to observe the staging directory
+when the BLB-6 error is raised. It asserts that at least one file was already in staging,
+which proves verification happens while writing (EXT-7) and not in a pre-pass, and that
+staging is gone afterwards.
 `late-blob-hash.chst` has a valid structure, but its *last* blob's bytes are corrupted, so
 earlier files are already written into staging when the failure happens. Fixtures whose
 outcome depends on the OS, or that need a specific failure point, live in
@@ -785,13 +859,22 @@ full path strings:
 #### AC-SAFE-8 — Links and reparse points swapped in during extraction are never followed
 Core · OS all · fast · Traces: EXT-8, EXT-6, D10
 ```sh
-cargo_test_nonempty --release -p chst-fs --test swap_race
+cargo_test_nonempty --release -p chst-fs --features test-hooks --test swap_race
 ```
-A test hook pauses extraction right after a directory is created in staging. It replaces
-that directory with a symlink (Unix) or a junction (Windows) pointing outside, then
-resumes. The test asserts three things: the result is `refused/extract.unsafe-object`,
-nothing was created or modified outside staging, and staging and the destination are both
-gone.
+The hook is compiled only with the non-default `test-hooks` Cargo feature (DESIGN D13), so
+release builds never contain it. The hook points (F19):
+
+- **Unix:** between `mkdirat` and the `openat(O_NOFOLLOW | O_DIRECTORY)` that obtains the
+  new directory's handle. The hook replaces the directory with a symlink pointing outside.
+  That `openat` must then fail (ELOOP or ENOTDIR), and the result must be
+  `refused/extract.unsafe-object`.
+- **Windows:** between creating a directory and any later reopening of it by name, if the
+  implementation ever reopens. The hook replaces it with a junction. If the implementation
+  never reopens by name, there's no window, and the test asserts success instead.
+
+In every case the test asserts that nothing outside staging was created or modified. On
+failure it also asserts that staging and the destination are both gone; on success, that
+every file is inside the destination.
 
 #### AC-SAFE-9 — Extraction never creates alternate data streams
 Core · OS windows · fast · Traces: EXT-9, PATH-7
@@ -807,15 +890,18 @@ they must be `malformed`.
 Core · OS windows · fast · Traces: EXT-2, D8
 ```sh
 f=$FX/core/extract-cases/short-name.chst; mkdir -p "$W/p"
-fsutil 8dot3name query "$(cygpath -w "$W")" || true          # logged: shows which branch applies
-set +e; $CHST extract "$f" -C "$W/p/out" 2> "$W/err"; rc=$?; set -e
-if [ $rc = 9 ]; then grep -q 'extract.collision' "$W/err" && test -z "$(ls -A "$W/p")"
-else test $rc = 0 && test "$(ls "$W/p/out/ABCDEFGHIJ")" = a && test "$(ls "$W/p/out/ABCDEF~1")" = b; fi
+vol=$(cygpath -w "$W" | cut -c1-2)
+fsutil 8dot3name set "$vol" 0                                # enable 8.3 names on this volume (runner is admin)
+fsutil 8dot3name query "$vol"                                # logged
+expect_exit 9 $CHST extract "$f" -C "$W/p/out" 2> "$W/err"
+grep -q 'error\[refused/extract.collision\]' "$W/err" && test -z "$(ls -A "$W/p")"
 ```
-`short-name.chst` holds `ABCDEFGHIJ/a` and then `ABCDEF~1/b`, in canonical order. If the
-volume generates 8.3 names, the second directory collides with the first one's short name
-and must be refused. Otherwise both are distinct directories. Either way, `b` never lands
-inside `ABCDEFGHIJ`.
+`short-name.chst` holds `ABCDEFGHIJ/a` and then `ABCDEF~1/b`, in canonical order. With 8.3
+names enabled (F38), creating `ABCDEFGHIJ` also creates the short name `ABCDEF~1`. So
+creating the second directory must fail, with create-new semantics (EXT-2), and the
+extraction must be refused with nothing left behind. If 8.3 names can't be enabled on the
+runner, `fsutil` fails, and so does this check: it never silently runs only the trivial
+branch.
 
 #### AC-SAFE-11 — macOS: decomposed source names round-trip as NFC
 Core · OS macos · fast · Traces: W-9, PATH-2, D8
@@ -826,6 +912,49 @@ $CHST list --json "$W/c.chst" | jq -e '[.entries[].path] == ["\u00e9"]'
 $CHST extract "$W/c.chst" -C "$W/x"
 python3.14 -I tools/acceptance/tree_eq.py --nfc "$W/t" "$W/x"
 ```
+
+#### AC-SAFE-12 — The create-entry layer refuses hostile names on its own
+Core · OS all · fast · Traces: EXT-6, EXT-8, D10
+```sh
+cargo_test_nonempty --release -p chst-fs --test create_layer
+```
+The test calls `chst-fs`'s create-entry layer directly, bypassing format validation (F15),
+with the names `..`, `.`, `/x`, `a/../..`, `C:`, `a\b` and a name containing NUL. Each must
+be refused, with nothing created outside the test's staging directory.
+
+#### AC-SAFE-13 — The final rename never replaces a destination created mid-extract
+Core · OS all · fast · Traces: EXT-1, EXT-4, D10
+```sh
+cargo_test_nonempty --release -p chst-fs --features test-hooks --test dest_race
+```
+Just before the final rename, a hook creates something at the destination (F16). The test
+runs three cases: an empty directory, a symlink on Unix (a junction on Windows), and a
+regular file. In each, the result must be `refused/extract.dest-exists`, the planted object
+must be unchanged, and staging must be gone.
+
+#### AC-SAFE-14 — The staging directory is private and unpredictable
+Core · OS all · fast · Traces: EXT-4, D10
+```sh
+cargo_test_nonempty --release -p chst-fs --features test-hooks --test staging_props
+```
+A hook pauses extraction right after the staging directory is created (F17). The test
+asserts:
+- its name matches `^\.<dest>\.chst-[0-9a-f]{32}$`;
+- two extractions use different names;
+- its mode is 0700 on Unix, or its DACL grants only the current user on Windows;
+- if the test pre-creates a directory with the exact name the next staging directory will
+  use (forced through the hook's random source), creation fails, and nothing is written
+  into the pre-created directory.
+
+#### AC-SAFE-15 — Cleanup never follows a link
+Core · OS all · fast · Traces: EXT-4, EXT-6, D10
+```sh
+cargo_test_nonempty --release -p chst-fs --features test-hooks --test cleanup_race
+```
+Extraction is made to fail late (the BLB-6 fixture `late-blob-hash`) (F18). Before cleanup
+runs, a hook replaces a directory inside staging with a symlink (a junction on Windows) to
+an outside directory full of sentinel files. After cleanup, every sentinel file must still
+exist, and staging must be gone.
 
 ### 3.8 Pack behaviour
 
@@ -855,8 +984,11 @@ Core · OS all · fast · Traces: D2, W-4
 ```sh
 cargo_test_nonempty --release -p chst-fs --test source_changed
 ```
-The test uses a fault-injecting source that returns different bytes on its second read. It
-asserts `refused/pack.source-changed` and that no output file exists.
+The test covers two cases, each asserting `refused/pack.source-changed` and that no output
+file exists:
+- a fault-injecting source that returns different bytes on its second read;
+- a file replaced between pass 1 and pass 2 by a different file (a new inode or file ID)
+  with identical bytes. This proves pass 2 checks the file's identity (W-5, F23).
 
 #### AC-PACK-4 — Container writes are atomic, including under `--force`
 Core · OS linux, macos · fast · Traces: G5, W-2, W-7
@@ -910,13 +1042,53 @@ touch "$W/b/$(printf 'e\xcc\x81')" "$W/b/$(printf '\xc3\xa9')"
 expect_exit 9 $CHST pack "$W/b" -o "$W/b.chst" 2> "$W/err" && grep -q pack.unportable-name "$W/err"
 ```
 
-#### AC-PACK-5 — An output path inside the source tree is refused
+#### AC-PACK-5 — An output path inside the source tree is refused, however it's spelled
 Core · OS all · fast · Traces: W-6
 ```sh
-mkdir -p "$W/t" && echo x > "$W/t/f"
+mkdir -p "$W/t/sub" && echo x > "$W/t/f"
 expect_exit 9 $CHST pack "$W/t" -o "$W/t/self.chst" 2> "$W/err"
 grep -q 'pack.output-in-source' "$W/err" && test ! -e "$W/t/self.chst"
+expect_exit 9 $CHST pack "$W/t" -o "$W/t/sub/../sub/self.chst"           # .. route (F22)
+if [ "$CHST_OS" != windows ]; then
+  ln -s "$W/t/sub" "$W/alias"                                           # symlinked route
+  expect_exit 9 $CHST pack "$W/t" -o "$W/alias/self.chst" && test ! -e "$W/t/sub/self.chst"
+fi
 ```
+"Inside" is decided by file identity (W-6). So routes through `..` or through a symlink to
+a directory in the source tree are refused too.
+
+#### AC-PACK-10 — A directory swapped for a link during the walk is never followed
+Core · OS all · fast · Traces: W-5, W-8, D10
+```sh
+cargo_test_nonempty --release -p chst-fs --features test-hooks --test walk_race
+```
+A hook pauses the pack walk after a directory has been listed, and replaces it with a
+symlink (a junction on Windows) to an outside directory (F23). No byte of the outside
+directory may appear in the output. The pack either fails `refused/pack.source-changed`, or
+completes without that directory's contents.
+
+#### AC-PACK-11 — Pack refuses to write what its own verify would reject
+Core · OS all · fast · Traces: W-10, D11
+```sh
+d=$FX/core/valid/worked-example; $GEN materialize $d/tree.json "$W/t"
+expect_exit 8 $CHST pack --max-entries 4 "$W/t" -o "$W/a.chst" 2> "$W/err"
+grep -q 'error\[limit-exceeded/limit.entries\]' "$W/err" && test ! -e "$W/a.chst"
+expect_exit 8 $CHST pack --max-total-bytes 14 "$W/t" -o "$W/b.chst" && test ! -e "$W/b.chst"
+expect_exit 0 $CHST pack --max-entries 5 --max-total-bytes 15 "$W/t" -o "$W/c.chst"
+```
+F24.
+
+#### AC-PACK-12 — Skipped cloud placeholders get their own warning
+Core · OS all · fast · Traces: W-8
+```sh
+cargo_test_nonempty --release -p chst-fs --test skip_classification
+```
+Real cloud-file placeholders can't be created on CI runners. So the test feeds the walk's
+classification function synthetic Windows reparse tags (F46):
+- every `IO_REPARSE_TAG_CLOUD*` tag must give `pack.skipped-placeholder`;
+- symlink, mount-point and other tags give `pack.skipped`.
+
+AC-CLI-2 checks the `summary.skipped` count end to end.
 
 ### 3.9 Limits (V8)
 
@@ -984,10 +1156,21 @@ head -c 100 /dev/urandom > "$W/r" && expect_exit 4 $CHST verify "$W/r"
 Core · OS linux, macos · fast · Traces: D12, W-5
 ```sh
 mkdir -p "$W/t" && mkfifo "$W/t/p" && echo x > "$W/t/f"
-expect_exit 0 $CHST pack --json "$W/t" -o "$W/c.chst" | jq -e '.warnings[0].detail == "pack.skipped"'
+expect_exit 0 $CHST pack --json "$W/t" -o "$W/c.chst" > "$W/r.json"
+jq -e '.warnings[0].detail == "pack.skipped" and .summary.skipped == 1' "$W/r.json"
 ```
 `pack --json` emits a `chst-report/1` object with `command: "pack"` (FORMAT_SPEC
 Appendix B).
+
+#### AC-CLI-3 — list's text output escapes non-printing characters
+Core · OS all · fast · Traces: PATH-6, D8
+```sh
+$CHST list $FX/core/valid/nonprinting/container.chst > "$W/out.txt"
+grep -qF 'zero\u{200b}width.txt' "$W/out.txt"
+if LC_ALL=C grep -q $'\xe2\x80\x8b' "$W/out.txt"; then exit 1; fi    # the raw U+200B must not appear
+```
+Code points that PATH-6 allows but that don't print are escaped as `\u{X}` (FORMAT_SPEC
+Appendix C, F42).
 
 ### 3.11 Compatibility (V9)
 
@@ -999,9 +1182,14 @@ for e in $FX/compat/*.expect.json; do
   set +e; $CHST_CORE verify --json "$f" > "$W/r.json"; rc=$?; set -e
   test $rc = "$(jq .exit $e)"
   jq -e --slurpfile x $e '($x[0].detail == null) or (.error.detail == $x[0].detail)' "$W/r.json"
-  if [ "$rc" = 0 ]; then diff <($CHST_CORE list --json "$f" | jqn /dev/stdin) <(jqn ${e%.expect.json}.list.json); fi
+  if [ "$rc" = 0 ]; then for c in list verify inspect; do
+    $CHST_CORE $c --json "$f" > "$W/c.json"; diff <(jqn "$W/c.json") <(jqn ${e%.expect.json}.$c.json)
+  done; fi
 done
 ```
+For every exit-0 fixture, the Core-only reader's list, verify and inspect reports must
+match the expected Core view (F33). That view names KV_METADATA `unknown`, names
+`ENTRY_ATTRS` `bit0`, and shows attribute bytes as `extra`.
 
 The compat set MUST include:
 
@@ -1064,7 +1252,15 @@ FAIL.
 #### AC-X-NEG-1 — Extended negative fixtures (ZST, ATT, KV, FLG-1, LIM-6)
 Extended:all · OS all · fast · Traces: ZST-1…3, ATT-1, KV-1, FLG-1, LIM-6, D7
 The same script as AC-NEG-1 and AC-NEG-2, over `$FX/extended/invalid`, for the rules
-ZST-1…3, ATT-1, KV-1, FLG-1 and LIM-6.
+ZST-1…3, ATT-1, KV-1, FLG-1, LIM-6 and SEC-4 (KV_METADATA's record size).
+
+The required sub-condition fixtures (F35) are:
+- `FLG-1-kv-section-no-flag`, `FLG-1-zstd-unused`;
+- `ATT-1-mode`, `ATT-1-reserved`;
+- `KV-1-empty`, `KV-1-utf8`, `KV-1-keylen0`, `KV-1-keylen256`, `KV-1-value-too-long`,
+  `KV-1-truncated`, `KV-1-duplicate`;
+- `SEC-4-kv`;
+- `ZST-2-window`, `ZST-2-dictid`, `ZST-2-short`, `ZST-2-checksum`.
 
 #### AC-X-ZSTD-1 — Compressed round-trip; compressed only when smaller
 Extended:#12 · OS all · fast · Traces: #12, D7, ZST-3
@@ -1080,15 +1276,20 @@ done
 The fixtures include incompressible random data, which must list as `encoding: "stored"`.
 Comparison deliberately excludes compressed sizes and keys (D7).
 
-#### AC-X-ZSTD-2 — Decompression bombs are contained
-Extended:#12 · OS all · fast · Traces: ZST-1, LIM-6, D11
+#### AC-X-ZSTD-2 — Decompression bombs and huge windows are contained
+Extended:#12 · OS linux · fast · Traces: ZST-1, ZST-2, LIM-6, D11
 ```sh
-cargo_test_nonempty --release -p chst-format --features zstd --test zstd_bombs
+for t in ZST-2-window:6:zstd.frame ZST-2-dictid:6:zstd.frame ZST-1:7:zstd.raw-length LIM-6:8:limit.ratio; do
+  IFS=: read -r n code det <<< "$t"
+  set +e; /usr/bin/time -f '%M' -o "$W/rss" $CHST verify --json $FX/extended/invalid/$n.chst > "$W/r.json"; rc=$?; set -e
+  test $rc = $code && test "$(jq -r .error.detail "$W/r.json")" = "$det"
+  test "$(cat "$W/rss")" -lt 65536                                      # peak RSS < 64 MiB, C allocations included
+done
 ```
-The test covers three cases:
-- a frame that decodes to more than `raw_length` gives `integrity/zstd.raw-length`;
-- a ratio above 1000 gives `limit-exceeded/limit.ratio`;
-- peak heap stays under 8 MiB above the baseline.
+The memory limit is measured on the whole process's peak RSS (F10), so libzstd's C
+allocations are included; a counting Rust allocator can't see them.
+`ZST-2-window` declares a 2 GiB window, which the reader must refuse from the frame header
+before allocating anything (FORMAT_SPEC §12.5).
 
 #### AC-X-ATTR-1 — Modification time and mode round-trip; setuid is never stored or set
 Extended:#16 · OS linux · fast · Traces: #16, ATT-1
@@ -1098,6 +1299,14 @@ $CHST pack --attrs "$W/t" -o "$W/c.chst"
 $CHST list --json "$W/c.chst" | jq -e '.entries[0].mode == 493 and .entries[0].mtime_seconds == 1700000000 and .entries[0].mtime_nanos == 500000000'
 $CHST extract "$W/c.chst" -C "$W/x"
 test "$(stat -c %a "$W/x/f")" = 755
+# F27: modes are applied as stored (not subject to umask); a read-only directory doesn't block
+# its children; directory mtimes survive their children being written.
+mkdir -p "$W/u/ro" && echo y > "$W/u/ro/g" && chmod 600 "$W/u/ro/g" && touch -d @1600000000 "$W/u/ro" && chmod 555 "$W/u/ro"
+$CHST pack --attrs "$W/u" -o "$W/u.chst"
+(umask 077; $CHST extract "$W/u.chst" -C "$W/y")
+test "$(stat -c %a "$W/y/ro")" = 555 && test "$(stat -c %a "$W/y/ro/g")" = 600
+test "$(stat -c %Y "$W/y/ro")" = 1600000000
+chmod 755 "$W/u/ro" "$W/y/ro"
 ```
 
 #### AC-X-ATTR-2 — `--deterministic` neutralises environment-derived attributes
@@ -1130,10 +1339,20 @@ $CHST extract $f -C "$W/z" 'docs'
 (cd "$W/z" && find . | sort) | diff - <(printf '.\n./docs\n./docs/a.txt\n./docs/b.txt\n./docs/empty\n')
 expect_exit 9 $CHST extract $f -C "$W/y" 'docs/*.txt' 'nomatch/*' 2> "$W/err"
 grep -q 'error\[refused/extract.no-match\]' "$W/err" && grep -q 'nomatch/\*' "$W/err" && test ! -e "$W/y"
+$CHST extract $f -C "$W/q" 'docs/?.txt' 'notes.tx[st]'                 # ? and [...]
+(cd "$W/q" && find . | sort) | diff - <(printf '.\n./docs\n./docs/a.txt\n./docs/b.txt\n./notes.txt\n')
+$CHST extract $f -C "$W/r" 'docs/[!a].txt'                             # negated class
+(cd "$W/r" && find . | sort) | diff - <(printf '.\n./docs\n./docs/b.txt\n')
+$CHST extract $f -C "$W/s" 'docs/**'                                   # a/** matches a itself
+(cd "$W/s" && find . | sort) | diff - <(printf '.\n./docs\n./docs/a.txt\n./docs/b.txt\n./docs/empty\n')
+expect_exit 2 $CHST extract $f -C "$W/u" 'docs\a.txt'                  # no escape character
 ```
-The behaviour is defined in FORMAT_SPEC §12.8:
-- ancestors of selected entries are created;
+The behaviour is defined in FORMAT_SPEC §12.8 (F25):
+- ancestors of selected entries are created, but aren't themselves selected, so
+  `docs/*.txt` doesn't bring in `docs/empty`;
 - selecting a directory selects its whole subtree;
+- `?`, `[...]`, `[!...]` and `**` behave as specified;
+- a backslash is a usage error;
 - any pattern that matches nothing is `refused/extract.no-match`, with nothing written.
 
 #### AC-X-EXCL-1 — Exclude patterns when packing
@@ -1142,6 +1361,11 @@ Extended:#7 · OS all · fast · Traces: #7
 mkdir -p "$W/t/logs" "$W/t/src" && echo a > "$W/t/src/a.rs" && echo b > "$W/t/x.log" && echo c > "$W/t/logs/y"
 $CHST pack --exclude '*.log' --exclude 'logs' "$W/t" -o "$W/c.chst"
 test "$($CHST list --json "$W/c.chst" | jq -c '[.entries[].path]')" = '["src","src/a.rs"]'
+if [ "$CHST_OS" = linux ]; then                    # F26: excluded names are never checked (W-3) or descended
+  touch "$W/t/logs/a:b"; chmod 000 "$W/t/logs"
+  expect_exit 0 $CHST pack --exclude 'logs' --exclude '*.log' "$W/t" -o "$W/d.chst"
+  chmod 755 "$W/t/logs"
+fi
 ```
 
 #### AC-X-TS-1 — The TypeScript reader matches the generator's expected JSON on valid fixtures
@@ -1169,6 +1393,7 @@ grep -rqF 'node:crypto' ts-reader/src
 jq -e '(.dependencies // {} | length) == 0' ts-reader/package.json
 jq -e '.devDependencies // {} | keys | all(. == "typescript" or . == "@types/node")' ts-reader/package.json
 node --version | grep -qE '^v24\.'
+test "$(node -p process.versions.unicode)" = 16.0                    # F12: Unicode 16.0 tables
 ```
 The expected values come from the generator's fixtures, never from the Rust code. The
 reader has no runtime dependencies (D15): it uses `node:crypto` for SHA-256 and

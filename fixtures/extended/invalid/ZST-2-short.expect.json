@@ -1,0 +1,11 @@
+{
+  "rule": "ZST-2",
+  "category": "malformed",
+  "detail": "zstd.frame",
+  "exit": 6,
+  "base": "zstd-mixed",
+  "mutation": "zeros.bin stored as 3 bytes with encoding 1 (shorter than any frame)",
+  "also_violates": [
+    "limit.ratio"
+  ]
+}

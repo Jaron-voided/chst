@@ -1,0 +1,8 @@
+{
+  "rule": "LIM-2",
+  "category": "malformed",
+  "detail": "lim.index-size",
+  "exit": 6,
+  "base": "worked-example",
+  "mutation": "index_length = 2^32 + 1, with only header and trailer stored (sparse recipe)"
+}

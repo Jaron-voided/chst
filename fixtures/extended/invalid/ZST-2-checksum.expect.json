@@ -1,0 +1,8 @@
+{
+  "rule": "ZST-2",
+  "category": "malformed",
+  "detail": "zstd.frame",
+  "exit": 6,
+  "base": "zstd-compressed",
+  "mutation": "last byte of the frame's content checksum XORed with 0x01"
+}

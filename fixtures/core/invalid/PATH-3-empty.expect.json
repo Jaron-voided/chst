@@ -1,0 +1,8 @@
+{
+  "rule": "PATH-3",
+  "category": "malformed",
+  "detail": "path.length",
+  "exit": 6,
+  "base": "worked-example",
+  "mutation": "directory with the empty path (path_length 0) added"
+}

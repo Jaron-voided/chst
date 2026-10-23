@@ -87,18 +87,19 @@ def require(cond, msg):
         raise SystemExit(f"self-check failed: {msg}")
 
 
-def expect_violations(name, data, rule, allow=(), limits=None):
-    got = check(data, limits=limits)
-    allowed = {rule, *allow}
-    require(rule in got, f"{name}: expected {rule}, checker found {sorted(got)}")
-    require(got <= allowed, f"{name}: {sorted(got - allowed)} violated besides {sorted(allowed)}")
-    return sorted(got)
+def expect_first(name, data, rule, limits=None, reader="extended"):
+    """The reader must report `rule` (the first violation in §13 order). Returns all violations."""
+    got = check(data, limits=limits, reader=reader)
+    require(got and got[0] == rule, f"{name}: expected {rule} first, checker found {got}")
+    return got
 
 
-def write_valid(out, base, entries, **kw):
-    plan = chst.layout(entries, **kw)
+def write_valid(out, base, entries, *, readers=("extended",), **kw):
+    frame = kw.pop("frame", None)
+    plan = catalog.with_frame(entries, *frame) if frame else chst.layout(entries, **kw)
     data = chst.serialize(plan)
-    require(check(data) == set(), f"{base}: valid fixture violates {sorted(check(data))}")
+    for r in readers:
+        require(check(data, reader=r) == [], f"{base}: valid fixture violates {check(data, reader=r)} ({r} reader)")
     c = reports.parse_bytes(data)
     out.write(f"{base}/container.chst", data)
     out.json(f"{base}/tree.json", chst.tree_from_entries(entries, with_attrs=kw.get("attrs", False)))
@@ -114,10 +115,15 @@ def invalid_expect(rule, base, mutation, got, args=None):
     if args:
         e["args"] = args
     if len(got) > 1:
-        e["details"] = sorted(RULES[r][1] for r in got)
-        e["note"] = ("This change necessarily breaks more than one rule, and FORMAT_SPEC §13 lets steps 8-10 "
-                     "run in any order, so a reader may report any detail listed in 'details'.")
+        # Informational only: rules also broken, which a reader must not report because they come
+        # later in FORMAT_SPEC §13's order. Checks compare only `detail`.
+        e["also_violates"] = [RULES[r][1] for r in got[1:]]
     return e
+
+
+def single_detail_expect(rule, **extra):
+    cat, det, code = outcome(rule)
+    return {"rule": rule, "category": cat, "detail": det, "exit": code, **extra}
 
 
 # ---------------------------------------------------------------- build everything
@@ -135,9 +141,9 @@ def build(out_root):
     def bump(k):
         counts[k] = counts.get(k, 0) + 1
 
-    # core/valid
+    # core/valid: valid for both a Core-only and an Extended reader
     for name, fn in catalog.VALID_CORE.items():
-        data = write_valid(out, f"core/valid/{name}", fn())
+        data = write_valid(out, f"core/valid/{name}", fn(), readers=("extended", "core"))
         bump("core/valid")
         if name == "worked-example":
             require(data == SPEC_WORKED_EXAMPLE,
@@ -147,75 +153,74 @@ def build(out_root):
     # core/invalid
     for rule, suffix, base, mutation, builder, opts in catalog.core_invalid():
         data = to_bytes(builder())
-        got = expect_violations(f"{rule}{suffix}", data, rule, opts.get("allow", ()), opts.get("limits"))
+        got = expect_first(f"{rule}{suffix}", data, rule, opts.get("limits"))
+        require(check(data, limits=opts.get("limits"), reader="core")[:1] == [rule], f"{rule}{suffix}: core reader differs")
         out.write(f"core/invalid/{rule}{suffix}.chst", data)
         out.json(f"core/invalid/{rule}{suffix}.expect.json", invalid_expect(rule, base, mutation, got, opts.get("args")))
         bump("core/invalid")
+    build_lim2_recipe(out)
+    bump("core/invalid")
 
-    # core/attacks: every path rule or parent violation must make extraction fail as malformed
+    # core/attacks: the expected first violation is written in the catalog, not taken from the checker
     for name, rule, builder in catalog.attacks():
         data = chst.serialize(builder())
-        got = check(data)
-        require(rule in got, f"attack {name}: expected {rule}, got {sorted(got)}")
-        require(all(RULES[r][0] == "malformed" for r in got), f"attack {name}: non-malformed {sorted(got)}")
+        expect_first(f"attack {name}", data, rule)
         out.write(f"core/attacks/{name}.chst", data)
-        out.json(f"core/attacks/{name}.expect.json",
-                 {"rule": rule, "category": "malformed", "exit": EXITS["malformed"],
-                  "details": sorted(RULES[r][1] for r in got)})
+        out.json(f"core/attacks/{name}.expect.json", single_detail_expect(rule))
         bump("core/attacks")
 
     # core/extract-cases
     for name, code, rule, note, entries, builder in catalog.extract_cases():
         data = chst.serialize(builder() if builder else chst.layout(entries))
-        got = check(data)
-        require(got == ({rule} if rule else set()), f"extract-case {name}: got {sorted(got)}")
+        require(check(data) == ([rule] if rule else []), f"extract-case {name}: got {check(data)}")
         out.write(f"core/extract-cases/{name}.chst", data)
         e = {"exit": code, "note": note}
         if rule:
-            e.update({"rule": rule, "category": RULES[rule][0], "detail": RULES[rule][1]})
+            e.update(single_detail_expect(rule))
         out.json(f"core/extract-cases/{name}.expect.json", e)
         if entries:
             out.json(f"core/extract-cases/{name}.tree.json", chst.tree_from_entries(entries))
         bump("core/extract-cases")
 
     # core/hostile (AC-LIM-1): huge declared sizes in tiny files
-    for name, mutation, builder in catalog.hostile():
+    for name, rule, mutation, builder in catalog.hostile():
         data = chst.serialize(builder())
-        got = check(data)
-        require(got and all(RULES[r][0] == "malformed" for r in got), f"hostile {name}: got {sorted(got)}")
+        expect_first(f"hostile {name}", data, rule)
         require(len(data) < 1024, f"hostile {name}: {len(data)} bytes")
         out.write(f"core/hostile/{name}.chst", data)
         out.json(f"core/hostile/{name}.expect.json",
-                 {"exit": EXITS["malformed"], "base": catalog.WE_MUTATION, "mutation": mutation,
-                  "details": sorted(RULES[r][1] for r in got)})
+                 single_detail_expect(rule, base=catalog.WE_MUTATION, mutation=mutation))
         bump("core/hostile")
 
     # core/hostile64 (AC-ROB-8): 2^32 added to u64 fields; a 32-bit reader would accept these
     for name, mutation, rules, mut in catalog.hostile64():
         data = chst.serialize(mut(catalog.we()))
-        got = check(data)
-        require(got and got <= set(rules), f"hostile64 {name}: got {sorted(got)}, allowed {rules}")
+        expect_first(f"hostile64 {name}", data, rules[0])
         out.write(f"core/hostile64/{name}.chst", data)
-        out.json(f"core/hostile64/{name}.expect.json",
-                 {"exit": EXITS["malformed"], "base": catalog.WE_MUTATION, "mutation": mutation,
-                  "details": sorted(RULES[r][1] for r in rules)})
+        e = single_detail_expect(rules[0], base=catalog.WE_MUTATION, mutation=mutation)
+        e["details"] = [e["detail"]]
+        out.json(f"core/hostile64/{name}.expect.json", e)
         bump("core/hostile64")
 
     # core/sparse (AC-ROB-9): a valid 5 GiB container, stored as a recipe
     build_sparse(out, "core/sparse/huge-5g", 5 * 2 ** 30)
     bump("core/sparse")
 
-    # compat (AC-COMPAT-1): how a Core-only reader treats Extended and future files
+    # compat (AC-COMPAT-1): proven with a Core-only reader; reports are the Core reader's view
     for name, code, rule, builder in catalog.compat():
         data = chst.serialize(builder())
-        require(check(data) == ({rule} if rule in ("HDR-3", "HDR-4", "SEC-2") or (rule == "HDR-6" and name != "zstd-required-flag") else set()),
-                f"compat {name}: full-reader check got {sorted(check(data))}")
+        core_got = check(data, reader="core")
+        require(core_got == ([rule] if rule else []), f"compat {name}: core reader found {core_got}")
+        require(check(data, reader="extended") in ([], [rule]), f"compat {name}: extended reader found {check(data)}")
         out.write(f"compat/{name}.chst", data)
         out.json(f"compat/{name}.expect.json",
                  {"exit": code, "detail": RULES[rule][1] if rule else None,
                   "note": "Expected result for a Core-only reader (built with --no-default-features)."})
         if code == 0:
-            out.json(f"compat/{name}.list.json", reports.list_report(reports.parse_bytes(data), core_view=True))
+            c = reports.parse_bytes(data, reader="core")
+            out.json(f"compat/{name}.list.json", reports.list_report(c))
+            out.json(f"compat/{name}.verify.json", reports.verify_report(c))
+            out.json(f"compat/{name}.inspect.json", reports.inspect_report(c))
         bump("compat")
 
     # extended/valid
@@ -226,7 +231,7 @@ def build(out_root):
     # extended/invalid
     for rule, suffix, base, mutation, builder, opts in catalog.extended_invalid():
         data = to_bytes(builder())
-        got = expect_violations(f"{rule}{suffix}", data, rule, opts.get("allow", ()), opts.get("limits"))
+        got = expect_first(f"{rule}{suffix}", data, rule, opts.get("limits"))
         out.write(f"extended/invalid/{rule}{suffix}.chst", data)
         out.json(f"extended/invalid/{rule}{suffix}.expect.json", invalid_expect(rule, base, mutation, got, opts.get("args")))
         bump("extended/invalid")
@@ -239,6 +244,26 @@ def build(out_root):
 
     write_manifest(out_root)
     return counts
+
+
+def build_lim2_recipe(out):
+    """LIM-2 (F7): an index over 2^32 bytes. Only a header and a trailer are stored: LIM-2 is
+    checked in step 6, before the index is read, so the index bytes are never needed."""
+    head = chst.header_bytes(catalog.we()["header"])
+    index_length = 2 ** 32 + 1
+    prefix = struct.pack("<QQ", chst.HEADER_LEN, index_length)
+    trailer = prefix + b"\x00" * 32 + chst.TRAILER_MAGIC  # structure hash never reached (step 7)
+    file_length = chst.HEADER_LEN + index_length + chst.TRAILER_LEN
+    from check import head_trailer_checks, DEFAULT_LIMITS
+    require(head_trailer_checks(head, trailer, file_length, DEFAULT_LIMITS) == ["LIM-2"], "LIM-2 recipe")
+    out.json("core/invalid/LIM-2.recipe.json",
+             {"schema": "chst-sparse-recipe/1", "file_length": file_length, "head_hex": head.hex(),
+              "tail_offset": file_length - chst.TRAILER_LEN, "tail_hex": trailer.hex(),
+              "note": "Index of 2^32 + 1 bytes (all zero, never read). Create the file sparse, then "
+                      "write head and tail (gen.py materialize-sparse)."})
+    out.json("core/invalid/LIM-2.expect.json",
+             invalid_expect("LIM-2", catalog.WE_MUTATION,
+                            "index_length = 2^32 + 1, with only header and trailer stored (sparse recipe)", ["LIM-2"]))
 
 
 def build_sparse(out, base, size):
@@ -294,18 +319,22 @@ def long_path(p):
 def materialize(tree_path, dest, reverse=False):
     tree = json.loads(pathlib.Path(tree_path).read_text(encoding="utf-8"))
     entries = tree["entries"]
-    rng = random.Random()
+    seed = os.environ.get("CHST_DET_SEED", "chst-det-1")
+    rng = random.Random(seed)
+    if reverse:
+        print(f"materialize --reverse: CHST_DET_SEED={seed}", file=sys.stderr)
     os.makedirs(dest, exist_ok=False)
     dirs = [e for e in entries if e["type"] == "dir"]
     files = [e for e in entries if e["type"] == "file"]
-    if reverse:
-        dirs, files = dirs[::-1], files[::-1]
+    if reverse:  # deepest directories first (their ancestors appear as a side effect), files reversed
+        dirs, files = sorted(dirs, key=lambda e: e["path"], reverse=True), files[::-1]
     import base64
+    made = set()
     for e in dirs:
-        _mkdirs(dest, e["path"].split("/"))
+        _mkdirs(dest, e["path"].split("/"), made)
     for e in files:
         parts = e["path"].split("/")
-        _mkdirs(dest, parts[:-1])
+        _mkdirs(dest, parts[:-1], made)
         _write_file(dest, parts, base64.b64decode(e["content_b64"]))
     if reverse:
         for e in entries:
@@ -322,22 +351,23 @@ def _open_dir(root, parts):
     return fd
 
 
-def _mkdirs(root, parts):
-    if os.name == "nt":
-        os.makedirs(long_path(os.path.join(root, *parts)), exist_ok=True)
-        return
-    fd = os.open(root, os.O_RDONLY)
-    try:
-        for part in parts:
+def _mkdirs(root, parts, made):
+    """Create each missing directory. An existing name we didn't create here means two entries
+    collided on this filesystem (for example case-insensitive): fail instead of merging."""
+    for i in range(1, len(parts) + 1):
+        key = "/".join(parts[:i])
+        if key in made:
+            continue
+        if os.name == "nt":
+            p = long_path(os.path.join(root, *parts[:i]))
+            os.mkdir(p)  # raises FileExistsError on a collision
+        else:
+            fd = _open_dir(root, parts[:i - 1])
             try:
-                os.mkdir(part, dir_fd=fd)
-            except FileExistsError:
-                pass
-            nfd = os.open(part, os.O_RDONLY, dir_fd=fd)
-            os.close(fd)
-            fd = nfd
-    finally:
-        os.close(fd)
+                os.mkdir(parts[i - 1], dir_fd=fd)  # raises FileExistsError on a collision
+            finally:
+                os.close(fd)
+        made.add(key)
 
 
 def _write_file(root, parts, content):

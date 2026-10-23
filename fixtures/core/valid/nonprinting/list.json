@@ -1,0 +1,17 @@
+{
+  "schema": "chst-report/1",
+  "command": "list",
+  "ok": true,
+  "error": null,
+  "warnings": [],
+  "entries": [
+    {
+      "path": "zero​width.txt",
+      "type": "file",
+      "size": 5,
+      "stored_size": 5,
+      "encoding": "stored",
+      "blob": "82cd93e2b251ee9d991032f69e6a794c07367bf9907647bc917af40e31da375e"
+    }
+  ]
+}

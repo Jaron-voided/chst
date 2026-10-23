@@ -1,0 +1,6 @@
+{
+  "rule": "PATH-6",
+  "category": "malformed",
+  "detail": "path.control-char",
+  "exit": 6
+}

@@ -1,0 +1,8 @@
+{
+  "schema": "chst-sparse-recipe/1",
+  "file_length": 4294967385,
+  "head_hex": "434853540d0a1a00010000000100000000000000000000000000000000000000",
+  "tail_offset": 4294967329,
+  "tail_hex": "200000000000000001000000010000000000000000000000000000000000000000000000000000000000000000000000001a0a0d54534843",
+  "note": "Index of 2^32 + 1 bytes (all zero, never read). Create the file sparse, then write head and tail (gen.py materialize-sparse)."
+}

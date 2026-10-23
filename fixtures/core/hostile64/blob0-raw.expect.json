@@ -1,4 +1,7 @@
 {
+  "rule": "BLB-3",
+  "category": "malformed",
+  "detail": "blob.raw-length",
   "exit": 6,
   "base": "worked-example",
   "mutation": "blob[0].raw_length + 2^32",

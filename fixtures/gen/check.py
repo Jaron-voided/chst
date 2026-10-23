@@ -1,10 +1,12 @@
 """Rule checker used only to validate the generated fixtures against FORMAT_SPEC.md.
 
-check(data) returns the set of rule IDs the container violates, following the reader
-algorithm of FORMAT_SPEC §13. Steps 1-7 stop at the first violation, as the spec requires.
-Steps 8-11 collect every violation they can still evaluate. The generator asserts that each
-valid fixture returns an empty set, and that each bad fixture returns only the rules its
-expect.json allows.
+check(data) returns the rules a container violates, as a list in the reporting order of
+FORMAT_SPEC §13. The first element is the one a conforming reader must report. Steps 1-7
+stop at their first violation, because later steps can't be evaluated; steps 8-11 keep
+collecting, so the generator can see every co-violation, not just the reported one.
+A reader that hits HDR-6 or SEC-2 evaluates nothing after step 9 (§13).
+
+reader="extended" knows every 1.0 feature; reader="core" knows none (Core-only build).
 """
 
 import hashlib
@@ -18,266 +20,326 @@ from chst import (BLOB_RECORD, DIR, ENC_STORED, ENC_ZSTD, ENTRY_RECORD, ENTRY_RE
 
 DEFAULT_LIMITS = {"entries": 1_048_576, "index": 268_435_456, "total": 68_719_476_736, "ratio": 1000}
 U64 = 2 ** 64
+ZSTD_WINDOW_MAX = 8 * 1024 * 1024
 RESERVED_STEMS = {"CON", "PRN", "AUX", "NUL", "CONIN$", "CONOUT$"} | {f"COM{i}" for i in range(10)} \
     | {f"LPT{i}" for i in range(10)} | {"COM¹", "COM²", "COM³", "LPT¹", "LPT²", "LPT³"}
 FORBIDDEN_CHARS = set('\\<>:"|?*')
+_ASCII_UPPER = {c: c - 32 for c in range(97, 123)}
+READERS = {
+    "extended": {"req": REQ_ZSTD, "opt": OPT_ENTRY_ATTRS | OPT_KV_METADATA,
+                 "sections": {SEC_BLOB_TABLE, SEC_ENTRY_TABLE, SEC_PATH_POOL, SEC_KV_METADATA}},
+    "core": {"req": 0, "opt": 0, "sections": {SEC_BLOB_TABLE, SEC_ENTRY_TABLE, SEC_PATH_POOL}},
+}
+
+
+def banned_char(ch):
+    o = ord(ch)
+    return o < 0x20 or 0x7F <= o <= 0x9F or 0x202A <= o <= 0x202E or 0x2066 <= o <= 0x2069
 
 
 def path_violations(path):
-    v = set()
+    """PATH-1..PATH-10 for one path, in §13 (g) order: 1, 2, 4, 3, 5, 6, 7, 8, 9, 10."""
+    v = []
     try:
         s = path.decode("utf-8")
     except UnicodeDecodeError:
-        v.add("PATH-1")
+        v.append("PATH-1")
         s = None
     if s is not None and not unicodedata.is_normalized("NFC", s):
-        v.add("PATH-2")
+        v.append("PATH-2")
     segs = path.split(b"/")
-    if not 1 <= len(path) <= 4096 or any(len(g) > 255 for g in segs):
-        v.add("PATH-3")
     if path.startswith(b"/") or path.endswith(b"/") or b"//" in path:
-        v.add("PATH-4")
-        v.add("PATH-3")  # an empty segment also breaks PATH-3's 1-255 byte segment length
+        v.append("PATH-4")
+    if not 1 <= len(path) <= 4096 or any(not 1 <= len(g) <= 255 for g in segs):
+        v.append("PATH-3")
     if any(g in (b".", b"..") for g in segs):
-        v.add("PATH-5")
-    if any(c < 0x20 or c == 0x7F for c in path):
-        v.add("PATH-6")
+        v.append("PATH-5")
     text = s if s is not None else path.decode("latin-1")
+    if (any(banned_char(ch) for ch in text) if s is not None else any(c < 0x20 or c == 0x7F for c in path)):
+        v.append("PATH-6")
     if any(ch in FORBIDDEN_CHARS for ch in text):
-        v.add("PATH-7")
-    for g in (text.split("/")):
-        if g.endswith(".") or g.endswith(" "):
-            v.add("PATH-8")
-        stem = g.split(".", 1)[0].rstrip(" ")
-        if stem.translate(_ASCII_UPPER) in RESERVED_STEMS:
-            v.add("PATH-9")
+        v.append("PATH-7")
+    names = text.split("/")
+    if any((g.endswith(".") or g.endswith(" ")) and g not in (".", "..") for g in names):
+        v.append("PATH-8")
+    if any(g.split(".", 1)[0].rstrip(" ").translate(_ASCII_UPPER) in RESERVED_STEMS for g in names):
+        v.append("PATH-9")
     if len(segs) > 256:
-        v.add("PATH-10")
+        v.append("PATH-10")
     return v
 
 
-_ASCII_UPPER = {c: c - 32 for c in range(97, 123)}
+# ---------------------------------------------------------------- Zstandard (RFC 8878)
+
+def zstd_header(frame):
+    """Parse the frame header. Returns dict or None if malformed."""
+    if len(frame) < 6 or frame[:4] != ZSTD_MAGIC:
+        return None
+    fhd = frame[4]
+    fcs_flag, single, reserved, checksum, did_flag = fhd >> 6, (fhd >> 5) & 1, (fhd >> 3) & 1, (fhd >> 2) & 1, fhd & 3
+    if reserved:
+        return None
+    pos, window = 5, None
+    if not single:
+        wd = frame[pos]
+        pos += 1
+        base = 1 << (10 + (wd >> 3))
+        window = base + (base // 8) * (wd & 7)
+    did_len = (0, 1, 2, 4)[did_flag]
+    did = int.from_bytes(frame[pos:pos + did_len], "little")
+    pos += did_len
+    fcs_len = (1 if single else 0, 2, 4, 8)[fcs_flag]
+    fcs = None
+    if fcs_len:
+        if pos + fcs_len > len(frame):
+            return None
+        fcs = int.from_bytes(frame[pos:pos + fcs_len], "little") + (256 if fcs_len == 2 else 0)
+    pos += fcs_len
+    if single:
+        window = fcs
+    return {"pos": pos, "window": window, "dict": did, "fcs": fcs, "checksum": checksum}
 
 
-def zstd_decode(frame):
-    """Decode a frame of Raw/RLE blocks. Returns (content, ok_frame)."""
-    if frame[:4] != ZSTD_MAGIC or len(frame) < 5:
-        return b"", False
-    desc = frame[4]
-    if desc != 0xE0 or len(frame) < 13:
-        return b"", False
-    fcs = struct.unpack_from("<Q", frame, 5)[0]
-    pos, out = 13, bytearray()
+def zstd_check(frame, raw_length):
+    """ZST-2 / ZST-1 for one encoded blob (§12.5), in that order. Returns a rule or None."""
+    h = zstd_header(frame)
+    if h is None or h["dict"] != 0 or h["window"] is None or h["window"] > ZSTD_WINDOW_MAX:
+        return "ZST-2"
+    pos, out, simple = h["pos"], bytearray(), True
     while True:
         if pos + 3 > len(frame):
-            return bytes(out), False
+            return "ZST-2"
         hdr = int.from_bytes(frame[pos:pos + 3], "little")
         pos += 3
         last, btype, size = hdr & 1, (hdr >> 1) & 3, hdr >> 3
+        if btype == 3:
+            return "ZST-2"
+        body = 1 if btype == 1 else size
+        if pos + body > len(frame):
+            return "ZST-2"
         if btype == 0:
-            if pos + size > len(frame):
-                return bytes(out), False
             out += frame[pos:pos + size]
-            pos += size
         elif btype == 1:
-            if pos + 1 > len(frame):
-                return bytes(out), False
             out += frame[pos:pos + 1] * size
-            pos += 1
         else:
-            return bytes(out), False
+            simple = False
+        pos += body
         if last:
             break
-    return bytes(out), pos == len(frame) and fcs == len(out)
+    pos += 4 if h["checksum"] else 0
+    if pos != len(frame):
+        return "ZST-2"  # trailing bytes, a second frame, or a truncated checksum
+    if h["fcs"] is not None and h["fcs"] != raw_length:
+        return "ZST-1"
+    if not simple or h["checksum"]:
+        from compression import zstd  # standard library (3.14); used only to decode, never to build
+        try:
+            out = zstd.decompress(frame)
+        except zstd.ZstdError:
+            return "ZST-2"
+    if len(out) != raw_length:
+        return "ZST-1"
+    return None
 
 
-def check(data, limits=None, mode="verify"):
-    lim = dict(DEFAULT_LIMITS, **(limits or {}))
-    n = len(data)
-    # steps 1-7: in order, stop at the first violation
+# ---------------------------------------------------------------- the reader algorithm
+
+def head_trailer_checks(head, trailer, n, lim):
+    """Steps 1-6 from the header, the trailer and the file length only (sparse recipes)."""
     if n < HEADER_LEN + TRAILER_LEN:
-        return {"HDR-1"}
-    if data[:8] != MAGIC:
-        return {"HDR-2"}
-    major, minor, alg = struct.unpack_from("<HHB", data, 8)
+        return ["HDR-1"]
+    if head[:8] != MAGIC:
+        return ["HDR-2"]
+    major, minor, alg = struct.unpack_from("<HHB", head, 8)
     if major != 1:
-        return {"HDR-3"}
+        return ["HDR-3"]
     if alg != 1:
-        return {"HDR-4"}
-    if data[-8:] != TRAILER_MAGIC:
-        return {"TRL-1"}
-    ioff, ilen = struct.unpack_from("<QQ", data, n - TRAILER_LEN)
+        return ["HDR-4"]
+    if trailer[-8:] != TRAILER_MAGIC:
+        return ["TRL-1"]
+    ioff, ilen = struct.unpack_from("<QQ", trailer, 0)
     if ioff < HEADER_LEN or ioff + ilen + TRAILER_LEN >= U64 or ioff + ilen + TRAILER_LEN != n:
-        return {"TRL-2"}
+        return ["TRL-2"]
     if ilen > 2 ** 32:
-        return {"LIM-2"}
+        return ["LIM-2"]
     if ilen > lim["index"]:
-        return {"LIM-4"}
+        return ["LIM-4"]
+    return []
+
+
+def check(data, limits=None, mode="verify", reader="extended"):
+    lim = dict(DEFAULT_LIMITS, **(limits or {}))
+    known = READERS[reader]
+    n = len(data)
+    first = head_trailer_checks(data[:HEADER_LEN], data[-TRAILER_LEN:], n, lim)
+    if first:
+        return first
+    ioff, ilen = struct.unpack_from("<QQ", data, n - TRAILER_LEN)
     index = data[ioff:ioff + ilen]
     if hashlib.sha256(data[:HEADER_LEN] + index + data[n - TRAILER_LEN:n - 40]).digest() != data[n - 40:n - 8]:
-        return {"TRL-3"}
-    v = set()
-    # step 8
-    if data[13:16] != b"\x00\x00\x00":
-        v.add("HDR-5")
+        return ["TRL-3"]
+    v = []
+
+    def add(rule):
+        if rule not in v:
+            v.append(rule)
+
+    # step 8: HDR-6, then HDR-5
     req, opt = struct.unpack_from("<QQ", data, 16)
-    if req & ~REQ_ZSTD:
-        return v | {"HDR-6"}
-    known_all = (opt & ~(OPT_ENTRY_ATTRS | OPT_KV_METADATA)) == 0
-    # step 9
+    if req & ~known["req"]:
+        add("HDR-6")
+        return v
+    if data[13:16] != b"\x00\x00\x00":
+        add("HDR-5")
+    zstd_on = bool(req & REQ_ZSTD and known["req"] & REQ_ZSTD)
+    attrs_on = bool(opt & OPT_ENTRY_ATTRS and known["opt"] & OPT_ENTRY_ATTRS)
+    kv_known = SEC_KV_METADATA in known["sections"]
+    knows_all_flags = (opt & ~known["opt"]) == 0
+    # step 9: SEC-1 framing, SEC-2, SEC-3, SEC-4, SEC-5, LIM-3
     secs, pos = [], 0
     while pos < ilen:
         if pos + 16 > ilen:
-            return v | {"SEC-1"}
+            add("SEC-1")
+            return v
         t, rs, cnt = struct.unpack_from("<IIQ", index, pos)
         size = rs * cnt
         if size >= U64 or pos + 16 + size > ilen:
-            return v | {"SEC-1"}
-        secs.append((t, rs, cnt, ioff + pos, index[pos + 16:pos + 16 + size]))
+            add("SEC-1")
+            return v
+        secs.append((t, rs, cnt, index[pos + 16:pos + 16 + size]))
         pos += 16 + size
-    known = {SEC_BLOB_TABLE, SEC_ENTRY_TABLE, SEC_PATH_POOL, SEC_KV_METADATA}
-    if any(t not in known and t & MUST_UNDERSTAND for t, *_ in secs):
-        return v | {"SEC-2"}
+    if any(t & MUST_UNDERSTAND and t not in known["sections"] for t, *_ in secs):
+        add("SEC-2")
+        return v
     types = [t for t, *_ in secs]
     rest = types[3:]
     if types[:3] != [SEC_BLOB_TABLE, SEC_ENTRY_TABLE, SEC_PATH_POOL] or any(
             a >= b for a, b in zip(rest, rest[1:])) or any(t in types[:3] for t in rest):
-        return v | {"SEC-3"}
-    (bt, brs, bcnt, _, bpay), (et, ers, ecnt, _, epay), (pt, prs, pcnt, _, pool) = secs[:3]
-    kv = [s for s in secs[3:] if s[0] == SEC_KV_METADATA]
+        add("SEC-3")
+        return v
+    (_, brs, bcnt, bpay), (_, ers, ecnt, epay), (_, prs, _, pool) = secs[:3]
+    kv = [s for s in secs[3:] if s[0] == SEC_KV_METADATA and kv_known]
     if brs < BLOB_RECORD or ers < ENTRY_RECORD or prs != 1 or any(s[1] != 1 for s in kv):
-        return v | {"SEC-4"}
-    if req == (req & REQ_ZSTD) and known_all:
-        want_e = ENTRY_RECORD_ATTRS if opt & OPT_ENTRY_ATTRS else ENTRY_RECORD
-        if brs != BLOB_RECORD or ers != want_e:
-            v.add("SEC-5")
-    if ecnt > 2 ** 32 - 1:
-        return v | {"LIM-1"}
+        add("SEC-4")
+        return v
+    if knows_all_flags and (brs != BLOB_RECORD or ers != (ENTRY_RECORD_ATTRS if attrs_on else ENTRY_RECORD)):
+        add("SEC-5")
     if ecnt > lim["entries"]:
-        return v | {"LIM-3"}
-    # step 10
+        add("LIM-3")
+    # step 10, items (a)-(p)
     blobs = []
     for i in range(bcnt):
         r = bpay[i * brs:i * brs + BLOB_RECORD]
-        key = r[:32]
         off, sl, rl, enc = struct.unpack_from("<QQQB", r, 32)
-        blobs.append({"key": key, "offset": off, "stored": sl, "raw": rl, "enc": enc, "res": r[57:64]})
+        blobs.append({"key": r[:32], "offset": off, "stored": sl, "raw": rl, "enc": enc, "res": r[57:64]})
     entries = []
     for i in range(ecnt):
         r = epay[i * ers:(i + 1) * ers]
         po, pl, typ = struct.unpack_from("<QIB", r, 0)
         entries.append({"po": po, "pl": pl, "type": typ, "res": r[13:16], "key": r[16:48], "tail": r[48:]})
-    for b in blobs:
+    for b in blobs:  # (a)
+        encoded = b["enc"] == ENC_ZSTD and zstd_on
         if b["res"] != b"\x00" * 7:
-            v.add("BLB-1")
-        if not (b["enc"] == ENC_STORED or (b["enc"] == ENC_ZSTD and req & REQ_ZSTD)):
-            v.add("BLB-2")
+            add("BLB-1")
+        if not (b["enc"] == ENC_STORED or encoded):
+            add("BLB-2")
         if b["enc"] == ENC_STORED and b["stored"] != b["raw"]:
-            v.add("BLB-3")
-        if b["enc"] == ENC_ZSTD and req & REQ_ZSTD and b["stored"] >= b["raw"]:
-            v.add("ZST-3")
-        if b["enc"] == ENC_ZSTD and req & REQ_ZSTD and b["stored"] and b["raw"] > lim["ratio"] * b["stored"]:
-            v.add("LIM-6")
-    expect = HEADER_LEN
+            add("BLB-3")
+        if encoded and b["stored"] < 4:
+            add("ZST-2")
+        if encoded and b["stored"] >= b["raw"]:
+            add("ZST-3")
+        if encoded and b["raw"] > lim["ratio"] * b["stored"]:
+            add("LIM-6")
+    expect = HEADER_LEN  # (b)
     for b in blobs:
         if b["offset"] != expect:
-            v.add("BLB-4")
+            add("BLB-4")
         expect = b["offset"] + b["stored"]
-    if expect != ioff or (not blobs and ioff != HEADER_LEN):
-        v.add("BLB-4")
+    if expect != ioff:
+        add("BLB-4")
     keys = [b["key"] for b in blobs]
-    if len(set(keys)) != len(keys):
-        v.add("BLB-5")
-    paths = []
-    for e in entries:
+    if len(set(keys)) != len(keys):  # (c)
+        add("BLB-5")
+    for e in entries:  # (d)
         if e["type"] not in (DIR, FILE):
-            v.add("ENT-1")
+            add("ENT-1")
         if e["res"] != b"\x00\x00\x00":
-            v.add("ENT-2")
+            add("ENT-2")
         if e["type"] == DIR and e["key"] != ZERO_KEY:
-            v.add("ENT-3")
+            add("ENT-3")
         if e["type"] == FILE and e["key"] not in keys:
-            v.add("ENT-4")
+            add("ENT-4")
+    paths = []
+    for e in entries:  # (e)
         if e["po"] + e["pl"] > len(pool):
-            v.add("ENT-5")
+            add("ENT-5")
             paths.append(None)
         else:
             paths.append(pool[e["po"]:e["po"] + e["pl"]])
-    referenced = {e["key"] for e in entries if e["type"] == FILE}
-    if any(k not in referenced for k in keys):
-        v.add("BLB-7")
-    dirs = {p for p, e in zip(paths, entries) if p is not None and e["type"] == DIR}
-    for p in paths:
-        if p is None:
-            continue
-        v |= path_violations(p)
-        if b"/" in p and p.rsplit(b"/", 1)[0] not in dirs:
-            v.add("ENT-6")
+    acc = 0  # (f)
+    for e in entries:
+        if e["po"] != acc:
+            add("CAN-3")
+        acc += e["pl"]
+    if acc != len(pool):
+        add("CAN-3")
+    for p in paths:  # (g)
+        if p is not None:
+            for r in path_violations(p):
+                add(r)
     real = [p for p in paths if p is not None]
-    if any(a >= b for a, b in zip(real, real[1:])):
-        v.add("CAN-1")
-    folds = {}
+    if any(a >= b for a, b in zip(real, real[1:])):  # (h)
+        add("CAN-1")
+    dirs = {p for p, e in zip(paths, entries) if p is not None and e["type"] == DIR}
+    for p in paths:  # (i)
+        if p is not None and b"/" in p and p.rsplit(b"/", 1)[0] not in dirs:
+            add("ENT-6")
+    folds = {}  # (j)
     for p in real:
         folds.setdefault(fold_key(p), set()).add(p)
     if any(len(s) > 1 for s in folds.values()):
-        v.add("PATH-11")
-    order, seen = [], set()
-    for e in entries:
-        if e["type"] == FILE and e["key"] in keys and e["key"] not in seen:
-            seen.add(e["key"])
-            order.append(e["key"])
-    first = []
-    for k in keys:
-        if k not in first:
-            first.append(k)
-    ref_part = [k for k in first if k in referenced]
-    if ref_part != order or first[:len(ref_part)] != ref_part:
-        v.add("CAN-2")
-    acc = 0
-    for e in entries:
-        if e["po"] != acc:
-            v.add("CAN-3")
-        acc += e["pl"]
-    if acc != len(pool):
-        v.add("CAN-3")
-    if bool(req & REQ_ZSTD) != any(b["enc"] == ENC_ZSTD for b in blobs):
-        v.add("FLG-1")
-    if bool(opt & OPT_ENTRY_ATTRS) != (ers >= ENTRY_RECORD_ATTRS):
-        v.add("FLG-1")
-    if bool(opt & OPT_KV_METADATA) != bool(kv):
-        v.add("FLG-1")
-    if opt & OPT_ENTRY_ATTRS and ers >= ENTRY_RECORD_ATTRS:
+        add("PATH-11")
+    referenced = [e["key"] for e in entries if e["type"] == FILE and e["key"] in keys]
+    if any(k not in referenced for k in keys):  # (k)
+        add("BLB-7")
+    order = list(dict.fromkeys(referenced))  # (l) CAN-2: the first |K| records hold K, in order
+    if keys[:len(order)] != order:
+        add("CAN-2")
+    if zstd_on and not any(b["enc"] == ENC_ZSTD for b in blobs):  # (m) FLG-1, for flags the reader knows
+        add("FLG-1")
+    if known["opt"] & OPT_ENTRY_ATTRS and bool(opt & OPT_ENTRY_ATTRS) != (ers >= ENTRY_RECORD_ATTRS):
+        add("FLG-1")
+    if known["opt"] & OPT_KV_METADATA and bool(opt & OPT_KV_METADATA) != bool(kv):
+        add("FLG-1")
+    if attrs_on and ers >= ENTRY_RECORD_ATTRS:  # (n)
         for e in entries:
-            secs_, nanos, mode = struct.unpack_from("<qIH", e["tail"], 0)
-            if nanos >= 1_000_000_000 or mode > 0o777 or e["tail"][14:16] != b"\x00\x00":
-                v.add("ATT-1")
-    if kv and opt & OPT_KV_METADATA:
-        if not kv_ok(kv[0][4]):
-            v.add("KV-1")
-    if mode in ("verify", "extract"):
+            _, nanos, mode_ = struct.unpack_from("<qIH", e["tail"], 0)
+            if nanos >= 1_000_000_000 or mode_ > 0o777 or e["tail"][14:16] != b"\x00\x00":
+                add("ATT-1")
+    if kv and known["opt"] & OPT_KV_METADATA and not kv_ok(kv[0][3]):  # (o)
+        add("KV-1")
+    if mode in ("verify", "extract"):  # (p)
         by_key = {b["key"]: b for b in blobs}
-        total = sum(by_key[e["key"]]["raw"] for e in entries if e["type"] == FILE and e["key"] in by_key)
-        if total > lim["total"]:
-            v.add("LIM-5")
-    if v or mode == "list":
+        if sum(by_key[e["key"]]["raw"] for e in entries if e["type"] == FILE and e["key"] in by_key) > lim["total"]:
+            add("LIM-5")
+    if mode == "list" or v:
         return v
-    # step 11
-    for b in blobs:
+    for b in blobs:  # step 11, in blob-table order
         stored = data[b["offset"]:b["offset"] + b["stored"]]
         if hashlib.sha256(stored).digest() != b["key"]:
-            v.add("BLB-6")
-            continue
-        if b["enc"] == ENC_ZSTD:
-            content, ok = zstd_decode(stored)
-            if not ok and len(content) <= b["raw"]:
-                v.add("ZST-2")
-            elif len(content) != b["raw"]:
-                v.add("ZST-1")
+            add("BLB-6")
+        elif b["enc"] == ENC_ZSTD and zstd_on:
+            r = zstd_check(stored, b["raw"])
+            if r:
+                add(r)
     return v
 
 
 def kv_ok(payload):
     pos, prev = 0, None
+    if not payload:
+        return False  # KV-1: at least one pair
     while pos < len(payload):
         if pos + 2 > len(payload):
             return False

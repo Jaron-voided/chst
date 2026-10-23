@@ -76,6 +76,24 @@ def zstd_frame(content, declared_size=None):
     return bytes(out)
 
 
+def zstd_frame_custom(content, *, window_log=None, dict_id=0):
+    """A frame with a Window_Descriptor (not single segment) and an optional Dictionary_ID.
+
+    Used only for bad fixtures (ZST-2): a huge declared window, or a dictionary."""
+    did_flag, did_bytes = (0, b"") if not dict_id else (1, bytes([dict_id]))
+    out = bytearray(ZSTD_MAGIC)
+    out.append(did_flag)  # no FCS, not single segment, no checksum
+    out.append(((window_log - 10) << 3) if window_log else 0)
+    out += did_bytes
+    if len(content) > 1 and content.count(content[0]) == len(content):
+        out += ((len(content) << 3) | (1 << 1) | 1).to_bytes(3, "little")  # one last RLE block
+        out.append(content[0])
+    else:
+        out += ((len(content) << 3) | 1).to_bytes(3, "little")  # one last Raw block
+        out += content
+    return bytes(out)
+
+
 def encode_blob(content, compress):
     """D7: keep the compressed form only if it is strictly smaller."""
     if compress:
@@ -133,6 +151,7 @@ def layout(entries, *, compress=False, attrs=False, kv=None, extra_sections=()):
         "section_order": None,
         "trailer": {},
         "data_override": None,
+        "index_append": b"",
         "append": b"",
     }
     relayout(plan)
@@ -146,12 +165,13 @@ def relayout(plan):
         b["offset"] = off
         b["stored_length"] = len(b["data"])
         off += len(b["data"])
-    pool = b""
+    parts, acc = [], 0
     for e in plan["entries"]:
-        e["path_offset"] = len(pool)
+        e["path_offset"] = acc
         e["path_length"] = len(e["path"])
-        pool += e["path"]
-    plan["pool"] = pool
+        acc += len(e["path"])
+        parts.append(e["path"])
+    plan["pool"] = b"".join(parts)  # join, not +=: linear time for a million entries
     return plan
 
 
@@ -218,7 +238,7 @@ def build_sections(plan):
 def serialize(plan, *, recompute_hash=True):
     header = header_bytes(plan["header"])
     data = plan["data_override"] if plan["data_override"] is not None else b"".join(b["data"] for b in plan["blobs"])
-    index = b"".join(raw for _, raw, _ in build_sections(plan))
+    index = b"".join(raw for _, raw, _ in build_sections(plan)) + plan["index_append"]
     t = plan["trailer"]
     index_offset = t.get("index_offset", HEADER_LEN + len(data))
     index_length = t.get("index_length", len(index))

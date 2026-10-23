@@ -1,0 +1,11 @@
+{
+  "rule": "SEC-5",
+  "category": "malformed",
+  "detail": "sec.record-size",
+  "exit": 6,
+  "base": "worked-example",
+  "mutation": "ENTRY_TABLE record_size = 64 (zero tails), no flags set",
+  "also_violates": [
+    "flag.mismatch"
+  ]
+}

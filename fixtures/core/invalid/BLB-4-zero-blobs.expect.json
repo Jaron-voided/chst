@@ -1,0 +1,8 @@
+{
+  "rule": "BLB-4",
+  "category": "malformed",
+  "detail": "blob.layout",
+  "exit": 6,
+  "base": "dirs-only",
+  "mutation": "one stray data byte added: no blobs, but index_offset = 33"
+}

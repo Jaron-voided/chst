@@ -1,0 +1,8 @@
+{
+  "rule": "FLG-1",
+  "category": "malformed",
+  "detail": "flag.mismatch",
+  "exit": 6,
+  "base": "worked-example",
+  "mutation": "required flag ZSTD set, but every blob is stored"
+}

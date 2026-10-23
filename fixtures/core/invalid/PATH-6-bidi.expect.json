@@ -1,0 +1,8 @@
+{
+  "rule": "PATH-6",
+  "category": "malformed",
+  "detail": "path.control-char",
+  "exit": 6,
+  "base": "worked-example",
+  "mutation": "directory 'docs/a‮b' added (RIGHT-TO-LEFT OVERRIDE)"
+}

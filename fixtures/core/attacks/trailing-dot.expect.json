@@ -1,8 +1,6 @@
 {
   "rule": "PATH-8",
   "category": "malformed",
-  "exit": 6,
-  "details": [
-    "path.trailing-dot-space"
-  ]
+  "detail": "path.trailing-dot-space",
+  "exit": 6
 }

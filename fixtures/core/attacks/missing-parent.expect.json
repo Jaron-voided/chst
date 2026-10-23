@@ -1,8 +1,6 @@
 {
   "rule": "ENT-6",
   "category": "malformed",
-  "exit": 6,
-  "details": [
-    "entry.parent"
-  ]
+  "detail": "entry.parent",
+  "exit": 6
 }

@@ -1,0 +1,8 @@
+{
+  "rule": "BLB-4",
+  "category": "malformed",
+  "detail": "blob.layout",
+  "exit": 6,
+  "base": "worked-example",
+  "mutation": "one stray byte after the last blob (last blob ends at 41, index at 42)"
+}

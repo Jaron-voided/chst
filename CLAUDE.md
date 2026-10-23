@@ -34,6 +34,8 @@ If the code and the spec disagree, the spec wins. From plan-v1 on, if you think 
 log it under "Needs decision"; don't change it.
 
 ## Protected (from plan-v1 on, change only with my approval)
+CLAUDE.md is protected now, not only from plan-v1: you may only propose changes to it (as a diff),
+and I apply them.
 FORMAT_SPEC.md, ACCEPTANCE.md, DESIGN.md, fixtures/ (including fixtures/gen/), and every existing check in check.sh.
 DESIGN.md may be edited only to record decisions I've approved. It holds the approved dependency
 list (D15) and the environment pins (D16), so they can't change without me.

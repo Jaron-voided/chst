@@ -1,0 +1,10 @@
+{
+  "schema": "chst-tree/1",
+  "entries": [
+    {
+      "path": "zero​width.txt",
+      "type": "file",
+      "content_b64": "endzcAo="
+    }
+  ]
+}

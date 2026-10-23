@@ -14,10 +14,18 @@ MAX_SAFE = 2 ** 53 - 1
 
 
 def num(x):
-    return x if x <= MAX_SAFE else str(x)
+    """Appendix B: integers outside +/-(2^53 - 1) are written as decimal strings."""
+    return x if -MAX_SAFE <= x <= MAX_SAFE else str(x)
 
 
-def parse(head, index, trailer, file_length):
+# What a reader implements decides how it names sections and flags, and whether it shows attributes.
+READER_VIEW = {
+    "extended": {"sections": set(SECTION_NAMES), "required": dict(REQUIRED_FLAG_NAMES), "optional": dict(OPTIONAL_FLAG_NAMES)},
+    "core": {"sections": {SEC_BLOB_TABLE, SEC_ENTRY_TABLE, SEC_PATH_POOL}, "required": {}, "optional": {}},
+}
+
+
+def parse(head, index, trailer, file_length, reader="extended"):
     """head: the 32 header bytes; index: the index bytes; trailer: the 56 trailer bytes."""
     h = {
         "magic": head[0:8], "major_version": struct.unpack_from("<H", head, 8)[0],
@@ -39,7 +47,8 @@ def parse(head, index, trailer, file_length):
         r = bt["payload"][i * bt["record_size"]:]
         off, sl, rl, enc = struct.unpack_from("<QQQB", r, 32)
         blobs.append({"key": r[:32], "offset": off, "stored_length": sl, "raw_length": rl, "encoding": enc})
-    attrs = bool(h["optional_flags"] & OPT_ENTRY_ATTRS) and et["record_size"] >= 64
+    attrs = (bool(h["optional_flags"] & OPT_ENTRY_ATTRS) and et["record_size"] >= 64
+             and OPT_ENTRY_ATTRS in READER_VIEW[reader]["optional"])
     entries = []
     for i in range(et["record_count"]):
         r = et["payload"][i * et["record_size"]:(i + 1) * et["record_size"]]
@@ -50,20 +59,21 @@ def parse(head, index, trailer, file_length):
         entries.append(e)
     return {"header": h, "sections": secs, "blobs": blobs, "entries": entries, "attrs": attrs,
             "index_offset": index_offset, "index_length": index_length,
-            "structure_hash": trailer[16:48], "trailer_magic": trailer[48:56], "file_length": file_length}
+            "structure_hash": trailer[16:48], "trailer_magic": trailer[48:56], "file_length": file_length,
+            "reader": reader}
 
 
-def parse_bytes(data):
+def parse_bytes(data, reader="extended"):
     n = len(data)
     io, il = struct.unpack_from("<QQ", data, n - TRAILER_LEN)
-    return parse(data[:HEADER_LEN], data[io:io + il], data[n - TRAILER_LEN:], n)
+    return parse(data[:HEADER_LEN], data[io:io + il], data[n - TRAILER_LEN:], n, reader)
 
 
 def common(command):
     return {"schema": "chst-report/1", "command": command, "ok": True, "error": None, "warnings": []}
 
 
-def list_report(c, core_view=False):
+def list_report(c):
     blobs = {b["key"]: b for b in c["blobs"]}
     out = []
     for e in c["entries"]:
@@ -72,7 +82,7 @@ def list_report(c, core_view=False):
             b = blobs[e["blob_key"]]
             d.update({"size": num(b["raw_length"]), "stored_size": num(b["stored_length"]),
                       "encoding": "zstd" if b["encoding"] == ENC_ZSTD else "stored", "blob": b["key"].hex()})
-        if c["attrs"] and not core_view:
+        if c["attrs"]:
             d.update({"mtime_seconds": e["mtime_seconds"], "mtime_nanos": e["mtime_nanos"], "mode": e["mode"]})
         out.append(d)
     r = common("list")
@@ -81,7 +91,8 @@ def list_report(c, core_view=False):
 
 
 def flag_names(value, names):
-    return [names[bit] for bit in sorted(names) if value & bit]
+    """Names for every set bit; bits the reader doesn't implement are 'bit<N>' (Appendix B)."""
+    return [names.get(1 << n, f"bit{n}") for n in range(64) if value >> n & 1]
 
 
 def summary(c):
@@ -95,8 +106,8 @@ def summary(c):
         "stored_bytes": num(sum(b["stored_length"] for b in c["blobs"])),
         "raw_bytes": num(sum(b["raw_length"] for b in c["blobs"])),
         "extracted_bytes": num(sum(blobs[e["blob_key"]]["raw_length"] for e in files)),
-        "required_flags": flag_names(c["header"]["required_flags"], REQUIRED_FLAG_NAMES),
-        "optional_flags": flag_names(c["header"]["optional_flags"], OPTIONAL_FLAG_NAMES),
+        "required_flags": flag_names(c["header"]["required_flags"], READER_VIEW[c["reader"]]["required"]),
+        "optional_flags": flag_names(c["header"]["optional_flags"], READER_VIEW[c["reader"]]["optional"]),
     }
 
 
@@ -130,13 +141,14 @@ def inspect_report(c):
     sections = []
     for s in c["sections"]:
         base, rs, cnt = s["offset"], s["record_size"], s["record_count"]
-        sec = {"type": f"0x{s['type']:08x}", "name": SECTION_NAMES.get(s["type"], "unknown"),
+        known_type = s["type"] in READER_VIEW[c["reader"]]["sections"]
+        sec = {"type": f"0x{s['type']:08x}", "name": SECTION_NAMES[s["type"]] if known_type else "unknown",
                "offset": num(base), "length": num(16 + rs * cnt), "record_size": rs, "record_count": num(cnt),
                "fields": [field("type", base, 4, s["type"]), field("record_size", base + 4, 4, rs),
                           field("record_count", base + 8, 8, cnt)],
                "records": []}
         p = s["payload"]
-        if s["type"] == SEC_BLOB_TABLE:
+        if s["type"] == SEC_BLOB_TABLE:  # the three Core sections are known to every reader
             for i in range(cnt):
                 o, r = base + 16 + i * rs, p[i * rs:(i + 1) * rs]
                 off, sl, rl, enc = struct.unpack_from("<QQQB", r, 32)
@@ -164,12 +176,7 @@ def inspect_report(c):
                     fs.append(field("extra", o + 48, rs - 48, r[48:].hex()))
                 sec["records"].append({"index": i, "offset": num(o), "length": rs, "fields": fs})
         else:
-            try:
-                val = p.decode("utf-8") if s["type"] in (SEC_PATH_POOL, SEC_KV_METADATA) else p.hex()
-            except UnicodeDecodeError:
-                val = p.hex()
-            if s["type"] == SEC_KV_METADATA:
-                val = p.hex()
+            val = p.decode("utf-8") if s["type"] == SEC_PATH_POOL else p.hex()  # valid files: UTF-8 (PATH-1)
             if len(p):
                 sec["fields"].append(field("payload", base + 16, len(p), val))
         sections.append(sec)

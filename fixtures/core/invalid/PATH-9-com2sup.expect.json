@@ -1,0 +1,8 @@
+{
+  "rule": "PATH-9",
+  "category": "malformed",
+  "detail": "path.reserved-name",
+  "exit": 6,
+  "base": "worked-example",
+  "mutation": "directory 'docs/COM²' added"
+}

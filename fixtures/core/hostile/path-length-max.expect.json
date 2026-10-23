@@ -1,9 +1,8 @@
 {
+  "rule": "ENT-5",
+  "category": "malformed",
+  "detail": "entry.path-range",
   "exit": 6,
   "base": "worked-example",
-  "mutation": "entry[4] path_length = 2^32 - 1",
-  "details": [
-    "canon.path-pool",
-    "entry.path-range"
-  ]
+  "mutation": "entry[4] path_length = 2^32 - 1"
 }

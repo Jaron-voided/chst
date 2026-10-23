@@ -1,4 +1,7 @@
 {
+  "rule": "SEC-1",
+  "category": "malformed",
+  "detail": "sec.bounds",
   "exit": 6,
   "base": "worked-example",
   "mutation": "BLOB_TABLE record_count + 2^32",

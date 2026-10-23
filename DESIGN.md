@@ -283,7 +283,8 @@ Detailed byte layouts live in `FORMAT_SPEC.md`.
 ### D6 — Hashing (amended in review round 2)
 - **D6a options:** SHA-256, BLAKE3, or SHA-512/256, each with or without an algorithm ID.
   **Choice: SHA-256 with a hash-algorithm ID in the header** (`hash_alg` = 1). v1 defines
-  only SHA-256. A new algorithm would be a new ID, gated by a required flag.
+  only SHA-256. A different algorithm would need a new `hash_alg` ID with the same 32-byte
+  output; a different width needs a new major version (round 6, F31).
 - **D6b options:** one trailer hash, or separate checksums per part. **Choice: one
   structure hash** in the trailer, using the same algorithm. It covers the header, the
   whole index, and the trailer's location fields.
@@ -358,7 +359,17 @@ Detailed byte layouts live in `FORMAT_SPEC.md`.
 
   Each concern has a criterion (AC-PACK-7 … AC-PACK-9, AC-SAFE-5 … AC-SAFE-11).
 
-### D9 — Determinism
+- **Amendment (review round 6):**
+  - **PATH-2:** judged with exactly the Unicode 16.0 tables in every reader and writer (F12).
+    Code points added after 16.0 may be judged differently by other tools, and the fixture
+    `PATH-2-unicode16` documents a 15.x/16.0 difference.
+  - **PATH-6:** now also bans the C1 controls (U+0080–U+009F) and the bidirectional
+    embedding, override and isolate characters (U+202A–U+202E, U+2066–U+2069), so an
+    extracted name can't spoof another in any file manager (F42). `list`'s text output
+    escapes the non-printing characters that remain allowed.
+  - **PATH-8:** no longer applies to `.` and `..` (F6).
+
+### D9 — Determinism (amended in review round 6: writers write `minor_version` 0 unless a revision changes the encoding, F32)
 - **Options:** (A) canonical form mandatory and enforced by readers; (B) canonical order
   only recommended; (C) an opt-in deterministic mode.
 - **Choice: A.**
@@ -401,7 +412,22 @@ Detailed byte layouts live in `FORMAT_SPEC.md`.
   - Staging needs space on the destination's filesystem.
   - Selective extract (#6) has the same fresh-destination rule.
 
-### D11 — Resource limits (amended in review round 1)
+- **Amendment (review round 6):** FORMAT_SPEC §15 now states the threat model: a hostile
+  container, plus other local principals who can write to the destination's parent and race
+  the extractor. It adds:
+  - an unpredictable, create-new, owner-only (0700) staging directory with a fixed name
+    pattern (F17, F43);
+  - a final rename that never replaces an existing object (F16);
+  - cleanup relative to directory handles, never following links (F18);
+  - verification while writing, not as a pre-pass (F14);
+  - handle-relative reopening of earlier directories (F21);
+  - EXT-6's exception for the final rename (F20).
+
+  Pack now walks relative to directory handles and checks file identity in pass 2 (F23),
+  decides "output inside source" by file identity (F22), and applies the reader limits
+  (W-10, F24).
+
+### D11 — Resource limits (amended in review rounds 1 and 6)
 - **Options:** (A) implementation limits only; (B) hard maxima in the spec only; (C) both.
 - **Choice: C.**
   - Spec hard maxima: beyond them a file is `malformed`.
@@ -410,6 +436,13 @@ Detailed byte layouts live in `FORMAT_SPEC.md`.
   - **No allocation or loop proportional to a declared size** before checking
     record count × record size ≤ section length ≤ index length ≤ file length.
 - **Numbers:** see `FORMAT_SPEC.md` §10.
+- **Amendment (review round 6):**
+  - **LIM-1 is retired (F7):** LIM-2 and SEC-4 already cap the entry count at 89,478,485.
+  - **LIM-2** has a sparse-recipe fixture.
+  - **LIM-6** is defined by multiplication: `raw_length > limit × stored_length`, computed
+    without overflow (F8).
+  - **LIM-5's sum** is computed without overflow (F9).
+  - Every limit has a CLI flag (FORMAT_SPEC Appendix C, F45).
 - **Amendment (review round 1):** the references-per-blob limit is **dropped**. It could
   reject legitimate trees, for example many empty files sharing the empty blob. Dedup
   amplification is bounded instead by LIM-5, the total logical size. LIM-5 sums every file
@@ -418,7 +451,7 @@ Detailed byte layouts live in `FORMAT_SPEC.md`.
 - **Rationale:** Interoperability plus defence against hostile files, with a testable
   difference between "invalid" and "too big for this reader's configuration".
 
-### D12 — Errors and exit codes
+### D12 — Errors and exit codes (amended in review round 6)
 - **Options:** (A) categories only; (B) a code per rule; (C) category plus detail code.
 - **Choice: C.**
   - The stable category determines the exit code.
@@ -437,6 +470,11 @@ Detailed byte layouts live in `FORMAT_SPEC.md`.
 Warnings, such as skipped special files, go to stderr and the JSON `warnings` array, and
 don't change the exit code.
 
+**Amendment (review round 6, F1 and F2):** FORMAT_SPEC §13 is now a total order. A reader
+reports only the first violation, so the detail code is deterministic. An unsupported file
+(HDR-6, SEC-2) is never reported as anything else. Each negative fixture therefore has
+exactly one expected detail, with no lists of acceptable alternatives.
+
 ### D13 — Library and CLI architecture
 - **Options:** (A) a single crate; (B) format, fs and cli crates; (C) a library crate plus
   a CLI crate.
@@ -445,6 +483,10 @@ don't change the exit code.
 - **Rationale:** The format crate's boundary matches the spec's boundary, so fuzzing and
   conformance evidence is directly about the format. Platform-specific safety code is
   isolated in one place.
+- **Test hooks (review round 6, F19):** the race tests (AC-SAFE-3, AC-SAFE-8, AC-SAFE-13 …
+  15, AC-PACK-10) need hook points inside `chst-fs`. Those hooks are compiled only with a
+  non-default Cargo feature, `test-hooks`, so release builds never contain them. It's a
+  feature of `chst-fs`, not a new dependency, so D15 is unaffected.
 
 ### D14 — Existing output file (review round 1)
 - **Options:** (A) atomically overwrite an existing output; (B) refuse unless `--force`,
@@ -516,7 +558,8 @@ don't change the exit code.
 | Rust stable | `rust-toolchain.toml` with `channel = "1.99.1"` and components `rustfmt`, `clippy`; `rust-version = "1.99"`; edition 2024 | 1.99.1 is the current stable (released 2026-10-13) and is what's installed on the owner's WSL machine |
 | Rust nightly (fuzzing only) | `fuzz/rust-toolchain.toml` with `channel = "nightly-2026-10-01"`, invoked as `cargo +<that> fuzz` | A dated nightly, so fuzz builds are reproducible. Not yet confirmed to have every component on all three runners; the first full CI run confirms it. If it doesn't, the fallback is the nearest earlier date that does. |
 | cargo-fuzz | 0.13.2 (`cargo install --locked`) | Latest release at proposal time |
-| Python | **3.14, always invoked explicitly as `python3.14`** | Its `unicodedata` is Unicode 16.0, which meets PATH-2's 15.1 minimum. The system `python3` on the owner's WSL machine is 3.12.3 (Unicode 15.0.0, below the spec minimum), so no check or document may call plain `python3`. The owner has installed 3.14 locally. The CI workflow must provide a `python3.14` command on every runner; on Windows that's a shim to the interpreter `setup-python` installs. |
+| Python | **3.14, always invoked explicitly as `python3.14`**. Its `unicodedata` is exactly Unicode 16.0, which PATH-2 requires (round 6, F12; AC-ENG-6) | Its `unicodedata` is Unicode 16.0, which meets PATH-2's 15.1 minimum. The system `python3` on the owner's WSL machine is 3.12.3 (Unicode 15.0.0, below the spec minimum), so no check or document may call plain `python3`. The owner has installed 3.14 locally. The CI workflow must provide a `python3.14` command on every runner; on Windows that's a shim to the interpreter `setup-python` installs. |
+| Unicode tables | **Exactly 16.0** in every reader (round 6, F12): `unicode-normalization` with 16.0 tables (AC-ENG-8), Python 3.14 (AC-ENG-6), and Node ICU (AC-X-TS-3) | Conforming readers must agree on every path |
 | Node (Extended TypeScript reader only) | **24 LTS** | Active LTS. It has `node:zlib` zstd and TypeScript type stripping. |
 | jq | 1.7 or later | Has `walk`, which `jqn` uses |
 
@@ -696,51 +739,39 @@ Two layers, detailed in `ACCEPTANCE.md`:
 | 2 | `inspect` report shape | Copied into FORMAT_SPEC Appendix B as the normative definition. The generator follows the spec. |
 | 3 | Other §9 items | Left for the independent review. |
 
-Still-open drafting choices, for the reviewer (until `plan-v1`):
+## 9f. Review round 6 decisions (independent review: 46 findings)
 
-- **Found while building the fixtures (planning step 2).** Each comes with a recommendation.
-  1. **LIM-1 and LIM-2 have no single-violation fixture.**
-     - **LIM-1:** an entry count over 2³²−1 can't fit inside the index, so SEC-1 fires
-       first.
-     - **LIM-2:** an index over 2³² bytes needs a file over 4 GiB.
+| # | Item | Owner decision |
+|---|---|---|
+| 1 | F1, F2 with F5, F10, F16, F17, F18, and all ten generator fixes | Accepted as proposed. |
+| 2 | F6 | Only its PATH-8 exemption for `.` and `..`. The rest of F6 is superseded by F2's order. Because PATH-3's literal wording still covers empty segments, §13 checks PATH-4 before PATH-3 so the PATH-4 fixture stays reachable. |
+| 3 | F12 | The cheaper option: exactly Unicode 16.0 tables in every reader. It's documented that code points added after 16.0 may be judged differently, with fixture `PATH-2-unicode16`. |
+| 4 | F42 | Ban the characters: PATH-6 adds C1 (U+0080–U+009F) and the bidi characters (U+202A–U+202E, U+2066–U+2069). `list`'s text output also escapes the non-printing characters that remain allowed. |
+| 5 | §9 item 10 (Node zstd) | Node's documentation lists `ZSTD_d_windowLogMax` as a `node:zlib` zstd decompressor option, so the TypeScript reader uses `node:zlib`, with no D15 change. That's confirmed from the documentation only, because Node isn't installed locally. The `ZST-2-window` fixture under AC-X-TS-2 exercises it. Node marks zstd as Experimental, which remains a known risk for Extended. |
+| 6 | F3, F4, F7–F9, F11, F13–F15, F19–F41, F43–F46 | Applied as proposed. F40 is documented only, F44 is applied as per-directory schemas, and F46 without `--strict`. |
+| 7 | `CLAUDE.md` | Protected now. Claude only proposes changes to it, and the owner applies them. |
 
-     Options: (a) check LIM-1 on the ENTRY_TABLE header's `record_count` before SEC-1's
-     payload bounds; (b) add a sparse-recipe invalid fixture for LIM-2, with
-     `--max-index-bytes` raised, and teach AC-NEG-1/2 to materialise recipes; (c) drop both
-     hard maxima, since LIM-3 and LIM-4 already bound them in practice. **Recommendation:
-     (a) for LIM-1 and (b) for LIM-2.** Until then, AC-NEG-1 honestly FAILs on both.
-  2. **Rules that overlap by construction**, so no fixture can break only one:
-     - ENT-5 always breaks CAN-3 too;
-     - PATH-4 always breaks PATH-3 (an empty segment) and ENT-6;
-     - PATH-5 always breaks PATH-8 (`.` and `..` end in a dot).
+The reviewer's §9 recommendations, as applied:
+- **LIM-1 and LIM-2:** retired; sparse recipe.
+- **Overlapping rules:** F2's order.
+- **CAN-2:** F5's wording.
+- **PATH_MAX:** made normative (W-5 and EXT-8 reopening).
+- **Empty container** and **hard links:** accepted as drafted.
+- **`ENTRY_ATTRS` layout:** kept, with F27's rules for applying attributes.
+- **Reparse points:** F46.
+- **Runner feasibility:** includes enabling 8.3 names (F38).
+- **Node zstd:** item 5 above.
 
-     Their fixtures list every acceptable detail (AC-NEG-2). Option: tighten the spec so
-     each case has one rule, for example "PATH-8 doesn't apply to `.` and `..`" and "CAN-3
-     is checked only when ENT-5 holds". **Recommendation:** tighten them, so each fixture
-     has one exact expected detail.
-  3. **CAN-2 is read as applying only to referenced blobs,** with unreferenced blobs left to
-     BLB-7 (`fixtures/gen/README.md`). **Recommendation:** add that sentence to CAN-2.
-  4. **PATH_MAX.** The `long-names` fixture can't be reached through full path strings on
-     Linux or macOS. AC-SAFE-7 used `test -e "$W/x/$p"`, which can't work there, and now
-     compares trees by walking directory handles instead. Rust pack and extract must also
-     work relative to directory handles. EXT-8 already requires that for extract; pack's
-     directory walk needs the same.
+Still open, for the next reviewer (until `plan-v1`):
 
-- **Empty container.** Zero entries and zero blobs is valid. Packing an empty directory
-  produces one.
-- **Hard links (N2).** Each hard-linked name is packed as an independent regular file, and
-  its content dedups to one blob.
-- **`ENTRY_ATTRS` layout** (seconds + nanoseconds + 9-bit mode) is a proposal; see
-  FORMAT_SPEC §12.6.
-- **Windows reparse points.** Skipping every reparse point also skips cloud placeholder
-  files, such as OneDrive files not stored locally. That's acceptable for v1, and pack
-  warns about each one.
 - **Runner feasibility** is unconfirmed until the first full CI run:
   - AC-ROB-4 on Windows (the provisional fallback is in place);
   - the dated nightly (D16);
-  - disk for AC-ROB-7 (ACCEPTANCE.md §1.3).
-- **`node:zlib` zstd** is marked experimental in Node's documentation (D15). The `fzstd`
-  fallback would need a decision when Extended starts.
+  - disk for AC-ROB-7 (ACCEPTANCE.md §1.3);
+  - whether `fsutil 8dot3name set` works on the Windows runner (AC-SAFE-10).
+- **Unverified pins:** `unicode-normalization`'s Unicode version (AC-ENG-8) and Node 24's
+  ICU Unicode version (AC-X-TS-3) are expected to be 16.0, but nothing has run them yet.
+- **`node:zlib` zstd** is Experimental in Node's documentation.
 
 ## 10. Checkpoints
 
