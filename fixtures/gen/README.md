@@ -42,18 +42,13 @@ python3.14 -I fixtures/gen/gen.py worked-example-hexdump
 
 The independent review should confirm or reject each of these.
 
-1. **inspect report shape.** Appendix B defines `inspect` only loosely. The generator emits:
-   - `header`, `data`, `sections[]` and `trailer`, each with `offset`, `length` and
-     `fields[]` entries of `{name, offset, length, value}`;
-   - per-record `records[]` for BLOB_TABLE and ENTRY_TABLE;
-   - a single `payload` field for byte sections; KV_METADATA's payload is hex;
-   - `data.fields[]` with one `blob[i].data` field per blob, which has no `value`.
-
-   Together the fields cover every byte exactly once, which AC-POS-3 relies on.
+1. **inspect report shape.** *Resolved in review round 5:* FORMAT_SPEC Appendix B now
+   defines it exactly, and the generator follows that definition.
 2. **CAN-2 and unreferenced blobs.** CAN-2 is read as applying to referenced blobs, which
    must come first and in first-reference order. Unreferenced blobs are BLB-7's concern
    only. With that reading, the BLB-5 (duplicate key) and BLB-7 fixtures each break one rule.
-3. **Zstandard frames** are written with Raw and RLE blocks only. They're valid RFC 8878
+3. **Zstandard frames** are written with Raw and RLE blocks only, by the generator itself;
+   no zstd package is used. They're valid RFC 8878
    frames (libzstd decodes them), deterministic, and independent of libzstd. Fixture trees
    are chosen so both this writer and a real compressor make the same stored-or-compressed
    decision: long zero runs compress, while random data and tiny files stay stored.

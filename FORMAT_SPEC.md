@@ -779,13 +779,32 @@ Command-specific fields:
   | `required_flags` | Names of the required flags set |
   | `optional_flags` | Names of the optional flags set |
 
-- **inspect:** `file_length`, `header`, `data`, `sections` and `trailer`. `data` lists one
-  field per blob (`blob[i].data`, with `offset` and `length`, and no `value`), so the regions
-  together account for every byte of the file.
-  - Each region or record carries `offset` and `length`, plus `fields`: an array of
-    `{"name", "offset", "length", "value"}` using the field names in §§4–8 and absolute
-    offsets.
-  - Each section adds `type` (hex string), `name` (or `"unknown"`), `record_size`,
-    `record_count` and `records`. Records are listed for every section; PATH_POOL and
-    KV_METADATA show their payload as a single `payload` field (UTF-8 string, or hex if
-    not valid UTF-8).
+- **inspect:** adds `file_length` (integer), `header`, `data`, `sections` and `trailer`,
+  defined in the table below.
+
+  **Every byte of the file is covered by exactly one field.** Take the fields of `header`,
+  `data`, `trailer`, every section, and every section's records, and sort them by
+  `offset`: each field starts where the previous one ends, the first starts at 0, and the
+  last ends at `file_length`.
+
+  - **Field object:** `{"name", "offset", "length", "value"}`.
+    - `offset` is absolute; `offset` and `length` are integers.
+    - `value` depends on the field's kind:
+      - **int:** the unsigned little-endian integer. `mtime_seconds` is the exception: it's
+        signed.
+      - **hex:** the raw bytes as lowercase hex.
+      - **text:** a UTF-8 string.
+    - Blob data fields have no `value`.
+  - **Region object:** `{"offset", "length", "fields"}`.
+  - **Order:** `fields` within an object are in ascending `offset` order. `sections` are in
+    file order, and `records` in ascending `index` order.
+
+  | Key | Contents |
+  |---|---|
+  | `header` | A region with `offset` 0 and `length` 32. Fields: `magic` (8, hex), `major_version` (2, int), `minor_version` (2, int), `hash_alg` (1, int), `reserved` (3, hex), `required_flags` (8, int), `optional_flags` (8, int). |
+  | `data` | A region with `offset` 32 and `length` `index_offset − 32`. One field per blob record, in blob-table order, named `blob[i].data`, with that blob's `offset` and `stored_length` and no `value`. |
+  | `sections[]` | One object per section, in file order. Keys: `type` (the type as an 8-digit lowercase hex string such as `"0x80000001"`), `name` (`BLOB_TABLE`, `ENTRY_TABLE`, `PATH_POOL`, `KV_METADATA`, or `"unknown"`), `offset` (of the section header), `length` (`16 + record_size × record_count`), `record_size`, `record_count`, `fields` and `records`. Its `fields` are the section header, `type` (4, int), `record_size` (4, int) and `record_count` (8, int), followed for sections without records by one `payload` field covering the whole payload. That field is omitted when the payload is empty. The payload's `value` is text for PATH_POOL and hex for KV_METADATA and unknown sections. |
+  | BLOB_TABLE `records[]` | `{"index", "offset", "length" (= record_size), "fields"}`. Fields: `key` (32, hex), `offset` (8, int), `stored_length` (8, int), `raw_length` (8, int), `encoding` (1, int), `reserved` (7, hex). If `record_size` > 64, they're followed by `extra` (`record_size − 64`, hex). |
+  | ENTRY_TABLE `records[]` | The same record shape. Fields: `path_offset` (8, int), `path_length` (4, int), `type` (1, int), `reserved` (3, hex), `blob_key` (32, hex). If `ENTRY_ATTRS` is set and `record_size` ≥ 64, they're followed by `mtime_seconds` (8, int, signed), `mtime_nanos` (4, int), `mode` (2, int) and `attrs_reserved` (2, hex), then `extra` (hex) for any bytes beyond 64. Otherwise, if `record_size` > 48, they're followed by `extra` (`record_size − 48`, hex). |
+  | Other sections | `records` is `[]`. The payload appears as the `payload` field above. |
+  | `trailer` | A region with `offset` `file_length − 56` and `length` 56. Fields: `index_offset` (8, int), `index_length` (8, int), `structure_hash` (32, hex), `trailer_magic` (8, hex). |

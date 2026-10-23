@@ -323,11 +323,12 @@ Detailed byte layouts live in `FORMAT_SPEC.md`.
   - Compressed-file fixtures compare decoded content and structure, not compressed bytes.
     Core fixtures stay byte-exact.
   - The TypeScript reader needs a Zstandard decoder (D15).
-  - **The zstd library is shared, and that's accepted (review round 2).** The Rust `zstd`
-    crate and the generator's Python `zstandard` package both wrap the same C libzstd.
-    That's acceptable because compressed bytes are never compared (only decoded content
-    and structure). Correctness is still pinned independently: blob keys are SHA-256 over
-    the stored bytes, and decoded output must match the original content and length.
+  - **The zstd library is shared on the Rust side, and that's accepted (review round 2).**
+    The Rust `zstd` crate wraps C libzstd. Since round 5 the generator writes its own
+    Raw/RLE-block frames with no zstd library at all, so the fixtures don't depend on
+    libzstd either. Compressed bytes are never compared, only decoded content and
+    structure. Blob keys are SHA-256 over the stored bytes, and decoded output must match
+    the original content and length.
 
 ### D8 — Paths
 - **Options:** (A) strict portable rules; (B) portable without normalisation; (C) raw bytes;
@@ -490,9 +491,8 @@ don't change the exit code.
 - **Python:**
   - The fixture generator (`fixtures/gen/`) and the helper scripts (`tools/acceptance/`)
     use the **standard library only** (`hashlib`, `struct`, `json`, `unicodedata`,
-    `pathlib`, `argparse`).
-  - Extended adds `zstandard` (pinned), which only the generator uses to build compressed
-    fixtures.
+    `pathlib`, `argparse`). That includes Extended: the generator writes its own
+    Raw/RLE-block Zstandard frames. (`zstandard` was dropped in round 5.)
 - **TypeScript reader (Extended):**
   - **No runtime dependencies.** It uses `node:crypto` (SHA-256),
     `String.prototype.normalize` (NFC) and `node:zlib` Zstandard decoding.
@@ -688,6 +688,14 @@ Two layers, detailed in `ACCEPTANCE.md`:
 | 2 | Fuzz targets and the unsafe lint | If `fuzz_target!` trips the lint, the fuzz crate only is exempt (D18). |
 | 3 | `CLAUDE.md` wording | Aligned with D18. |
 
+## 9e. Review round 5 decisions
+
+| # | Item | Owner decision |
+|---|---|---|
+| 1 | `zstandard` | Dropped from D15. The generator writes its own Raw/RLE-block Zstandard frames, so it uses the standard library only, for Extended too. |
+| 2 | `inspect` report shape | Copied into FORMAT_SPEC Appendix B as the normative definition. The generator follows the spec. |
+| 3 | Other §9 items | Left for the independent review. |
+
 Still-open drafting choices, for the reviewer (until `plan-v1`):
 
 - **Found while building the fixtures (planning step 2).** Each comes with a recommendation.
@@ -712,14 +720,7 @@ Still-open drafting choices, for the reviewer (until `plan-v1`):
      has one exact expected detail.
   3. **CAN-2 is read as applying only to referenced blobs,** with unreferenced blobs left to
      BLB-7 (`fixtures/gen/README.md`). **Recommendation:** add that sentence to CAN-2.
-  4. **The `inspect` report shape** in Appendix B was underspecified. The generator's exact
-     shape is documented in `fixtures/gen/README.md`. **Recommendation:** copy it into
-     Appendix B, so the Rust and TypeScript readers have a normative target.
-  5. **`zstandard` isn't needed.** The generator writes its own Raw/RLE-block Zstandard
-     frames, which libzstd 1.5.5 decodes, so it uses the standard library only.
-     **Recommendation:** drop `zstandard` from D15. This needs owner approval, because D15
-     is approved.
-  6. **PATH_MAX.** The `long-names` fixture can't be reached through full path strings on
+  4. **PATH_MAX.** The `long-names` fixture can't be reached through full path strings on
      Linux or macOS. AC-SAFE-7 used `test -e "$W/x/$p"`, which can't work there, and now
      compares trees by walking directory handles instead. Rust pack and extract must also
      work relative to directory handles. EXT-8 already requires that for extract; pack's

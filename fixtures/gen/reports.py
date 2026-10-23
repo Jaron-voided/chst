@@ -158,6 +158,8 @@ def inspect_report(c):
                     fs += [field("mtime_seconds", o + 48, 8, ms),
                            field("mtime_nanos", o + 56, 4, mn), field("mode", o + 60, 2, mode),
                            field("attrs_reserved", o + 62, 2, r[62:64].hex())]
+                    if rs > 64:
+                        fs.append(field("extra", o + 64, rs - 64, r[64:].hex()))
                 elif rs > 48:
                     fs.append(field("extra", o + 48, rs - 48, r[48:].hex()))
                 sec["records"].append({"index": i, "offset": num(o), "length": rs, "fields": fs})

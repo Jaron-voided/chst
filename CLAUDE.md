@@ -19,9 +19,8 @@ archive or container format; mention existing formats only to explain a trade-of
 
 ## Fixtures are the independent test oracle
 - The generator in fixtures/gen/ builds every fixture and its expected JSON directly from
-  FORMAT_SPEC.md. It uses only the Python standard library (SHA-256 from hashlib), plus
-  `zstandard` for Extended fixtures. The shared C zstd library is accepted because
-  compressed bytes are never compared. Hashes never come from the Rust code.
+  FORMAT_SPEC.md. It uses only the Python standard library (SHA-256 from hashlib), and
+  writes its own Zstandard frames for Extended fixtures. Hashes never come from the Rust code.
 - The generator shares no code with the Rust implementation, and never invokes or reads it.
 - Conformance is checked by the CLI-based fixture comparisons in ACCEPTANCE.md. There is no
   separate cargo conformance suite. Never use the Rust code to generate fixtures or their

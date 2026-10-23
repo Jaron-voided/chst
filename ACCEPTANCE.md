@@ -86,7 +86,8 @@ Rust tests that extract or pack files use only temporary directories (`tempfile`
 
 **Fixture layout.** Everything under `fixtures/` is produced by the generator in
 `fixtures/gen/` (V1), which builds it directly from FORMAT_SPEC.md. The generator uses only
-the Python standard library, plus `zstandard` for Extended, with SHA-256 from `hashlib`.
+the Python standard library only, for Extended too. SHA-256 comes from `hashlib`, and it
+writes its own Zstandard frames (D15).
 
 - **Valid fixtures:** `fixtures/core/valid/<name>/` holds:
   - `tree.json`: the source tree as data, so empty directories and awkward names survive git;
@@ -224,11 +225,11 @@ if grep -rnE 'subprocess|os\.system|os\.exec|cargo|chst_|target/|crates/' fixtur
 grep -rqE 'hashlib\.sha256' fixtures/gen
 # no hand-written SHA-256 (initial values and round constants)
 if grep -rniE '0x6a09e667|0x428a2f98|0xbb67ae85' fixtures/gen; then exit 1; fi
-if grep -vxE '(zstandard==[0-9.]+)?' fixtures/gen/requirements.txt; then exit 1; fi
+test ! -s fixtures/gen/requirements.txt                          # no third-party packages at all
 python3.14 -I - fixtures/gen <<'PY'
 import ast, pathlib, sys
 root = pathlib.Path(sys.argv[1]); local = {p.stem for p in root.rglob("*.py")}
-ok = set(sys.stdlib_module_names) | {"zstandard"} | local
+ok = set(sys.stdlib_module_names) | local
 bad = []
 for f in root.rglob("*.py"):
     for n in ast.walk(ast.parse(f.read_text(encoding="utf-8"))):
@@ -239,8 +240,8 @@ print("\n".join(bad)); sys.exit(1 if bad else 0)
 PY
 ```
 Pass: exit 0.
-- The generator uses only the Python standard library (SHA-256 from `hashlib`, NFC from
-  `unicodedata`), plus pinned `zstandard` for Extended only.
+- The generator uses only the Python standard library: SHA-256 from `hashlib`, NFC from
+  `unicodedata`, and its own Zstandard frame writer. `requirements.txt` stays empty.
 - It contains no hand-written SHA-256: the third line looks for SHA-256's initial values
   and round constants.
 - It never invokes or reads the Rust code.
