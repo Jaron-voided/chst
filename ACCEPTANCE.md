@@ -76,6 +76,7 @@
 | `$CHST_BIG_ROOT` | A parent directory on a volume with enough free space, set by the CI workflow per runner (§1.3); locally it defaults to the system temp directory. Checks never write into it directly: they create a fresh `mktemp -d` under it, and remove it on exit. |
 | `jqn FILE` | `jq -S 'walk(if type=="object" then del(.message) else . end)' FILE`: normalised JSON for comparison (FORMAT_SPEC Appendix B) |
 | `expect_exit N CMD…` | Runs CMD and fails unless its exit code is exactly N |
+| *(no `!` negation)* | Scripts run under `bash -e`, which **ignores the failure of a `!`-negated command** unless it's the script's last command. So a check that must fail when something is found is written as `if CMD; then exit 1; fi`, never `! CMD`. `check.sh` rejects any check script containing a line that starts with `! `. |
 | `cargo_test_nonempty ARGS…` | **The zero-test guard.** Runs `cargo test ARGS…`, then sums the `N passed` counts of every `test result:` line. It fails if cargo exits non-zero, if there's no `test result:` line, or if the sum is 0. That last case covers an empty test target, a filter matching nothing, and an all-ignored suite. **Every check that runs cargo tests uses it.** |
 | `sha256 FILE` | Prints the file's lowercase hex SHA-256: `sha256sum`, or `shasum -a 256` on macOS |
 | `mk_sparse FILE SIZE` | Creates a sparse file of SIZE bytes. On Linux and macOS this is `truncate -s`. On Windows: create the file empty, run `fsutil sparse setflag` on it, then `truncate -s`. |
@@ -219,10 +220,11 @@ Reader rules are covered collectively by AC-NEG-1.
 #### AC-META-4 — The fixture generator is independent and uses only approved libraries
 Core · OS all · fast · Traces: V1, D6, D15
 ```sh
-! grep -rnE 'subprocess|os\.system|os\.exec|cargo|chst_|target/|crates/' fixtures/gen
+if grep -rnE 'subprocess|os\.system|os\.exec|cargo|chst_|target/|crates/' fixtures/gen; then exit 1; fi
 grep -rqE 'hashlib\.sha256' fixtures/gen
-! grep -rniE '0x6a09e667|0x428a2f98|0xbb67ae85' fixtures/gen       # no hand-written SHA-256
-! grep -vxE '(zstandard==[0-9.]+)?' fixtures/gen/requirements.txt
+# no hand-written SHA-256 (initial values and round constants)
+if grep -rniE '0x6a09e667|0x428a2f98|0xbb67ae85' fixtures/gen; then exit 1; fi
+if grep -vxE '(zstandard==[0-9.]+)?' fixtures/gen/requirements.txt; then exit 1; fi
 python3.14 -I - fixtures/gen <<'PY'
 import ast, pathlib, sys
 root = pathlib.Path(sys.argv[1]); local = {p.stem for p in root.rglob("*.py")}
@@ -299,7 +301,7 @@ cargo fmt --all --check
 Core · OS all · fast · Traces: D13, #26
 ```sh
 grep -q '#!\[forbid(unsafe_code)\]' crates/chst-format/src/lib.rs
-! grep -rnE 'std::fs|std::env|std::process|std::net|unsafe' crates/chst-format/src
+if grep -rnE 'std::fs|std::env|std::process|std::net|unsafe' crates/chst-format/src; then exit 1; fi
 cargo tree -p chst-format -e normal --depth 1 --prefix none --no-default-features \
   | tail -n +2 | awk '{print $1}' | sort -u > "$W/deps"
 diff "$W/deps" <(printf 'sha2\nunicode-normalization\n')
@@ -310,7 +312,8 @@ Pass: exit 0, meaning the Core build's direct dependencies are exactly `sha2` an
 #### AC-ENG-3 — The CLI is thin
 Core · OS all · fast · Traces: D13, #27
 ```sh
-! cargo tree -p chst-cli -e normal --depth 1 --prefix none | grep -E '^(sha2|unicode-normalization|zstd) '
+cargo tree -p chst-cli -e normal --depth 1 --prefix none > "$W/cli-deps"
+if grep -E '^(sha2|unicode-normalization|zstd) ' "$W/cli-deps"; then exit 1; fi
 ```
 Pass: exit 0. The CLI reaches hashing, normalisation and compression only through
 `chst-format` and `chst-fs`.
@@ -329,7 +332,7 @@ git ls-files --error-unmatch Cargo.lock fuzz/Cargo.lock > /dev/null       # lock
 for m in Cargo.toml fuzz/Cargo.toml; do
   cargo tree --manifest-path $m --workspace --target all --all-features -e normal,build,dev \
     --depth 1 --prefix none | awk 'NF {print $1}' | sort -u > "$W/direct"
-  ! grep -vxE "$allow" "$W/direct"
+  if grep -vxE "$allow" "$W/direct"; then exit 1; fi
 done
 ```
 Pass: exit 0. Both lockfiles are committed, and every build uses `--locked`, so every
@@ -350,28 +353,46 @@ jq --version | grep -qE '^jq-1\.([7-9]|[1-9][0-9])'
 ```
 Pass: exit 0. The Node pin is checked by AC-X-TS-3, which applies only to the Extended cut.
 
-#### AC-ENG-7 — No unsafe code outside the Windows filesystem module, and every unsafe block there is justified
+#### AC-ENG-7 — Unsafe code only where D18 allows it, and justified there
 Core · OS all · fast · Traces: D18, #26
 ```sh
-for f in crates/chst-format/src/lib.rs crates/chst-cli/src/main.rs $(ls fuzz/fuzz_targets/*.rs); do
+fsw=crates/chst-fs/src/lib.rs; ca=crates/chst-format/tests/support/counting_alloc.rs
+ca_users='crates/chst-format/tests/hostile_sizes.rs crates/chst-format/tests/zstd_bombs.rs'
+# 1. forbid in every crate root except chst-fs and the two counting-allocator test crates
+for f in $(ls crates/*/src/lib.rs crates/*/src/main.rs crates/*/tests/*.rs 2>/dev/null); do
+  case " $fsw $ca_users " in *" $f "*) continue;; esac
   grep -qx '#!\[forbid(unsafe_code)\]' "$f" || { echo "missing forbid: $f"; exit 1; }
 done
-grep -qx '#!\[deny(unsafe_code)\]' crates/chst-fs/src/lib.rs
-grep -qx '#!\[deny(clippy::undocumented_unsafe_blocks, clippy::missing_safety_doc)\]' crates/chst-fs/src/lib.rs
-test "$(grep -rn 'allow(unsafe_code)' crates fuzz --include='*.rs' | wc -l | tr -d ' ')" = 1
-grep -B1 -A1 'allow(unsafe_code)' crates/chst-fs/src/lib.rs | grep -q 'cfg(windows)'
-grep -A1 'allow(unsafe_code)' crates/chst-fs/src/lib.rs | grep -qE '^\s*mod windows;'
-! grep -rnw 'unsafe' crates fuzz --include='*.rs' | grep -vE '^crates/chst-fs/src/(lib\.rs:.*(deny|allow)\(unsafe_code\)|windows(\.rs|/))'
+# 2. chst-fs: deny + SAFETY lints; exactly one allow, on the Windows module
+grep -qx '#!\[deny(unsafe_code)\]' $fsw
+grep -qx '#!\[deny(clippy::undocumented_unsafe_blocks, clippy::missing_safety_doc)\]' $fsw
+grep -B1 -A1 'allow(unsafe_code)' $fsw | grep -q 'cfg(windows)'
+grep -A1 'allow(unsafe_code)' $fsw | grep -qE '^\s*mod windows;'
+# 3. the counting-allocator exception: deny in its two users, allow only in the named file
+for f in $ca_users; do grep -qx '#!\[deny(unsafe_code)\]' "$f"; grep -q 'counting_alloc' "$f"; done
+grep -qx '#!\[allow(unsafe_code)\]' $ca
+test "$(grep -rln 'allow(unsafe_code)' crates fuzz --include='*.rs' | sort | tr '\n' ' ')" = "$ca $fsw "
+# 4. every unsafe item in the allocator file is preceded by a SAFETY comment
+awk '/unsafe/ && !/allow\(unsafe_code\)/ { if (prev !~ /SAFETY:/) { print FILENAME": "FNR": undocumented unsafe"; bad=1 } } { if ($0 !~ /^\s*$/) prev=$0 } END { exit bad }' $ca
+# 5. the word unsafe appears nowhere else
+grep -rnw 'unsafe' crates fuzz --include='*.rs' > "$W/unsafe-lines" || true
+if grep -vE "^($fsw:.*(deny|allow)\(unsafe_code\)|crates/chst-fs/src/windows(\.rs|/)|$ca:|crates/chst-format/tests/(hostile_sizes|zstd_bombs)\.rs:.*deny\(unsafe_code\))" "$W/unsafe-lines"; then exit 1; fi
+# 6. fuzz targets: forbid, or the documented exemption (D18 exception 2)
+for f in $(ls fuzz/fuzz_targets/*.rs); do
+  grep -qx '#!\[forbid(unsafe_code)\]' "$f" || grep -q 'unsafe_code' fuzz/FORBID_EXEMPTION.txt || { echo "fuzz target without forbid or exemption: $f"; exit 1; }
+done
 ```
 Pass: exit 0.
-- `forbid` is in every crate root except `chst-fs`.
-- `chst-fs` denies unsafe code, and the `// SAFETY:` lints, at crate level.
-- Exactly one `allow(unsafe_code)` exists, on `#[cfg(windows)] mod windows;`.
-- The word `unsafe` appears nowhere else, including integration tests.
-- The `// SAFETY:` lints run on the Windows runner through AC-ENG-1's clippy step, because
-  the module only compiles there.
-- Until the test-allocator question in DESIGN.md §9 is decided, this check FAILs if the
-  counting allocator (AC-LIM-1, AC-X-ZSTD-2) is written as planned.
+- Every crate root and integration-test crate has `forbid(unsafe_code)`, except `chst-fs`
+  and the two test crates that use the counting allocator.
+- `chst-fs` denies unsafe code, and the `// SAFETY:` lints, at crate level. Its only `allow`
+  is on `#[cfg(windows)] mod windows;`.
+- The only other `allow(unsafe_code)` is in `crates/chst-format/tests/support/counting_alloc.rs`,
+  where every `unsafe` line follows a `// SAFETY:` comment.
+- Fuzz targets carry `forbid`, unless `fuzz/FORBID_EXEMPTION.txt` records the compiler's
+  `unsafe_code` lint error (D18 exception 2).
+- The clippy `// SAFETY:` lints for the Windows module run on the Windows runner through
+  AC-ENG-1.
 
 ### 3.3 Positive conformance (V2)
 
@@ -887,8 +908,8 @@ done
 ```
 The hostile fixtures declare an `index_length` near 2⁶⁴, a `record_count` of 2⁶⁰, 2³²
 entries, and a path length of 2³²−1, all inside files under 1 KiB. `hostile_sizes` uses a
-counting allocator and asserts peak heap under 1 MiB per fixture. That allocator needs
-test-only `unsafe`, which is an open decision (DESIGN.md §9; AC-ENG-7).
+counting allocator (`crates/chst-format/tests/support/counting_alloc.rs`, the only test-only
+`unsafe` exception in D18) and asserts peak heap under 1 MiB per fixture.
 
 #### AC-LIM-2 — Configured limits trigger at exact boundaries
 Core · OS all · fast · Traces: #24, D11, LIM-3…LIM-5
@@ -1121,7 +1142,7 @@ feature.
 #### AC-X-TS-3 — The TypeScript reader is independent
 Extended:TS · OS all · fast · Traces: V11, D15, D16
 ```sh
-! grep -rnE 'chst-format|\.rs|target/|wasm|fixtures/gen' ts-reader/src
+if grep -rnE 'chst-format|\.rs|target/|wasm|fixtures/gen' ts-reader/src; then exit 1; fi
 grep -rqF 'node:crypto' ts-reader/src
 jq -e '(.dependencies // {} | length) == 0' ts-reader/package.json
 jq -e '.devDependencies // {} | keys | all(. == "typescript" or . == "@types/node")' ts-reader/package.json

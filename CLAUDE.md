@@ -67,9 +67,13 @@ You may add new checks; changing or removing an existing one needs my approval.
 - The definition of done is ACCEPTANCE.md §2, and only there.
 - Parse defensively: validate magic, version, lengths, and counts before allocating; use checked
   arithmetic; never panic on any input.
-- Every crate has `#![forbid(unsafe_code)]`, except the Windows filesystem module that calls
-  windows-sys (DESIGN.md D18). There, every unsafe block has a `// SAFETY:` comment explaining why
-  it's sound.
+- Unsafe code (DESIGN.md D18):
+  - chst-fs uses `#![deny(unsafe_code)]`, and only its Windows module (which calls windows-sys) is
+    allowed unsafe code.
+  - Every other crate uses `#![forbid(unsafe_code)]`, with two exceptions: the test-only file
+    crates/chst-format/tests/support/counting_alloc.rs (the counting allocator), and the fuzz crate
+    if fuzz_target! trips the unsafe lint.
+  - Every unsafe block has a `// SAFETY:` comment explaining why it's sound.
 - Every check and test creates its own fresh temporary directory and removes it afterward.
   Run extraction tests only inside temporary directories.
 - Approved dependencies: the list in DESIGN.md D15. Anything else: propose it under "Needs decision".

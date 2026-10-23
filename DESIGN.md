@@ -534,23 +534,39 @@ nightly toolchain, `cargo-fuzz`, and Node (needed only for Extended).
 - The owner creates the GitHub repository and pushes. Claude uses `gh` read-only to inspect
   runs.
 
-### D18 — Unsafe code policy (review round 3)
-- **Choice:**
-  - Every Chst crate root (`chst-format`, `chst-cli`, each fuzz target) has
-    `#![forbid(unsafe_code)]`.
-  - `chst-fs` has `#![deny(unsafe_code)]`. Its one exception is its Windows module
-    (`#[cfg(windows)] #[allow(unsafe_code)] mod windows;`), which calls `windows-sys`.
-    `forbid` can't be relaxed for a single module, so `chst-fs` uses `deny` plus that one
-    `allow`.
-  - Every `unsafe` block in that module has a `// SAFETY:` comment explaining why it's
-    sound, enforced by `clippy::undocumented_unsafe_blocks` and `clippy::missing_safety_doc`
-    at `deny` level.
+### D18 — Unsafe code policy (review rounds 3–4)
+- **Rule:**
+  - **`chst-fs`** uses `#![deny(unsafe_code)]`. Its only allowed module is the Windows one,
+    `#[cfg(windows)] #[allow(unsafe_code)] mod windows;`, which calls `windows-sys`. It also
+    denies `clippy::undocumented_unsafe_blocks` and `clippy::missing_safety_doc`, so every
+    `unsafe` block there needs a `// SAFETY:` comment explaining why it's sound. (`forbid`
+    can't be relaxed for a single module, so this crate uses `deny` plus one `allow`.)
+  - **Every other crate** uses `#![forbid(unsafe_code)]`. That means `chst-format`,
+    `chst-cli`, every integration-test crate and every fuzz target, apart from the two
+    exceptions below.
+- **Exception 1: the counting allocator (round 4).**
+  - The only file outside `chst-fs`'s Windows module that may contain `unsafe` is
+    **`crates/chst-format/tests/support/counting_alloc.rs`**. It holds the counting global
+    allocator (`unsafe impl GlobalAlloc`) that AC-LIM-1 and AC-X-ZSTD-2 use to measure peak
+    heap. It starts with `#![allow(unsafe_code)]`, and each `unsafe` item in it has a
+    `// SAFETY:` comment.
+  - Only the two test crates that include it,
+    `crates/chst-format/tests/hostile_sizes.rs` and
+    `crates/chst-format/tests/zstd_bombs.rs`, use `#![deny(unsafe_code)]` instead of
+    `forbid`. Every other test crate uses `forbid`.
+- **Exception 2: the fuzz crate (round 4).**
+  - If cargo-fuzz's `fuzz_target!` macro trips the `unsafe_code` lint, the **fuzz crate
+    only** is exempt from `forbid`. It's a test harness that never ships.
+  - The exemption covers the attribute only: fuzz sources still contain no hand-written
+    `unsafe`, and the library code they call keeps its own rule.
+  - To use the exemption, commit the compiler error that shows the lint firing, as
+    `fuzz/FORBID_EXEMPTION.txt`. AC-ENG-7 accepts a missing `forbid` in fuzz targets only
+    when that file exists and contains the `unsafe_code` lint error.
 - **Rationale:** the format parser handles hostile input and must be memory-safe by
-  construction. The Windows module is the only place that needs raw OS calls (D15), and
-  keeping it in one module keeps it reviewable.
-- **Enforcement:** AC-ENG-7. The clippy lints run on the Windows CI runner through AC-ENG-1,
-  because the module only compiles there.
-- **Open follow-up:** test-only `unsafe` for the counting allocator (§9).
+  construction. Raw OS calls are confined to one reviewable module. The test and fuzz
+  exceptions never ship.
+- **Enforcement:** AC-ENG-7. The `// SAFETY:` lints run on the Windows CI runner through
+  AC-ENG-1, because the Windows module only compiles there.
 
 ## 5. Implementation requirements that aren't byte format
 
@@ -562,8 +578,8 @@ These are normative for the Rust implementation and checked in `ACCEPTANCE.md`:
 - **G6** Memory use during pack, verify and extract is bounded by the index size plus a
   fixed buffer. Blob data is streamed and never fully buffered.
 - **#26** No panic, abort or unbounded allocation on any input.
-- **D18** No `unsafe` code in any Chst crate except `chst-fs`'s Windows module. Each
-  `unsafe` block there carries a `// SAFETY:` comment.
+- **D18** No `unsafe` code except in `chst-fs`'s Windows module and the two exceptions
+  named in D18. Each `unsafe` block carries a `// SAFETY:` comment.
 - **D13** `chst-format` has no filesystem access (enforced by its dependency list and API
   review; see AC-ENG-2).
 - Pack refuses an output path inside the source tree (`refused` / `pack.output-in-source`).
@@ -664,6 +680,14 @@ Two layers, detailed in `ACCEPTANCE.md`:
 | 3 | Unsafe code | `#![forbid(unsafe_code)]` in every crate except `chst-fs`'s Windows module, which calls `windows-sys`. Each `unsafe` block there has a comment explaining why it's sound (D18, AC-ENG-7). |
 | 4 | D16 | Approved as proposed. Python is called as `python3.14` everywhere, because the system `python3` is 3.12. |
 
+## 9d. Review round 4 decisions
+
+| # | Item | Owner decision |
+|---|---|---|
+| 1 | Test-only `unsafe` | Option (a): one named test-only file, `crates/chst-format/tests/support/counting_alloc.rs`, may contain `unsafe impl GlobalAlloc`, with `// SAFETY:` comments (D18, AC-ENG-7). |
+| 2 | Fuzz targets and the unsafe lint | If `fuzz_target!` trips the lint, the fuzz crate only is exempt (D18). |
+| 3 | `CLAUDE.md` wording | Aligned with D18. |
+
 Still-open drafting choices, for the reviewer (until `plan-v1`):
 
 - **Empty container.** Zero entries and zero blobs is valid. Packing an empty directory
@@ -679,18 +703,6 @@ Still-open drafting choices, for the reviewer (until `plan-v1`):
   - AC-ROB-4 on Windows (the provisional fallback is in place);
   - the dated nightly (D16);
   - disk for AC-ROB-7 (ACCEPTANCE.md §1.3).
-- **Test-only `unsafe` (round 3 follow-up).** AC-LIM-1 and AC-X-ZSTD-2 measure peak heap
-  with a counting global allocator in test code. Writing one requires `unsafe impl
-  GlobalAlloc`, and integration tests are crates too, so this conflicts with D18 as
-  written. AC-ENG-7 will report FAIL until it's resolved. Options:
-  - **(a)** Allow a second, test-only exception: one support file implementing the counting
-    allocator, with `// SAFETY:` comments. This is what I recommend.
-  - **(b)** Measure memory externally per OS instead, losing the precise heap cap.
-  - **(c)** Add an allocator-statistics crate, which is a new dependency.
-- **`fuzz_target!` and the unsafe lint (unverified).** cargo-fuzz's macro expands to an
-  exported `#[no_mangle]` function, which the `unsafe_code` lint can flag. It isn't yet
-  confirmed whether `#![forbid(unsafe_code)]` compiles in the fuzz targets. AC-ENG-1 and
-  AC-ENG-7 will show it. If it fails, a fuzz-target exception would need a decision.
 - **`node:zlib` zstd** is marked experimental in Node's documentation (D15). The `fzstd`
   fallback would need a decision when Extended starts.
 
