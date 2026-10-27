@@ -5,6 +5,7 @@
 #   ./check.sh --full          full mode: also the full-only IDs
 #   ./check.sh --only ID,ID    only the named IDs (development aid); every other ID is NOT RUN
 #   ./check.sh --list-ids      print every acceptance ID
+#   ./check.sh --self-test     run the harness's own self-test IDs (AC-META-7)
 #
 # Every applicable ID runs its script, tools/acceptance/checks/<ID>.sh, under `bash -euo pipefail`
 # in a fresh $W. Statuses and exit codes are those of ACCEPTANCE.md §1.1. N/A comes only from two
@@ -30,7 +31,7 @@ EXE=""
 if [ "$CHST_OS" = windows ]; then EXE=.exe; fi
 
 usage() {
-  echo "usage: ./check.sh [--full | --only ID,ID | --list-ids]" >&2
+  echo "usage: ./check.sh [--full | --only ID,ID | --list-ids | --self-test]" >&2
   exit 64
 }
 
@@ -56,6 +57,7 @@ while [ $# -gt 0 ]; do
       shift
       ;;
     --list-ids) set_mode list-ids ;;
+    --self-test) set_mode self-test ;;
     *) usage ;;
   esac
   shift
@@ -160,7 +162,9 @@ source "$1"' check "$script" >> "$log" 2>&1 || rc=$?
 }
 
 record() { # record ID STATUS EXIT DUR LOG
-  printf '%s\t%s\t%s\t%s\t./check.sh --only %s\t%s\n' "$1" "$2" "$3" "$4" "$1" "$5" >> "$RES"
+  local cmd="./check.sh --only $1"
+  if [ "$MODE" = self-test ]; then cmd="./check.sh --self-test"; fi
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$4" "$cmd" "$5" >> "$RES"
   echo "$2 $1"
 }
 
@@ -169,26 +173,63 @@ has_os() { # has_os "linux,macos" -> 0 when it covers this OS
   return 1
 }
 
-for id in $(list_ids); do
-  row=$(awk -F'\t' -v id="$id" '$1 == id' <<< "$META")
-  tier=$(cut -f2 <<< "$row")
-  os=$(cut -f3 <<< "$row")
-  kind=$(cut -f4 <<< "$row")
-  if [ "$tier" = extended ] && [ "$CUT" = core ]; then
-    record "$id" "N/A" "" 0 ""
-  elif ! has_os "$os"; then
-    record "$id" "N/A" "" 0 ""
-  elif [ "$MODE" = only ] && ! echo ",$ONLY," | grep -q ",$id,"; then
-    record "$id" "NOT RUN" "" 0 ""
-  elif [ "$kind" = full ] && [ "$MODE" != full ] && [ "$MODE" != only ]; then
-    record "$id" "NOT RUN" "" 0 ""
-  elif [ "$kind" = done ] && [ "$MODE" != only ]; then
-    record "$id" "NOT RUN" "" 0 ""
-  else
-    run_check "$id" "$CHECKS/$id.sh"
+# The self-test IDs go through run_check, the code path of the real IDs. Each must report its
+# required status: a check that is empty, missing or can't run must be FAIL.
+SELFTEST_WANT="SELFTEST-EMPTY-TARGET:FAIL SELFTEST-ZERO-FILTER:FAIL SELFTEST-MISSING-CHECK:FAIL SELFTEST-CANT-RUN:FAIL SELFTEST-PASS:PASS"
+self_test() {
+  local st crate pair id want
+  st=$(mktemp -d)
+  crate=$st/crate
+  mkdir -p "$crate/src" "$crate/tests" "$st/checks"
+  printf '[package]\nname = "selftest"\nversion = "0.0.0"\nedition = "2021"\n' > "$crate/Cargo.toml"
+  : > "$crate/src/lib.rs"
+  : > "$crate/tests/empty.rs"
+  printf '#[test]\nfn passes() {}\n' > "$crate/tests/one.rs"
+  export SELFTEST_CRATE=$crate
+  printf 'cd "$SELFTEST_CRATE"\ncargo_test_nonempty --test empty\n' > "$st/checks/SELFTEST-EMPTY-TARGET.sh"
+  printf 'cd "$SELFTEST_CRATE"\ncargo_test_nonempty --test one -- no_such_filter\n' > "$st/checks/SELFTEST-ZERO-FILTER.sh"
+  printf 'no-such-command-for-chst-selftest\n' > "$st/checks/SELFTEST-CANT-RUN.sh"
+  printf 'cd "$SELFTEST_CRATE"\ncargo_test_nonempty --test one\n' > "$st/checks/SELFTEST-PASS.sh"
+  # SELFTEST-MISSING-CHECK has no script, on purpose.
+  SELFTEST_OK=1
+  for pair in $SELFTEST_WANT; do
+    id=${pair%%:*}
+    want=${pair##*:}
+    run_check "$id" "$st/checks/$id.sh"
     record "$id" "$R_STATUS" "$R_EXIT" "$R_DUR" "$LOGS/$id.log"
-  fi
-done
+    if [ "$R_STATUS" != "$want" ]; then
+      echo "check.sh: self-test $id: wanted $want, got $R_STATUS" >&2
+      SELFTEST_OK=0
+    fi
+  done
+  chmod -R u+rwx "$st" 2> /dev/null || true
+  rm -rf "$st"
+}
+
+if [ "$MODE" = self-test ]; then
+  self_test
+else
+  for id in $(list_ids); do
+    row=$(awk -F'\t' -v id="$id" '$1 == id' <<< "$META")
+    tier=$(cut -f2 <<< "$row")
+    os=$(cut -f3 <<< "$row")
+    kind=$(cut -f4 <<< "$row")
+    if [ "$tier" = extended ] && [ "$CUT" = core ]; then
+      record "$id" "N/A" "" 0 ""
+    elif ! has_os "$os"; then
+      record "$id" "N/A" "" 0 ""
+    elif [ "$MODE" = only ] && ! echo ",$ONLY," | grep -q ",$id,"; then
+      record "$id" "NOT RUN" "" 0 ""
+    elif [ "$kind" = full ] && [ "$MODE" != full ] && [ "$MODE" != only ]; then
+      record "$id" "NOT RUN" "" 0 ""
+    elif [ "$kind" = done ] && [ "$MODE" != only ]; then
+      record "$id" "NOT RUN" "" 0 ""
+    else
+      run_check "$id" "$CHECKS/$id.sh"
+      record "$id" "$R_STATUS" "$R_EXIT" "$R_DUR" "$LOGS/$id.log"
+    fi
+  done
+fi
 
 # --- report ---
 COMMIT=$(git rev-parse HEAD 2> /dev/null || echo unknown)
@@ -204,6 +245,9 @@ jq -R -s --arg mode "$MODE" --arg cut "$CUT" --arg os "$CHST_OS" --arg commit "$
 n_fail=$(grep -c "$(printf '\tFAIL\t')" "$RES" || true)
 n_notrun=$(grep -c "$(printf '\tNOT RUN\t')" "$RES" || true)
 echo "check.sh ($MODE, $CHST_OS, cut $CUT): $(wc -l < "$RES" | tr -d ' ') IDs, $n_fail FAIL, $n_notrun NOT RUN; report: $OUT/report.json"
+if [ "$MODE" = self-test ]; then
+  if [ "$SELFTEST_OK" = 1 ]; then exit 0; else exit 1; fi
+fi
 if [ "$n_fail" != 0 ]; then exit 1; fi
 if [ "$n_notrun" != 0 ]; then exit 2; fi
 exit 0
