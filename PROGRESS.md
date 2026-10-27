@@ -4,7 +4,7 @@ Append-only log, one entry per task. Results are in EVIDENCE.md, not here.
 
 ## Needs decision
 
-- **AC-X-TS-2 has no script in ACCEPTANCE.md** (§3.13). I derived \`tools/acceptance/checks/AC-X-TS-2.sh\` from its prose (see H-4).
+- **AC-X-TS-2 has no script in ACCEPTANCE.md** (§3.13). I derived `tools/acceptance/checks/AC-X-TS-2.sh` from its prose (see H-4).
   Options: (a) keep the derived script; (b) have ACCEPTANCE.md state the script. Recommendation: (b) before the cut becomes
   Extended, so the script is the document's, not mine. It's N/A under Core, so nothing is blocked.
 
@@ -55,3 +55,25 @@ Append-only log, one entry per task. Results are in EVIDENCE.md, not here.
 - Open issues: the two points above.
 - Acceptance IDs affected: AC-META-1, AC-META-2, AC-META-4, AC-META-5 pass. AC-NEG-1 and AC-NEG-4 also pass, since they read only the
   fixtures.
+
+### H-5 Python helper scripts — f6a04da
+- Added the six helpers in `tools/acceptance/`. Each is standalone: `python3.14 -I` doesn't put the script's directory on
+  `sys.path`, so they can't share a module.
+- `trace.py` found 28 Core features, 18 decisions and 21 W/EXT/SEL rules, and none untraced. Its negative case (three traces removed)
+  names all three. It also fails when an input is missing or yields nothing.
+- `inspect_check.py` follows Appendix B's field kinds: ints are little-endian (signed for `mtime_seconds`) and become decimal strings
+  beyond 2^53-1, hex fields are lowercase hex, and the PATH_POOL payload is UTF-8 text. My first version compared every string to hex,
+  and failed on the PATH_POOL payload and on the bit-63 `optional_flags`; I fixed it from the spec's definition, not by loosening a
+  check. It passes on the 10 valid fixtures and 6 exit-0 compat fixtures (the real `inspect` output doesn't exist yet; these are the
+  fixtures' `inspect.json`).
+- `tree_eq.py` walks by directory handle. It passes on all 10 fixtures' materialised trees, including `long-names` (paths beyond
+  PATH_MAX; `cp -R` can't copy that tree, so I materialised it twice) and `deep`. Its Windows fallback (extended-length path
+  strings) can't be run here.
+- `flip_sweep.py` and `truncate_sweep.py` can't be run against the real CLI yet. I tried them against a throwaway mock `verify` that
+  isn't in the repo: against a mock that accepts too much they reported the wrongly accepted flips, and against a mock that rejects any
+  changed file they passed. A missing CHST exits 1 in both. In `--rehash` mode, `flip_sweep.py` parses the PATH_POOL range from the
+  file itself (FORMAT_SPEC §5 and §6), not from `chst inspect`, to decide which flips may be accepted.
+- AC-POS-3, AC-POS-4, AC-ROB-1 and AC-ROB-2 report FAIL because the CLI doesn't exist, as TODO.md expects.
+- Also fixed stray backslashes in the "Needs decision" entry written in H-4.
+- Open issues: none.
+- Acceptance IDs affected: AC-META-3, AC-META-6 pass.

@@ -156,7 +156,7 @@ IDs will FAIL here, because the features don't exist yet.
     python3.14 -I tools/todo_coverage.py;
     sed '/^  - Checks: AC-META-1, AC-META-2, AC-META-4, AC-META-5\. /d' TODO.md > "$W/T.md"; if cmp -s TODO.md "$W/T.md" || python3.14 -I tools/todo_coverage.py --todo "$W/T.md"; then exit 1; fi;
     test "$(ls tools/acceptance/checks/*.sh | wc -l | tr -d ' ')" = 85`.
-- [ ] **H-5 Python helper scripts** (standard library only, run as `python3.14 -I`)
+- [x] **H-5 Python helper scripts** (standard library only, run as `python3.14 -I`)
   - Depends: H-4.
   - [ ] `trace.py` (AC-META-3)
   - [ ] `spec_hexdump.py` (AC-META-6)
