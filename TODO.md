@@ -91,7 +91,7 @@ Gates, from DESIGN.md §10:
 These tasks are done when every ID is reported honestly, not when everything passes. Most
 IDs will FAIL here, because the features don't exist yet.
 
-- [ ] **H-1 `check.sh` runner core**
+- [x] **H-1 `check.sh` runner core**
   - Depends: `plan-v1`.
   - Builds:
     - the modes in ACCEPTANCE §1: fast, `--full`, `--only`, `--list-ids`;
