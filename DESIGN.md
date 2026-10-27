@@ -442,7 +442,7 @@ Detailed byte layouts live in `FORMAT_SPEC.md`.
   then does it run `fchmod(handle, 0700)` and confirm `st_mode & 0o777` (P2, Q1). Every
   directory the extractor creates has any inherited setgid bit cleared (P2). On Windows, staging is held
   without `FILE_SHARE_DELETE` (P4). Extracting onto filesystems without Unix modes is refused,
-  a known v1 limitation (P5).
+  a known v1 limitation (P5) (superseded by Q5: refused or io, non-normative).
 
 ### D11 — Resource limits (amended in review rounds 1 and 6)
 - **Options:** (A) implementation limits only; (B) hard maxima in the spec only; (C) both.
@@ -881,7 +881,8 @@ How these were applied, where the planner had to choose:
   at that point.
 
 Known v1 limitation (P5): **extracting onto filesystems without Unix modes** (vfat, exFAT,
-CIFS, drvfs without `metadata`) is refused. To be revisited after v1.
+CIFS, drvfs without `metadata`) is refused (superseded by Q5: refused or io, non-normative).
+To be revisited after v1.
 
 Still open, for the next reviewer (until `plan-v1`), in addition to §9g's and §9h's lists:
 

@@ -637,11 +637,13 @@ BLB-6; otherwise it reports the ZST rule.
       the checks above usually can't succeed. Extraction onto them is a known v1
       limitation (§15.1), not a format rule.
       - *Non-normative (Q5):* the usual result is `refused` / `extract.unsafe-object`,
-        from step 3 or step 5.
-      - Some mount options (for example vfat with `dmask=077,quiet`) let those checks pass,
+        from step 3, 4 or 5.
+      - Some mount options (for example vfat with `dmask=077`) let those checks pass,
         and the failure then comes later, at the final permissions, as `io`.
-      - So the result on such a filesystem is "refused or `io`". An extractor isn't
-        required to detect the filesystem type.
+      - With `quiet`, chmod reports success without changing anything, so extraction may
+        complete with modes fixed by the mount.
+      - So the result on such a filesystem is "refused or `io`", or a completed extraction
+        with the mount's modes. An extractor isn't required to detect the filesystem type.
     - The extractor records the handle's identity (device and inode, or volume serial
       number and file ID). Every later operation on staging uses that handle: the writes
       under it, its final permissions, and cleanup.
