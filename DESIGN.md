@@ -924,6 +924,9 @@ drafting TODO.md.
 - AC-X-ZSTD-2 MUST fail if `zstd_bombs.rs` doesn't exist, doesn't use the counting
   allocator, or fails AC-ENG-7's checks for an allocator user. So the file can't be absent
   in Extended, and neither ID can pass by skipping it.
+- AC-X-ZSTD-2 also runs `zstd_bombs.rs` with `cargo_test_nonempty`, so at least one real
+  counting-allocator bomb test must run and pass. The file can't be satisfied by an empty or
+  placeholder test.
 
 ## 10. Checkpoints
 

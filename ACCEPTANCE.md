@@ -1418,6 +1418,7 @@ grep -q 'counting_alloc' $z                        # registered with the countin
 grep -qx '#!\[deny(unsafe_code)\]' $z              # AC-ENG-7 part 3
 grep -nw 'unsafe' $z > "$W/zu" || true             # AC-ENG-7 part 5: no unsafe beyond the deny line
 if grep -vE '^[0-9]+:#!\[deny\(unsafe_code\)\]$' "$W/zu"; then exit 1; fi
+cargo_test_nonempty --release -p chst-format --test zstd_bombs   # at least one real test runs and passes
 for t in ZST-2-window:6:zstd.frame ZST-2-dictid:6:zstd.frame ZST-1:7:zstd.raw-length LIM-6:8:limit.ratio \
          ZST-2-no-fcs-overflow:6:zstd.frame ZST-2-bomb:6:zstd.frame; do
   IFS=: read -r n code det <<< "$t"
@@ -1435,7 +1436,10 @@ expect_exit 0 $CHST verify --max-ratio 54738112978366623 $FX/extended/valid/zstd
 The first lines fail unless `crates/chst-format/tests/zstd_bombs.rs` exists, uses the
 counting allocator, and passes AC-ENG-7's checks for an allocator user (D18 exception 1).
 AC-ENG-7 skips that file while it's absent, so Core never needs it; this check makes sure
-it can't be absent in Extended.
+it can't be absent in Extended. It then runs the file's tests with `cargo_test_nonempty`, so
+at least one test must run and pass. The tests are the counting-allocator bomb tests: they
+decode the Extended bomb fixtures through `chst-format` and assert the peak Rust heap. An
+empty or placeholder test never counts (`CLAUDE.md`).
 
 The memory limit is measured on the whole process's peak RSS (F10), so libzstd's C
 allocations are included; a counting Rust allocator can't see them.

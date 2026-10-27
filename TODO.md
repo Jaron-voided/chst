@@ -364,7 +364,10 @@ so `$CHST_CORE` (`--no-default-features`) stays Core-only. Each task re-checks A
   - LIM-6 is computed exactly in at least 128 bits.
   - A blob is compressed only when that's smaller (ZST-3).
   - `crates/chst-format/tests/zstd_bombs.rs` with the counting allocator: `deny(unsafe_code)`,
-    and no `unsafe` of its own. AC-X-ZSTD-2 fails without it.
+    and no `unsafe` of its own. It holds the real counting-allocator bomb tests: they decode
+    the Extended bomb fixtures through `chst-format` and assert the peak Rust heap. It never
+    holds an empty or placeholder test. AC-X-ZSTD-2 fails without the file, and runs it
+    with `cargo_test_nonempty`, so at least one test must run and pass.
   - Checks: AC-X-ZSTD-1, AC-X-ZSTD-2.
   - Re-check: AC-ENG-7 (owned by C-8). Under the Extended cut it requires `zstd_bombs.rs`.
 - [ ] **X-2 Entry attributes (#16)**
