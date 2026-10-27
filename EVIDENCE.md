@@ -90,6 +90,7 @@ This is the only record of check results. Its format and rules are defined in
 | AC-X-ZSTD-2 | NOT RUN | NOT RUN | NOT RUN | ./check.sh --only AC-X-ZSTD-2 | — | — |
 | AC-X-ATTR-1 | NOT RUN | NOT RUN | NOT RUN | ./check.sh --only AC-X-ATTR-1 | — | — |
 | AC-X-ATTR-2 | NOT RUN | NOT RUN | NOT RUN | ./check.sh --only AC-X-ATTR-2 | — | — |
+| AC-X-ATTR-3 | NOT RUN | NOT RUN | NOT RUN | ./check.sh --only AC-X-ATTR-3 | — | — |
 | AC-X-KV-1 | NOT RUN | NOT RUN | NOT RUN | ./check.sh --only AC-X-KV-1 | — | — |
 | AC-X-SEL-1 | NOT RUN | NOT RUN | NOT RUN | ./check.sh --only AC-X-SEL-1 | — | — |
 | AC-X-EXCL-1 | NOT RUN | NOT RUN | NOT RUN | ./check.sh --only AC-X-EXCL-1 | — | — |

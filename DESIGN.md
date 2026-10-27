@@ -1,6 +1,6 @@
 # Chst — Design
 
-> Status: **DRAFT for independent review** (revised after review rounds 1–7; see §9, and the full review records in `reviews/`).
+> Status: **DRAFT for independent review** (revised after review rounds 1–8; see §9, and the full review records in `reviews/`).
 > The format is **Chst**, pronounced "chest". Its magic bytes are `CHST`, its file
 > extension is `.chst`, and the CLI binary is `chst`.
 >
@@ -430,6 +430,13 @@ Detailed byte layouts live in `FORMAT_SPEC.md`.
   decides "output inside source" by file identity (F22), and applies the reader limits
   (W-10, F24).
 
+- **Amendment (review round 8, §9h):** right after creating staging, the extractor confirms
+  through its handle that it's the directory just created. On Unix it must be owned by the
+  effective user, mode 0700 and empty; on Windows, creating and opening are one step (M1).
+  Cleanup removes only objects whose identities the extractor recorded, so "deleted on any
+  error" has stated exceptions when someone else's object is involved (M1, M9). Extraction
+  reports step 11 exactly as verify would (M2).
+
 ### D11 — Resource limits (amended in review rounds 1 and 6)
 - **Options:** (A) implementation limits only; (B) hard maxima in the spec only; (C) both.
 - **Choice: C.**
@@ -791,6 +798,45 @@ Still open, for the next reviewer (until `plan-v1`):
 - **Unverified pins:** `unicode-normalization`'s Unicode version (AC-ENG-8) and Node 24's
   ICU Unicode version (AC-X-TS-3) are expected to be 16.0, but nothing has run them yet.
 - **`node:zlib` zstd** is Experimental in Node's documentation.
+
+## 9h. Review round 8 decisions (third independent review: 15 new findings)
+
+| # | Item | Owner decision |
+|---|---|---|
+| 1 | M1 | The `fstat` route. After opening staging, it must be a directory owned by the effective user, with mode 0700, and empty. On Windows, create and open in one step (`NtCreateFile` with `FILE_CREATE`). Any failed open or mismatch is `refused/extract.unsafe-object`, and nothing under that name is touched. Both AC-SAFE-14 hooks are added (between create and open, and between the pre-rename check and the rename). Cleanup removes only objects whose identities the extractor recorded. |
+| 2 | M2 | The proposed wording: per blob, step 11's rules in step 11's order. If decoding fails, the extractor still hashes the remaining stored bytes and reports BLB-6 on a mismatch, otherwise the ZST rule. Plus an Extended extract-case. |
+| 3 | M3 | Compute LIM-6 exactly, in at least 128 bits, and remove the overflow parenthetical. Add the boundary to AC-CLI-1. TRL-2 is unchanged. |
+| 4 | M4 | FLG-1 becomes one-way in FORMAT_SPEC (`ENTRY_ATTRS` set ⇒ `record_size` ≥ 64), with an Extended-view expectation for `compat/unknown-optional-wider-entries`. |
+| 5 | M5 | Allow `fchmodat` on a name relative to a held parent handle, inside private staging, with `AT_SYMLINK_NOFOLLOW` where the platform has it. Where it doesn't, check with `fstatat` NOFOLLOW first. Add the 0o000-directory case to AC-SAFE-13. |
+| 6 | M6 | The 32 MiB / 1 TiB RLE time bomb as a `$GEN synth-*` recipe, and the sentence corrected. |
+| 7 | M7 | Add `ZST-2-second-frame` and `ZST-2-trailing-skippable`. |
+| 8 | M8–M11, M13, M14 | Applied as proposed. |
+| 9 | M12 | Limit values: ASCII digits only, no sign, no whitespace, no leading zeros (a lone `0` is allowed). |
+| 10 | M15 | Escape the bidi characters in `expect.json` and the catalog, and regenerate the fixtures. |
+| 11 | XXH64 | Add the multi-size libzstd cross-check to the generator build. |
+
+How two of these were placed:
+- **M5 and M3 test placement.** AC-SAFE-13 and AC-CLI-1 are Core IDs, and statuses are per ID
+  (ACCEPTANCE §1.1). An Extended-only case inside them would FAIL in the Core cut. So:
+  - The 0o000-directory case is a new Extended ID, AC-X-ATTR-3 (OS linux, macos), and
+    AC-SAFE-13 points to it.
+  - AC-CLI-1 gets the Core-side parse boundary for `--max-ratio`. The overflow boundary on
+    an encoded blob is in AC-X-ZSTD-2.
+- **M1's recorded-identity cleanup** changes two existing criteria. AC-SAFE-8 and AC-SAFE-15
+  plant a link inside staging, which cleanup now leaves in place, so "staging must be gone"
+  became "nothing the extractor created remains".
+
+Still open, for the next reviewer (until `plan-v1`), in addition to §9g's list:
+
+- **M1's ownership check** (the reason for the `fstat` route) can't be exercised by a
+  single-user test. AC-SAFE-14 tests mode, emptiness, links and non-directories only.
+- **M5's `AT_SYMLINK_NOFOLLOW` support.** D16 doesn't pin runner kernels.
+  - Linux honours the flag for `fchmodat` only through `fchmodat2` (kernel 6.6 or later), or
+    glibc's emulation.
+  - On the owner's WSL machine (kernel 6.6.87, glibc 2.39), the reviewer's `n17_handle.py`
+    shows it works.
+  - Whether `rustix` exposes it, and what `ubuntu-latest` and `macos-latest` do, is
+    unverified until the first CI run. The spec's fallback covers a platform without it.
 
 ## 10. Checkpoints
 

@@ -1,0 +1,7 @@
+{
+  "exit": 7,
+  "note": "zstd-compressed with byte 7 of the text.txt frame changed so its block type is 3 (reserved), key unchanged: breaks both BLB-6 and ZST-2, and BLB-6 comes first (M2)",
+  "rule": "BLB-6",
+  "category": "integrity",
+  "detail": "blob.hash"
+}

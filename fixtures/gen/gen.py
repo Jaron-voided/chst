@@ -5,6 +5,7 @@
   gen.py materialize-sparse RECIPE.json FILE
   gen.py synth-entries N FILE              N empty files sharing one blob
   gen.py synth-amplify N SIZE FILE         N files sharing one SIZE-byte blob
+  gen.py synth-zstd-bomb FILE              Extended: a 32 MiB frame decoding to 1 TiB (ZST-2, M6)
   gen.py worked-example-hexdump            print FORMAT_SPEC §18.3's hex dump from the fixture
 
 Every fixture is derived from FORMAT_SPEC.md. Rule categories, detail codes and exit codes are
@@ -211,11 +212,15 @@ def build(out_root):
         data = chst.serialize(builder())
         core_got = check(data, reader="core")
         require(core_got == ([rule] if rule else []), f"compat {name}: core reader found {core_got}")
-        require(check(data, reader="extended") in ([], [rule]), f"compat {name}: extended reader found {check(data)}")
+        ext_got = check(data, reader="extended")
+        require(ext_got in ([], [rule]), f"compat {name}: extended reader found {ext_got}")
         out.write(f"compat/{name}.chst", data)
         out.json(f"compat/{name}.expect.json",
                  {"exit": code, "detail": RULES[rule][1] if rule else None,
-                  "note": "Expected result for a Core-only reader (built with --no-default-features)."})
+                  "note": "Expected result for a Core-only reader (built with --no-default-features). "
+                          "'extended' is the expected result for a full (Extended) reader (M4).",
+                  "extended": {"exit": outcome(ext_got[0])[2] if ext_got else 0,
+                               "detail": RULES[ext_got[0]][1] if ext_got else None}})
         if code == 0:
             c = reports.parse_bytes(data, reader="core")
             out.json(f"compat/{name}.list.json", reports.list_report(c))
@@ -228,6 +233,7 @@ def build(out_root):
     require(zstd.decompress(catalog.COMPRESSED_FRAME) == catalog.COMPRESSED_TEXT, "COMPRESSED_FRAME output")
     from check import zstd_check
     require(zstd_check(catalog.COMPRESSED_FRAME, len(catalog.COMPRESSED_TEXT)) is None, "COMPRESSED_FRAME check")
+    xxh64_cross_check(zstd)
 
     # extended/valid
     for name, (fn, kw) in catalog.VALID_EXTENDED.items():
@@ -242,6 +248,18 @@ def build(out_root):
         out.json(f"extended/invalid/{rule}{suffix}.expect.json", invalid_expect(rule, base, mutation, got, opts.get("args")))
         bump("extended/invalid")
 
+    # extended/extract-cases (M2): the frame is broken too, but BLB-6 comes first in step 11
+    require(zstd_check(catalog.M2_CORRUPT_FRAME, len(catalog.COMPRESSED_TEXT)) == "ZST-2", "M2 frame must fail ZST-2")
+    for name, code, rule, note, builder in catalog.extended_extract_cases():
+        data = chst.serialize(builder())
+        require(check(data) == [rule], f"extended extract-case {name}: got {check(data)}")
+        out.write(f"extended/extract-cases/{name}.chst", data)
+        out.json(f"extended/extract-cases/{name}.expect.json", {"exit": code, "note": note, **single_detail_expect(rule)})
+        bump("extended/extract-cases")
+
+    # The on-demand time bomb (M6) must be exactly a ZST-2 file.
+    require(check(chst.serialize(catalog.zstd_time_bomb()))[:1] == ["ZST-2"], "synth-zstd-bomb")
+
     # Binary-exact files: stop git line-ending conversion (core.autocrlf on Windows) from touching them.
     out.write(".gitattributes", b"* -text\n")
     out.write("fuzz-regressions/README.txt",
@@ -250,6 +268,27 @@ def build(out_root):
 
     write_manifest(out_root)
     return counts
+
+
+XXH64_SIZES = list(range(65)) + [100, 255, 256, 1000, 4095, 4096, 4097, 8800, 65535, 65536,
+                                 131071, 131072, 131073, 1_000_000]
+
+
+def xxh64_cross_check(zstd):
+    """The checker's own XXH64 against libzstd's (N19, review round 8): for each size, a Raw-block
+    frame carrying our checksum must decode, and the same frame with one checksum bit flipped must
+    be rejected. libzstd only decodes here; the generator never compresses with it."""
+    from check import xxh64
+    for n in XXH64_SIZES:
+        content = catalog.pseudo_random(n, b"chst-xxh64")
+        plain = chst.zstd_frame(content)
+        frame = plain[:4] + bytes([plain[4] | 0x04]) + plain[5:] + (xxh64(content) & 0xFFFFFFFF).to_bytes(4, "little")
+        require(zstd.decompress(frame) == content, f"XXH64 cross-check: size {n} rejected by libzstd")
+        try:
+            zstd.decompress(frame[:-1] + bytes([frame[-1] ^ 1]))
+        except zstd.ZstdError:
+            continue
+        require(False, f"XXH64 cross-check: libzstd accepted a bad checksum at size {n}")
 
 
 def build_lim2_recipe(out):
@@ -443,6 +482,8 @@ def main(argv):
     elif argv and argv[0] == "synth-amplify":
         size = int(argv[2])
         synth(argv[3], int(argv[1]), bytes(i % 251 for i in range(size)))
+    elif argv and argv[0] == "synth-zstd-bomb":
+        pathlib.Path(argv[1]).write_bytes(chst.serialize(catalog.zstd_time_bomb()))
     elif argv and argv[0] == "worked-example-hexdump":
         worked_example_hexdump()
     else:

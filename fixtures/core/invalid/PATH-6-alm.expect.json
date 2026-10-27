@@ -4,5 +4,5 @@
   "detail": "path.control-char",
   "exit": 6,
   "base": "worked-example",
-  "mutation": "directory 'docs/a؜b' added (ARABIC LETTER MARK, N15)"
+  "mutation": "directory 'docs/a\\u061cb' added (ARABIC LETTER MARK, N15)"
 }

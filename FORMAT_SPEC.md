@@ -271,7 +271,7 @@ the values shown, so every conforming reader accepts files within the defaults.
 | **LIM-3** | Number of entries | 1,048,576 | all |
 | **LIM-4** | `index_length` | 268,435,456 (256 MiB) | all |
 | **LIM-5** | Total logical size: the sum, over **every file entry**, of the `raw_length` of the blob it references, computed without overflow (a sum of 2⁶⁴ or more exceeds every limit) | 68,719,476,736 (64 GiB) | verify, extract |
-| **LIM-6** | Compression ratio of an encoded blob (Extended): violated if and only if `raw_length > limit × stored_length`, computed without overflow (an overflow is a violation) | 1000 | all |
+| **LIM-6** | Compression ratio of an encoded blob (Extended): violated if and only if `raw_length > limit × stored_length`, computed exactly, in at least 128 bits: both factors are below 2⁶⁴, so the product always fits (M3) | 1000 | all |
 
 The CLI flag for each limit is in Appendix C.
 
@@ -304,7 +304,10 @@ A writer MUST produce, and a reader MUST require, exactly one encoding per input
 - **FLG-1** A writer MUST set a known flag if and only if the file uses the corresponding
   feature, and a reader MUST check this for every flag it knows:
   - `ZSTD` ⇔ at least one blob has `encoding` 1.
-  - `ENTRY_ATTRS` ⇔ ENTRY_TABLE `record_size` ≥ 64. The exact size is enforced by SEC-5.
+  - `ENTRY_ATTRS` set ⇒ ENTRY_TABLE `record_size` ≥ 64. This is one direction only (N9,
+    M4): a record size of 64 or more without `ENTRY_ATTRS` isn't an FLG-1 violation, because
+    a future optional flag may widen entry records (§17). When the reader knows every flag
+    that's set, SEC-5 enforces the exact size.
   - `KV_METADATA` ⇔ a KV_METADATA section is present.
 - Section order is fixed by SEC-3.
 - Core files contain no timestamps, tool identity or other environment-derived data.
@@ -408,9 +411,10 @@ These features change no bytes of the format. They define tool behaviour only.
     - A `]` straight after `[` or `[!` is a literal, not the end of the class, so `[]]`
       matches `]` and `[!]]` matches anything but `]`. That is also how to match a literal
       `[` inside a class: `[[]`.
-    - A `-` first or last in the class is a literal.
-    - An unterminated `[`, an empty class, or a range with x > y is `usage` /
-      `usage.pattern` (N16).
+    - A `-` first or last in the class is a literal, and so is a `-` straight after a
+      range: `[a-c-e]` is the set {`a`–`c`, `-`, `e`} (M13).
+    - An unterminated `[` or a range with x > y is `usage` / `usage.pattern` (N16). Because
+      of the `]` rule, `[]` and `[!]` are unterminated, so a class is never empty.
   - `**` as a complete segment matches zero or more whole segments, so `a/**` matches `a`
     and everything under it.
   - A pattern with no wildcard matches exactly that path.
@@ -487,6 +491,9 @@ deterministic, so two conforming readers report the same error for the same file
     - Frame_Content_Size ≠ `raw_length`: ZST-1;
     - one decoding pass with output capped at `raw_length`: any failure is ZST-2.
 
+    An extractor performs step 11 while it writes each file (EXT-7), and reports the same
+    rule a verifier would for that blob (§15, "Step 11 while writing", M2).
+
 Because step 7 comes before every structural check, any change to header bytes 10–11 or
 13–31, or to the index, is reported as `integrity` (TRL-3), unless it also breaks an earlier
 step.
@@ -539,7 +546,9 @@ step.
   would reject under LIM-3 … LIM-5 (F24). The error is `limit-exceeded`, with the same
   detail codes. It also refuses an index over LIM-2's 2³² bytes, as `malformed` /
   `lim.index-size`, whatever `--max-index-bytes` says (N23). Pack accepts the same `--max-*`
-  flags as the readers (Appendix C), and no output file is written. A writer MUST NOT emit
+  flags as the readers (Appendix C), and no output file is written. When several of these
+  limits are exceeded, pack reports the one a reader would report first: LIM-2, then LIM-4,
+  then LIM-3, then LIM-5 (M10). A writer MUST NOT emit
   an encoded blob that violates LIM-6 under its `--max-ratio` (default 1000): it stores that
   blob with `encoding` 0 instead (N8).
 
@@ -552,10 +561,17 @@ itself, or who has the extractor's own privileges. A parent-writer can always re
 destination after extraction finishes; the guarantees are that nothing is written outside
 staging and that no link is ever followed (N2).
 
-**Order of extractor checks (N12).** An extractor checks, in this order: command-line usage;
-EXT-1; §13 steps 1–10, with LIM-5; SEL-1 (selective extract); creating the staging directory;
-then, per entry in canonical order, EXT-2 and EXT-8 as each is created, and EXT-7 while each
-file is written; then the final rename. The first failure is the one reported.
+**Order of extractor checks (N12, M2, M8).** An extractor checks, in this order: command-line
+usage; opening and reading the input file (`io`); EXT-1; §13 steps 1–10, with LIM-5; SEL-1
+(selective extract); creating and holding the staging directory (EXT-4); then, per entry in
+canonical order, EXT-2 and EXT-8 as it's created, followed by §13 step 11 for its blob while
+the file is written (EXT-7); then the final rename. The first failure is the one reported.
+
+**Step 11 while writing (M2).** For each blob, the extractor reports step 11's rules in step
+11's order, so it reports what a verifier would. If the frame fails (ZST-1 or ZST-2, whether
+found in the header or while decoding), the extractor stops writing that file but still
+reads and hashes the rest of the blob's stored bytes. If the key doesn't match, it reports
+BLB-6; otherwise it reports the ZST rule.
 
 - **EXT-1** The destination path MUST NOT exist when extraction starts. The check doesn't
   follow a final symlink, so a dangling symlink also counts as existing. Otherwise the
@@ -574,17 +590,32 @@ file is written; then the final rename. The first failure is the one reported.
     `.<destination name>.chst-<32 lowercase hex digits from a cryptographically secure
     random source>`. Its mode is 0700 (on Windows, see below).
     - If that name would exceed 255 bytes (on Windows, 255 UTF-16 units), `<destination
-      name>` is truncated to its longest prefix that fits, at a character boundary (N4).
+      name>` is truncated to its longest prefix that fits (N4, M14): at a UTF-8 character
+      boundary if the name is valid UTF-8, otherwise at a byte boundary; on Windows, at a
+      code point boundary. On macOS the name must also fit HFS+, which stores names
+      decomposed: its NFD form must be at most 255 UTF-16 units.
     - If the name already exists, the result is `refused` / `extract.collision`; there's no
       retry, and nothing else is created (N5).
-  - **Holding it (N2):** right after creating it, the extractor opens the staging directory
-    with no-follow directory semantics and records its identity (device and inode, or
-    volume serial number and file ID). Every later operation on it uses that handle: the
-    writes under it, its final permissions, and cleanup. Immediately before the final
-    rename, the staging name MUST still resolve, without following links, to that
-    identity; immediately after it, the destination MUST. On a mismatch the result is
-    `refused` / `extract.unsafe-object`: the staging directory is emptied through its
-    handle, and nothing found under either name is touched.
+  - **Holding it (N2, M1):** the extractor holds the staging directory by an open handle,
+    and confirms that the handle is the directory it just created:
+    - Unix: `mkdirat` with mode 0700 relative to the parent's handle, then `openat` of the
+      same name with `O_DIRECTORY | O_NOFOLLOW`. `fstat` on the new handle MUST show a
+      directory owned by the effective user ID, with permission bits exactly 0700, and
+      reading it through the handle MUST find no entries other than `.` and `..`.
+    - Windows: create and open in one step, with `NtCreateFile` relative to the parent's
+      handle, `FILE_CREATE`, `FILE_DIRECTORY_FILE` and `FILE_OPEN_REPARSE_POINT`, passing
+      the private DACL (below) in its security descriptor. No other object can then be
+      opened in its place.
+    - If the open fails (including at a link: `ELOOP`), or any of these checks fails, the
+      result is `refused` / `extract.unsafe-object`, and nothing found under that name is
+      touched or removed.
+    - The extractor records the handle's identity (device and inode, or volume serial
+      number and file ID). Every later operation on staging uses that handle: the writes
+      under it, its final permissions, and cleanup.
+    - Immediately before the final rename, the staging name MUST still resolve, without
+      following links, to that identity; immediately after it, the destination MUST. On a
+      mismatch the result is `refused` / `extract.unsafe-object`, and cleanup applies, with
+      the exceptions listed there.
   - **Final permissions (N6),** set through the handle just before the rename:
     - Unix: mode `0755 & ~umask`, in Core and Extended alike.
     - Windows: the staging directory's DACL is protected, with one non-inheritable ACE
@@ -600,14 +631,42 @@ file is written; then the final rename. The first failure is the one reported.
       result is `refused` / `extract.dest-exists`, and cleanup applies.
     - If the filesystem doesn't support a no-replace rename, the result is `io` /
       `extract.no-atomic-rename`, and cleanup applies.
-  - **Cleanup (F18):** on any error, including integrity, the staging directory and all its
-    contents MUST be removed. The extractor MUST NOT leave behind a destination it created;
-    an object someone else created at the destination is left untouched (N3). Cleanup
-    removes entries relative to open directory handles (`unlinkat`, or Windows
-    handle-relative deletion). It never follows a link or reparse point, and never
-    re-resolves a full path. Before removing a directory's children, it restores the
-    owner's read, write and search permissions on that directory with `fchmod` on its
-    handle, so modes applied earlier (§12.6) can't block cleanup (N17).
+  - **Cleanup (F18, M1, M5, M9):** on any error, including integrity, the staging directory
+    and everything the extractor created in it MUST be removed, except as listed below. The
+    extractor MUST NOT leave behind a destination it created; an object someone else created
+    at the destination is left untouched (N3).
+    - **Only what it created:** the extractor records the identity of every object it
+      creates under staging. Cleanup walks from the staging handle and checks each name
+      without following links (`fstatat` with `AT_SYMLINK_NOFOLLOW`, or a Windows
+      handle-relative open with `FILE_FLAG_OPEN_REPARSE_POINT`). It removes an object only
+      if its identity is one it recorded; anything else is left in place, and so is the
+      directory holding it.
+    - **How:** removal is relative to open directory handles (`unlinkat`, or Windows
+      handle-relative deletion). It never follows a link or reparse point, and never
+      re-resolves a full path.
+    - **Restrictive modes (N17, M5):** before removing a directory's children, cleanup
+      restores the owner's read, write and search permissions on that directory, so modes
+      applied earlier (§12.6) can't block it. It uses `fchmod` if it holds an open handle to
+      the directory. Otherwise it uses `fchmodat` on the directory's name, relative to the
+      parent's held handle, with `AT_SYMLINK_NOFOLLOW` where the platform supports that
+      flag. Where it doesn't (the call fails with `EOPNOTSUPP` or `ENOTSUP`), the extractor
+      first checks with `fstatat(AT_SYMLINK_NOFOLLOW)` that the name is a directory with
+      the recorded identity, then calls `fchmodat` without the flag. That's safe because
+      staging is private (mode 0700), so nothing else can change names inside it.
+    - **The staging name itself (M9):** last, cleanup removes the staging directory's own
+      name from the parent, after checking with `fstatat(AT_SYMLINK_NOFOLLOW)` that the
+      name still has staging's recorded identity. If it doesn't, the name is left alone.
+    - **Exceptions (M9):**
+      - If the open or the checks right after creating staging fail, nothing under the
+        staging name is touched. The directory the extractor created may remain, empty,
+        wherever it was moved.
+      - If the staging name stops leading to staging (a mismatch before the final rename),
+        staging is emptied through its handle but can't be removed by name. It remains,
+        empty, wherever it was moved.
+      - If the mismatch is found just after the final rename, the object now at the
+        destination was moved there by the extractor's rename but isn't the extractor's.
+        It's left untouched. This is the one case where an object the extractor moved stays
+        at the destination. Staging is emptied through its handle, as above.
   - **After a crash (F43):** a crash can leave a staging directory behind. It's recognised
     by the name pattern above, and can be deleted by hand.
 - **EXT-5** In Core, files are created with mode 0644 and directories with 0755, both
@@ -617,7 +676,9 @@ file is written; then the final rename. The first failure is the one reported.
   except the destination created by EXT-4's final rename (F20).
 - **EXT-7** Each file's content MUST be checked against its key (BLB-6) **while it is
   written, not in a separate pass before writing** (F14). On mismatch the error is
-  `integrity` / `blob.hash`, and EXT-4 cleanup applies.
+  `integrity` / `blob.hash`, and EXT-4 cleanup applies. For an encoded blob, the ZST rules
+  are checked in the same pass, and the rule reported follows "Step 11 while writing"
+  above (M2).
 - **EXT-8** Extractors MUST NOT follow a symlink, junction or other reparse point anywhere
   under the staging directory, even one that appears during extraction (for example,
   through a concurrent swap).
@@ -667,7 +728,7 @@ several rules, a reader MUST report the first one in §13's order, and only that
 | `malformed` | A structural, path, canonical or hard-limit rule | 6 |
 | `integrity` | TRL-3, BLB-6, ZST-1 | 7 |
 | `limit-exceeded` | LIM-3 … LIM-6, W-10 | 8 |
-| `refused` | A policy refusal on otherwise valid input (EXT-1, EXT-2, EXT-4's `dest-exists` and `collision` outcomes, EXT-8, W-3, W-4, W-6, W-7, SEL-1) | 9 |
+| `refused` | A policy refusal on otherwise valid input (EXT-1, EXT-2, EXT-4's `dest-exists`, `collision` and `unsafe-object` outcomes, EXT-8, W-3, W-4, W-6, W-7, SEL-1) | 9 |
 | `internal` | An implementation bug; MUST NOT occur | 70 |
 
 Success is exit code 0. Warnings never change the exit code. The full mapping is in
@@ -898,7 +959,7 @@ SHA-256 of the whole 556-byte file, for fixture checking only:
 | **EXT-2** | refused | `extract.collision` |
 | **EXT-7** | integrity | `blob.hash` |
 | **EXT-8** | refused | `extract.unsafe-object` |
-| **EXT-4** | refused | `extract.dest-exists` (at the final rename); `extract.collision` (staging name exists); `extract.unsafe-object` (staging identity mismatch); `io` / `extract.no-atomic-rename` |
+| **EXT-4** | refused | `extract.dest-exists` (at the final rename); `extract.collision` (staging name exists); `extract.unsafe-object` (staging can't be confirmed as the directory just created, or a staging identity mismatch); `io` / `extract.no-atomic-rename` |
 | **W-1**, **W-2**, **W-9**, **EXT-3**, **EXT-5**, **EXT-6**, **EXT-9**, **EXT-10** | (requirement; no error of its own) | — |
 | *(retired)* LIM-1 | — | — (§10.1) |
 
@@ -1010,8 +1071,9 @@ behaviour differently, but must keep the limits configurable (§10.2).
 | inspect | `chst inspect FILE [--json] [limits]` |
 | extract | `chst extract FILE -C DEST [limits]`; Extended adds `[PATTERN]…` (§12.8) |
 
-**Limit flags**, accepted by every command. Each takes a decimal integer from 0 to 2⁶⁴ − 1;
-any other value is `usage` / `usage.limit`. A limit of 0 means nothing of that kind is
+**Limit flags**, accepted by every command. Each takes a decimal integer from 0 to 2⁶⁴ − 1,
+written in ASCII digits only: no sign, no whitespace, and no leading zeros, though a lone
+`0` is allowed (M12). Any other value is `usage` / `usage.limit`. A limit of 0 means nothing of that kind is
 allowed, for example `--max-entries 0` accepts only an empty container (N23).
 
 | Flag | Sets | Default |

@@ -4,5 +4,5 @@
   "detail": "path.control-char",
   "exit": 6,
   "base": "worked-example",
-  "mutation": "directory 'docs/a⁦b' added (LEFT-TO-RIGHT ISOLATE)"
+  "mutation": "directory 'docs/a\\u2066b' added (LEFT-TO-RIGHT ISOLATE)"
 }

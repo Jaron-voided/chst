@@ -1,0 +1,8 @@
+{
+  "rule": "ZST-2",
+  "category": "malformed",
+  "detail": "zstd.frame",
+  "exit": 6,
+  "base": "zstd-mixed",
+  "mutation": "the zeros.bin frame followed by a second, empty frame (M7)"
+}

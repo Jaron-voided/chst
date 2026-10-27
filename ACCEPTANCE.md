@@ -106,8 +106,8 @@ its own Zstandard frames (D15).
   | `core/attacks/` | `rule`, `category`, `detail`, `exit` |
   | `core/hostile/` | `rule`, `category`, `detail`, `exit`, `base`, `mutation` |
   | `core/hostile64/` | as hostile, plus `details`: a one-element list for AC-ROB-8 |
-  | `core/extract-cases/` | `exit`, `note`; plus `rule`, `category`, `detail` when the case fails. A sibling `<name>.tree.json` describes valid trees. |
-  | `compat/` | `exit`, `detail` (`null` when the exit is 0), `note`. Exit-0 fixtures also have `<name>.list.json`, `.verify.json` and `.inspect.json`: the **Core-only reader's** reports (FORMAT_SPEC Appendix B, "What the reader implements shapes its report"). |
+  | `core/extract-cases/`, `extended/extract-cases/` | `exit`, `note`; plus `rule`, `category`, `detail` when the case fails. A sibling `<name>.tree.json` describes valid trees. |
+  | `compat/` | `exit`, `detail` (`null` when the exit is 0), `note`: the **Core-only reader's** result; and `extended`, with its own `exit` and `detail`: a full (Extended) reader's result (M4). Exit-0 fixtures also have `<name>.list.json`, `.verify.json` and `.inspect.json`: the Core-only reader's reports (FORMAT_SPEC Appendix B, "What the reader implements shapes its report"). |
 - `fixtures/core/valid/`, `fixtures/core/sparse/` and `fixtures/extended/valid/` hold
   directories, as above (sparse: `recipe.json` instead of `container.chst` and `tree.json`).
 - `fixtures/fuzz-regressions/<target>/`: every input that ever crashed a fuzz target.
@@ -124,6 +124,8 @@ Generator commands used by checks:
   its tail bytes at the end of an existing sparse FILE, without filling the hole.
 - `$GEN synth-entries N FILE` and `$GEN synth-amplify N SIZE FILE` build large synthetic
   containers on demand.
+- `$GEN synth-zstd-bomb FILE` builds the Extended time bomb on demand: 32 MiB whose
+  Zstandard frame would decode to 1 TiB (AC-X-ZSTD-2, M6).
 
 ### 1.3 CI runners and heavy checks
 
@@ -874,7 +876,10 @@ release builds never contain it. The hook points (F19):
   never reopens by name, there's no window, and the test asserts success instead.
 
 In every case the test asserts that nothing outside staging was created or modified. On
-failure it also asserts that staging and the destination are both gone; on success, that
+failure it also asserts that the destination is gone and that nothing the extractor created
+remains. Staging must be gone too, unless it still holds the link the hook planted: cleanup
+removes only objects the extractor created, so it leaves that link, and the directory
+holding it, in place (FORMAT_SPEC EXT-4 Cleanup, M1). On success, the test asserts that
 every file is inside the destination.
 
 #### AC-SAFE-9 — Extraction never creates alternate data streams
@@ -932,12 +937,16 @@ Just before the final rename, a hook creates something at the destination (F16).
 runs three cases: an empty directory, a symlink on Unix (a junction on Windows), and a
 regular file. In each, the result must be `refused/extract.dest-exists`, the planted object
 must be unchanged, and staging must be gone.
+The same late failure with a directory whose stored mode is 0o000 is Extended, so it's
+tested by AC-X-ATTR-3 (M5).
 
 #### AC-SAFE-14 — The staging directory is private, unpredictable, and never handled by name
 Core · OS all · fast · Traces: EXT-4, D10
 ```sh
 cargo_test_nonempty --release -p chst-fs --features test-hooks --test staging_props
 cargo_test_nonempty --release -p chst-fs --features test-hooks --test staging_swap
+cargo_test_nonempty --release -p chst-fs --features test-hooks --test staging_open_race
+cargo_test_nonempty --release -p chst-fs --features test-hooks --test staging_rename_race
 ```
 `staging_props`: a hook pauses extraction right after the staging directory is created
 (F17). The test asserts:
@@ -960,6 +969,31 @@ outside directory under its name. The test asserts that the result is
 unchanged, nothing was moved to the destination, and the moved-away staging directory was
 emptied through its handle.
 
+`staging_open_race` (M1): a hook runs between creating the staging directory and opening it.
+On Unix it renames the new directory away and puts something else under its name. There are
+four cases: a directory with mode 0755, a non-empty directory with mode 0700, a symlink to an
+outside directory, and a regular file. In each, the result must be
+`refused/extract.unsafe-object`, and the object under the staging name must be unchanged
+(contents and permissions). Nothing may be written anywhere, and no destination may appear.
+On Windows, where creating and opening are one step, the hook runs right after it and
+attempts the same swap. The result must be `refused/extract.unsafe-object`, or success if
+Windows refuses the swap because the directory is open; either way nothing outside staging
+changes.
+A replacement owned by another user, which the ownership check exists for, can't be
+created by a single-user test; that case is reasoned from FORMAT_SPEC EXT-4, not tested.
+
+`staging_rename_race` (M1): a hook runs between the pre-rename identity check and the final
+rename. It renames the staging directory away and puts an outside directory, full of
+sentinel files, under its name.
+- On Linux and macOS, where the rename is by name, the outside directory is moved to the
+  destination, and the post-rename check catches it. The result must be
+  `refused/extract.unsafe-object`. The outside directory must be left untouched at the
+  destination, with every sentinel file unchanged, and the real staging directory must be
+  emptied through its handle (EXT-4 Cleanup, exceptions).
+- On Windows, the rename goes through staging's own handle, so the real staging directory is
+  what moves. The result must be success, with the extracted tree at the destination and the
+  outside directory unchanged under the staging name.
+
 #### AC-SAFE-15 — Cleanup never follows a link
 Core · OS all · fast · Traces: EXT-4, EXT-6, D10
 ```sh
@@ -968,7 +1002,9 @@ cargo_test_nonempty --release -p chst-fs --features test-hooks --test cleanup_ra
 Extraction is made to fail late (the BLB-6 fixture `late-blob-hash`) (F18). Before cleanup
 runs, a hook replaces a directory inside staging with a symlink (a junction on Windows) to
 an outside directory full of sentinel files. After cleanup, every sentinel file must still
-exist, and staging must be gone.
+exist, and nothing the extractor created may remain. Cleanup removes only objects the
+extractor created (FORMAT_SPEC EXT-4 Cleanup, M1), so the planted link, and the staging
+directory holding it, must be left in place.
 
 ### 3.8 Pack behaviour
 
@@ -1169,7 +1205,14 @@ expect_exit 2 $CHST verify --max-entries -1 $f
 expect_exit 2 $CHST verify --max-entries 18446744073709551616 $f
 expect_exit 0 $CHST verify --max-entries 18446744073709551615 $f
 expect_exit 0 $CHST verify --max-entries 0 $FX/core/valid/empty/container.chst
+for v in +5 05 00 ' 5' '5 ' 0x5 ''; do                                  # M12: ASCII digits only
+  expect_exit 2 $CHST verify --max-entries "$v" $f
+done
+expect_exit 0 $CHST verify --max-ratio 18446744073709551615 $f          # M3: largest ratio parses
+expect_exit 2 $CHST verify --max-ratio 18446744073709551616 $f
 ```
+The overflow boundary itself (`--max-ratio 18446744073709551615` on an encoded blob) is
+Extended, so it's in AC-X-ZSTD-2 (M3).
 
 #### AC-CLI-2 — Warnings never change the exit code and appear in the JSON
 Core · OS linux, macos · fast · Traces: D12, W-5
@@ -1282,8 +1325,25 @@ The required sub-condition fixtures (F35) are:
 - `SEC-4-kv`;
 - `ZST-2-window`, `ZST-2-dictid`, `ZST-2-short`, `ZST-2-checksum`, `ZST-2-no-fcs-overflow`,
   `ZST-2-bomb`, `ZST-2-reserved-fhd`, `ZST-2-block-type`, `ZST-2-block-size`,
-  `ZST-2-truncated`, `ZST-2-skippable` (N10, N11);
+  `ZST-2-truncated`, `ZST-2-skippable` (N10, N11), `ZST-2-second-frame`,
+  `ZST-2-trailing-skippable` (M7);
 - `FLG-1-attrs-short` (N9).
+
+`ZST-2-second-frame` and `ZST-2-trailing-skippable` catch a reader that checks the frame
+header itself and then decodes in one shot: libzstd's one-shot decode accepts both,
+because the extra frame produces no output.
+
+The full build must also give each compat fixture's Extended result (M4):
+```sh
+for e in $FX/compat/*.expect.json; do
+  f=${e%.expect.json}.chst
+  set +e; $CHST verify --json "$f" > "$W/r.json"; rc=$?; set -e
+  test $rc = "$(jq .extended.exit $e)"
+  jq -e --slurpfile x $e '($x[0].extended.detail == null) or (.error.detail == $x[0].extended.detail)' "$W/r.json"
+done
+```
+For example, `compat/unknown-optional-wider-entries` (64-byte entry records under an unknown
+optional flag, without `ENTRY_ATTRS`) must give 0: FLG-1 is one direction only.
 
 #### AC-X-ZSTD-1 — Compressed round-trip; compressed only when smaller
 Extended:#12 · OS all · fast · Traces: #12, D7, ZST-3
@@ -1299,11 +1359,19 @@ mkdir -p "$W/big" && head -c 2097152 /dev/zero > "$W/big/zeros.bin"      # N8: o
 $CHST pack --compress zstd "$W/big" -o "$W/big.chst"
 $CHST list --json "$W/big.chst" | jq -e '.entries[0].encoding == "stored"'
 $CHST verify "$W/big.chst"
+e=$FX/extended/extract-cases/zstd-corrupt-block                        # M2: verify and extract agree
+expect_exit 7 $CHST verify $e.chst
+mkdir -p "$W/p" && expect_exit 7 $CHST extract $e.chst -C "$W/p/out" 2> "$W/err"
+grep -q 'error\[integrity/blob.hash\]' "$W/err" && test -z "$(ls -A "$W/p")"
 ```
 The fixtures include incompressible random data, which must list as `encoding: "stored"`.
 2 MiB of zeros would compress far beyond the 1000:1 ratio limit, so pack must store it
 (W-10, N8), and the result must pass the default `verify`.
 Comparison deliberately excludes compressed sizes and keys (D7).
+`zstd-corrupt-block` breaks both BLB-6 and ZST-2, and its decoding fails at stored byte 7.
+An extractor that reported the decode failure as it happened would give `zstd.frame`
+(exit 6). It must instead finish hashing the blob and report `blob.hash` (exit 7), as
+verify does (FORMAT_SPEC §15, "Step 11 while writing", M2).
 
 #### AC-X-ZSTD-2 — Decompression bombs and huge windows are contained
 Extended:#12 · OS linux · fast · Traces: ZST-1, ZST-2, LIM-6, D11
@@ -1315,14 +1383,29 @@ for t in ZST-2-window:6:zstd.frame ZST-2-dictid:6:zstd.frame ZST-1:7:zstd.raw-le
   test $rc = $code && test "$(jq -r .error.detail "$W/r.json")" = "$det"
   test "$(cat "$W/rss")" -lt 65536                                      # peak RSS < 64 MiB, C allocations included
 done
+$GEN synth-zstd-bomb "$W/tb.chst"                                      # M6: 1 TiB of output in 32 MiB
+set +e; /usr/bin/time -f '%M' -o "$W/rss" timeout 10 $CHST verify --json "$W/tb.chst" > "$W/r.json"; rc=$?; set -e
+test $rc = 6 && test "$(jq -r .error.detail "$W/r.json")" = zstd.frame
+test "$(cat "$W/rss")" -lt 65536
+expect_exit 0 $CHST verify --max-ratio 18446744073709551615 $FX/extended/valid/zstd-compressed/container.chst   # M3
 ```
 The memory limit is measured on the whole process's peak RSS (F10), so libzstd's C
 allocations are included; a counting Rust allocator can't see them.
 `ZST-2-window` declares a 2 GiB window, which the reader must refuse from the frame header
-before allocating anything (FORMAT_SPEC §12.5). `ZST-2-no-fcs-overflow` and `ZST-2-bomb`
-have no content size in their headers, so only the decoder's output cap can catch them.
-The bomb would decode to 1 GiB for a 1 MiB `raw_length`, and must fail within 10 seconds
-and 64 MiB (N10).
+before allocating anything (FORMAT_SPEC §12.5).
+`ZST-2-no-fcs-overflow`, `ZST-2-bomb` and the synthesized time bomb have no content size in
+their headers, so no reader can reject them from the header alone (N10, M6):
+- `ZST-2-bomb` would decode to 1 GiB for a 1 MiB `raw_length`. It catches a decoder that
+  buffers all its output, which runs out of memory. A streaming decoder with no output cap
+  still finishes it in well under a second and then reports the length.
+- The time bomb (`synth-zstd-bomb`, 32 MiB stored, `raw_length` one more than that) would
+  decode to 1 TiB. Only a decoder that stops at the first byte beyond `raw_length` rejects
+  it within 10 seconds. An uncapped streaming decoder needs over a minute even at the
+  12 GiB/s measured in review round 8.
+
+`--max-ratio 18446744073709551615` on `zstd-compressed` must pass: computed exactly, as
+LIM-6 requires, 8,800 isn't more than that limit times 337 stored bytes, so a reader whose
+64-bit multiply overflows into a violation fails here (M3).
 
 #### AC-X-ATTR-1 — Modification time and mode round-trip; setuid is never stored or set
 Extended:#16 · OS linux · fast · Traces: #16, ATT-1
@@ -1351,6 +1434,24 @@ $CHST pack --attrs --deterministic --mtime 0 "$W/t1" -o "$W/a.chst"
 $CHST pack --attrs --deterministic --mtime 0 "$W/t2" -o "$W/b.chst"
 cmp "$W/a.chst" "$W/b.chst"
 ```
+
+#### AC-X-ATTR-3 — Cleanup works after restrictive directory modes are applied
+Extended:#16 · OS linux, macos · fast · Traces: EXT-4, §12.6, D10
+```sh
+cargo_test_nonempty --release -p chst-fs --features test-hooks --test cleanup_modes
+```
+This is AC-SAFE-13's late failure, with stored modes (M5). The test extracts a tree with
+`ENTRY_ATTRS` that holds a directory with mode 0o000, containing a file, and a directory
+with mode 0o300. Just before the final rename, a hook creates a directory at the destination.
+The test asserts the following:
+- the result is `refused/extract.dest-exists`;
+- the planted directory is unchanged;
+- staging is gone completely, including both restricted directories and their contents.
+
+Unless cleanup kept that directory's handle open from creation, it can't open a mode-0o000
+directory to `fchmod` it. So this exercises restoring owner permissions with `fchmodat`
+relative to the parent's handle (FORMAT_SPEC EXT-4 Cleanup).
+Windows ignores stored modes, so the case can't arise there.
 
 #### AC-X-KV-1 — Key/value metadata is written only when given
 Extended:#18 · OS all · fast · Traces: #18, KV-1, D5

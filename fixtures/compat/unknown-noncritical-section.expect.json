@@ -1,5 +1,9 @@
 {
   "exit": 0,
   "detail": null,
-  "note": "Expected result for a Core-only reader (built with --no-default-features)."
+  "note": "Expected result for a Core-only reader (built with --no-default-features). 'extended' is the expected result for a full (Extended) reader (M4).",
+  "extended": {
+    "exit": 0,
+    "detail": null
+  }
 }

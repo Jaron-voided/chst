@@ -321,15 +321,15 @@ def core_invalid():
          lambda: plan_from(WE + [d("docs/x\u0301\U000113ce")]), {}),
         ("PATH-3", "-empty", WE_MUTATION, "directory with the empty path (path_length 0) added",
          lambda: plan_from(WE + [d(b"")]), {}),
-        ("PATH-6", "-c1", WE_MUTATION, "directory 'docs/a\u0085b' added (C1 control NEL)",
+        ("PATH-6", "-c1", WE_MUTATION, "directory 'docs/a\\u0085b' added (C1 control NEL)",
          lambda: plan_from(WE + [d("docs/a\u0085b")]), {}),
-        ("PATH-6", "-bidi", WE_MUTATION, "directory 'docs/a\u202eb' added (RIGHT-TO-LEFT OVERRIDE)",
+        ("PATH-6", "-bidi", WE_MUTATION, "directory 'docs/a\\u202eb' added (RIGHT-TO-LEFT OVERRIDE)",
          lambda: plan_from(WE + [d("docs/a\u202eb")]), {}),
-        ("PATH-6", "-isolate", WE_MUTATION, "directory 'docs/a\u2066b' added (LEFT-TO-RIGHT ISOLATE)",
+        ("PATH-6", "-isolate", WE_MUTATION, "directory 'docs/a\\u2066b' added (LEFT-TO-RIGHT ISOLATE)",
          lambda: plan_from(WE + [d("docs/a\u2066b")]), {}),
-        ("PATH-6", "-rlm", WE_MUTATION, "directory 'docs/a\u200fb' added (RIGHT-TO-LEFT MARK, N15)",
+        ("PATH-6", "-rlm", WE_MUTATION, "directory 'docs/a\\u200fb' added (RIGHT-TO-LEFT MARK, N15)",
          lambda: plan_from(WE + [d("docs/a\u200fb")]), {}),
-        ("PATH-6", "-alm", WE_MUTATION, "directory 'docs/a\u061cb' added (ARABIC LETTER MARK, N15)",
+        ("PATH-6", "-alm", WE_MUTATION, "directory 'docs/a\\u061cb' added (ARABIC LETTER MARK, N15)",
          lambda: plan_from(WE + [d("docs/a\u061cb")]), {}),
         ("PATH-9", "-com0", WE_MUTATION, "directory 'docs/COM0' added",
          lambda: plan_from(WE + [d("docs/COM0")]), {}),
@@ -431,7 +431,48 @@ def extended_invalid():
          lambda: m(set_zeros(bytes.fromhex("502a4d18") + (4).to_bytes(4, "little") + b"skip" + chst.zstd_frame(b"\x00" * 8192)))(zstd_plan()), {}),
         ("ZST-2", "-checksum", "zstd-compressed", "last byte of the frame's content checksum XORed with 0x01",
          lambda: with_frame(compressed_entries(), "text.txt", COMPRESSED_FRAME[:-1] + bytes([COMPRESSED_FRAME[-1] ^ 1])), {}),
+        # M7: a one-shot decoder accepts both of these, since the extra frame adds no output
+        ("ZST-2", "-second-frame", "zstd-mixed", "the zeros.bin frame followed by a second, empty frame (M7)",
+         lambda: m(set_zeros(chst.zstd_frame(b"\x00" * 8192) + chst.zstd_frame(b"")))(zstd_plan()), {}),
+        ("ZST-2", "-trailing-skippable", "zstd-mixed", "the zeros.bin frame followed by a skippable frame (M7)",
+         lambda: m(set_zeros(chst.zstd_frame(b"\x00" * 8192) + SKIPPABLE_FRAME))(zstd_plan()), {}),
     ]
+
+
+SKIPPABLE_FRAME = bytes.fromhex("502a4d18") + (4).to_bytes(4, "little") + b"skip"
+
+# M2: the real Compressed frame with its block type changed from 2 (Compressed) to 3 (reserved)
+# at byte 7, so decoding fails at once; the blob key is left unchanged, so BLB-6 fails too.
+M2_CORRUPT_FRAME = COMPRESSED_FRAME[:7] + bytes([COMPRESSED_FRAME[7] | 0x02]) + COMPRESSED_FRAME[8:]
+
+
+def corrupt_compressed_blob():
+    p = with_frame(compressed_entries(), "text.txt", COMPRESSED_FRAME)
+    i = blob_index(p, ENC_ZSTD)
+    p["data_override"] = b"".join(M2_CORRUPT_FRAME if j == i else b["data"] for j, b in enumerate(p["blobs"]))
+    return p
+
+
+def extended_extract_cases():
+    return [
+        ("zstd-corrupt-block", 7, "BLB-6", "zstd-compressed with byte 7 of the text.txt frame changed so its "
+         "block type is 3 (reserved), key unchanged: breaks both BLB-6 and ZST-2, and BLB-6 comes first (M2)",
+         corrupt_compressed_blob),
+    ]
+
+
+def zstd_time_bomb(blocks=2 ** 23):
+    """M6: zeros.bin as a frame of `blocks` RLE blocks of 128 KiB each (1 TiB of output for the
+    default 2^23 blocks, in 32 MiB), with no content size and raw_length = stored_length + 1.
+    Only a decoder that stops at raw_length rejects it quickly; it's built on demand
+    (gen.py synth-zstd-bomb), not stored."""
+    rle = ((ZSTD_BLOCK_RLE_128K << 3) | (1 << 1)).to_bytes(3, "little") + b"\x00"
+    last = ((ZSTD_BLOCK_RLE_128K << 3) | (1 << 1) | 1).to_bytes(3, "little") + b"\x00"
+    frame = chst.ZSTD_MAGIC + bytes([0x00, (23 - 10) << 3]) + rle * (blocks - 1) + last
+    return m(set_zeros(frame, len(frame) + 1))(zstd_plan())
+
+
+ZSTD_BLOCK_RLE_128K = 128 * 1024
 
 
 def set_zeros(frame, raw_length=None):
