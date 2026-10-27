@@ -886,10 +886,11 @@ release builds never contain it. The hook points (F19):
 
 In every case the test asserts that nothing outside staging was created or modified. On
 failure it also asserts that the destination is gone, and that every object the extractor
-created *inside* staging is gone. Cleanup removes only objects the extractor created
-(FORMAT_SPEC EXT-4 Cleanup, M1), so it leaves the link the hook planted in place. That means
-the staging directory itself, and any directory on the path to the link, must remain;
-staging must be gone only if the hook planted nothing that's still there. On success, the
+created *inside* staging is gone, except the directories on the path to the planted link
+(Q6). Cleanup removes only objects the extractor created (FORMAT_SPEC EXT-4 Cleanup, M1),
+so it leaves the link the hook planted in place, and with it the staging directory and every
+directory on the path to the link. Staging must be gone only if the hook planted nothing
+that's still there. On success, the
 test asserts that every file is inside the destination.
 
 #### AC-SAFE-9 — Extraction never creates alternate data streams
@@ -959,7 +960,8 @@ cargo_test_nonempty --release -p chst-fs --features test-hooks --test staging_op
 cargo_test_nonempty --release -p chst-fs --features test-hooks --test staging_rename_race
 ```
 `staging_props`: a hook pauses extraction right after the staging directory is created
-(F17). The test asserts:
+and held, that is, after EXT-4's holding steps: the checks, `fchmod(handle, 0700)` and the
+confirming `fstat` (F17, Q7). The test asserts:
 - its name matches `^\.<dest>\.chst-[0-9a-f]{32}$`;
 - with a 250-byte destination name, the staging name is at most 255 bytes, and its prefix
   is truncated at a character boundary (N4);
@@ -1025,9 +1027,10 @@ cargo_test_nonempty --release -p chst-fs --features test-hooks --test cleanup_ra
 Extraction is made to fail late (the BLB-6 fixture `late-blob-hash`) (F18). Before cleanup
 runs, a hook replaces a directory inside staging with a symlink (a junction on Windows) to
 an outside directory full of sentinel files. After cleanup, every sentinel file must still
-exist, and every object the extractor created *inside* staging must be gone. Cleanup
-removes only objects the extractor created (FORMAT_SPEC EXT-4 Cleanup, M1), so the planted
-link must be left in place, and so must the staging directory that holds it.
+exist, and every object the extractor created *inside* staging must be gone, except the
+directories on the path to the planted link (Q6). Cleanup removes only objects the extractor
+created (FORMAT_SPEC EXT-4 Cleanup, M1), so the planted link must be left in place, and so
+must the staging directory and every directory on the path to the link.
 
 ### 3.8 Pack behaviour
 
@@ -1473,12 +1476,17 @@ with mode 0o300. Just before the final rename, a hook creates a directory at the
 The test asserts the following:
 - the result is `refused/extract.dest-exists`;
 - the planted directory is unchanged;
-- staging is gone completely, including both restricted directories and their contents.
+- staging is gone completely, including both restricted directories and their contents,
+  except in the macOS swap case below (Q2). There the planted symlink, `d` and staging
+  remain, because cleanup removes only objects the extractor created, and every other
+  object the extractor created is gone.
 
 **The check-then-chmod race (P1).** The tree also holds a directory `d` with mode 0o777,
 containing a directory `x` with mode 0o077, which is the shape round 9 used to change a
-file outside staging. A second hook runs inside cleanup's "Restrictive modes" step, between
-the identity check on `x` and the chmod.
+file outside staging. A second hook runs inside cleanup's "Restrictive modes" step. On Linux it
+runs between the identity check on `x` and the chmod. On macOS, where no identity check is
+needed because `fchmodat` takes `AT_SYMLINK_NOFOLLOW`, it runs immediately before the
+`fchmodat` on `x` (Q3).
 - On Linux and macOS, the hook asserts that staging's own mode is still 0700 and owned by
   the extractor's user. No other user can then reach `d`, so nobody but the extractor can
   swap `x` (FORMAT_SPEC EXT-4, "Staging stays private").

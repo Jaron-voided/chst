@@ -603,13 +603,25 @@ BLB-6; otherwise it reports the ZST rule.
       retry, and nothing else is created (N5).
   - **Holding it (N2, M1):** the extractor holds the staging directory by an open handle,
     and confirms that the handle is the directory it just created:
-    - Unix: `mkdirat` with mode 0700 relative to the parent's handle, then `openat` of the
-      same name with `O_DIRECTORY | O_NOFOLLOW`, then `fchmod(handle, 0700)`, so the umask
-      can't matter and an inherited setgid bit is cleared (P2). `fstat` on the handle MUST
-      then show a directory owned by the effective user ID, with `st_mode & 0o777` equal to
-      0700 (setuid, setgid and sticky are ignored by this comparison), and reading it
-      through the handle MUST find no entries other than `.` and `..`. The `fchmod` fails on
-      a directory owned by another user, which is also a failed check.
+    - Unix, in this order (Q1):
+      1. `mkdirat` with mode 0700, relative to the parent's handle.
+      2. `openat` of the same name with `O_DIRECTORY | O_NOFOLLOW`.
+      3. **Check before changing anything:** `fstat` on the handle MUST show a directory
+         owned by the effective user ID, with no group or other permission bits
+         (`st_mode & 0o077 == 0`; `mkdirat(0700)` never produces them, whatever the
+         umask), and reading it through the handle MUST find no entries other than `.`
+         and `..`.
+      4. Only then `fchmod(handle, 0700)`, so the umask can't matter and an inherited
+         setgid bit is cleared (P2).
+      5. Confirm with `fstat` that `st_mode & 0o777` is 0700. setuid, setgid and sticky
+         are ignored by this comparison.
+    - **Nothing under that name is touched on a refusal (Q1):**
+      - A failure at step 2 or 3 happens before anything has been changed.
+      - Step 4 runs only on a directory that passed step 3: empty, owned by the extractor's
+        user, with no group or other access. That's what the extractor's own new directory
+        looks like, and no other user can produce it.
+      - A failure at step 4 or 5 therefore leaves only that directory, which is covered
+        by Cleanup's first exception.
     - Windows: create and open in one step, with `NtCreateFile` relative to the parent's
       handle, `FILE_CREATE`, `FILE_DIRECTORY_FILE` and `FILE_OPEN_REPARSE_POINT`, passing
       the private DACL (below) in its security descriptor. Its ShareAccess MUST NOT include
@@ -617,13 +629,19 @@ BLB-6; otherwise it reports the ZST rule.
       extractor holds it. The handle includes `DELETE` access, so the extractor's own rename
       through it still works. No other object can be opened in its place.
     - If the open fails (including at a link: `ELOOP`), or any of these checks fails, the
-      result is `refused` / `extract.unsafe-object`, and nothing found under that name is
-      touched or removed.
+      result is `refused` / `extract.unsafe-object`. Nothing found under that name is
+      touched or removed, apart from step 4's `fchmod` on a directory that has already
+      passed step 3 (above).
     - **Filesystems without Unix modes (P5):** on vfat, exFAT, CIFS, or a WSL drvfs mount
       (`/mnt/<drive>`) without the `metadata` option, modes are fixed by mount options, so
-      the `fchmod` or the mode check can't succeed. Extraction onto them is therefore
-      refused, as `refused` / `extract.unsafe-object`. This is a known v1 limitation
-      (§15.1), not a format rule.
+      the checks above usually can't succeed. Extraction onto them is a known v1
+      limitation (§15.1), not a format rule.
+      - *Non-normative (Q5):* the usual result is `refused` / `extract.unsafe-object`,
+        from step 3 or step 5.
+      - Some mount options (for example vfat with `dmask=077,quiet`) let those checks pass,
+        and the failure then comes later, at the final permissions, as `io`.
+      - So the result on such a filesystem is "refused or `io`". An extractor isn't
+        required to detect the filesystem type.
     - The extractor records the handle's identity (device and inode, or volume serial
       number and file ID). Every later operation on staging uses that handle: the writes
       under it, its final permissions, and cleanup.
@@ -684,10 +702,15 @@ BLB-6; otherwise it reports the ZST rule.
     - **The staging name itself (M9):** last, cleanup removes the staging directory's own
       name from the parent, after checking with `fstatat(AT_SYMLINK_NOFOLLOW)` that the
       name still has staging's recorded identity. If it doesn't, the name is left alone.
+      After a successful final rename (the `io` outcome of "Final permissions"), the name
+      is the destination's: the same identity check, then removal, apply to the
+      destination name (Q4).
     - **Exceptions (M9):**
       - If the open or the checks right after creating staging fail, nothing under the
-        staging name is touched. The directory the extractor created may remain, empty,
-        wherever it was moved.
+        staging name is touched (apart from step 4's `fchmod` on a directory that passed
+        step 3, Q1), and nothing is removed. The directory the extractor created may
+        remain, empty, wherever it was moved, or under the staging name if step 4 or 5
+        failed.
       - If the staging name stops leading to staging (a mismatch before the final rename),
         staging is emptied through its handle but can't be removed by name. It remains,
         empty, wherever it was moved.

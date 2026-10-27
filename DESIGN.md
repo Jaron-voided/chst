@@ -438,8 +438,9 @@ Detailed byte layouts live in `FORMAT_SPEC.md`.
   reports step 11 exactly as verify would (M2).
 - **Amendment (review round 9, §9i):** staging stays 0700 (on Windows, private) until the final
   rename and its identity check have passed, and only then gets its final permissions (P1).
-  The staging check uses `fchmod(handle, 0700)` and `st_mode & 0o777`, and every directory
-  the extractor creates has any inherited setgid bit cleared (P2). On Windows, staging is held
+  The staging check first confirms ownership, no group or other bits, and emptiness. Only
+  then does it run `fchmod(handle, 0700)` and confirm `st_mode & 0o777` (P2, Q1). Every
+  directory the extractor creates has any inherited setgid bit cleared (P2). On Windows, staging is held
   without `FILE_SHARE_DELETE` (P4). Extracting onto filesystems without Unix modes is refused,
   a known v1 limitation (P5).
 
@@ -889,6 +890,26 @@ Still open, for the next reviewer (until `plan-v1`), in addition to §9g's and �
   extractor's own `FileRenameInfo` rename through that handle succeeds.
 - **The Linux check-then-chmod swap** in AC-X-ATTR-3 isn't exercised, because it needs a
   second user. Its safety rests on staging's 0700 mode, which the hook does assert.
+
+**Final check (`reviews/review-5.md`): Q1–Q7, all accepted and applied.** This was the last
+review round before `plan-v1`.
+
+| # | Item | Owner decision |
+|---|---|---|
+| 1 | Q1 | Check before you chmod. After `openat`, `fstat` must show a directory owned by the effective user ID, with `st_mode & 0o077 == 0`, and no entries. Only then `fchmod(handle, 0700)`, then confirm `st_mode & 0o777 == 0700`. P2's `fchmod` and the `& 0o777` comparison are kept, and "nothing under that name is touched" holds on every refusal path. |
+| 2 | Q2 | AC-X-ATTR-3's assertion list gets an exception: in the macOS swap case, the planted symlink, `d` and staging remain, and every other object the extractor created is gone. |
+| 3 | Q3 | On macOS, AC-X-ATTR-3's hook point is "immediately before the `fchmodat` on `x`". |
+| 4 | Q4 | After the rename, the M9 step applies to the destination name: an `fstatat(AT_SYMLINK_NOFOLLOW)` identity check, then removal. |
+| 5 | Q5 | P5's result is described as "refused or `io`", marked non-normative. |
+| 6 | Q6 | AC-SAFE-8 and AC-SAFE-15: "…is gone, except the directories on the path to the planted link". |
+| 7 | Q7 | `staging_props`'s first hook moves to after the holding checks. |
+
+How Q1's "nothing under that name is touched" was kept:
+- Step 4's `fchmod` runs only on a directory that has passed step 3: empty, owned by the
+  extractor's user, with no group or other access. No other user can produce that.
+- FORMAT_SPEC states this as the one exception to "touched" on a refusal path.
+- Cleanup's first exception notes that the extractor's own directory may remain under the
+  staging name if step 4 or 5 fails.
 
 ## 10. Checkpoints
 
