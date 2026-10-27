@@ -135,7 +135,7 @@ IDs will FAIL here, because the features don't exist yet.
     normal reports.
   - Checks: AC-META-7.
   - Verify: `pass_only AC-META-7; if ./check.sh --list-ids | grep -q SELFTEST; then exit 1; fi`.
-- [ ] **H-4 One check script per acceptance ID**
+- [x] **H-4 One check script per acceptance ID**
   - Depends: H-2.
   - Each script is the ACCEPTANCE §3 script exactly as written. A script that is missing
     makes its ID FAIL.

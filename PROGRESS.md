@@ -4,7 +4,9 @@ Append-only log, one entry per task. Results are in EVIDENCE.md, not here.
 
 ## Needs decision
 
-(none yet)
+- **AC-X-TS-2 has no script in ACCEPTANCE.md** (§3.13). I derived \`tools/acceptance/checks/AC-X-TS-2.sh\` from its prose (see H-4).
+  Options: (a) keep the derived script; (b) have ACCEPTANCE.md state the script. Recommendation: (b) before the cut becomes
+  Extended, so the script is the document's, not mine. It's N/A under Core, so nothing is blocked.
 
 ## Log
 
@@ -39,3 +41,17 @@ Append-only log, one entry per task. Results are in EVIDENCE.md, not here.
 - Each failing self-test ID was confirmed to fail for its own reason (0 tests passed, no script, command not found).
 - Open issues: none.
 - Acceptance IDs affected: AC-META-7.
+
+### H-4 One check script per acceptance ID — 13d75cf
+- Added the 84 remaining scripts in `tools/acceptance/checks/` (85 in all, one per ID, no extras), generated verbatim from the
+  `sh` blocks under each `#### AC-` heading of ACCEPTANCE.md. AC-ROB-1 has two blocks, which are joined in order. No script has a
+  line starting with `! `.
+- **AC-X-TS-2 is a derived script.** ACCEPTANCE.md gives it no code block, only "the same script as AC-NEG-2 and AC-COMPAT-1, with
+  `node ts-reader/dist/cli.js` in place of `$CHST`". The script sets `CHST` and `CHST_CORE` to that command, then holds AC-NEG-2.sh and
+  AC-COMPAT-1.sh unchanged. It's N/A until the cut is Extended. Owner: please confirm that reading (see Needs decision).
+- Preflight: `check.sh` runs `python3.14 -I tools/todo_coverage.py` before any ID, logs to `target/acceptance/logs/todo-coverage.log`
+  and exits 1 if it fails (no report is left behind). TODO.md says fast and full mode; I also run it under `--only`, because H-4's
+  Verify checks that the log exists straight after `pass_only`.
+- Open issues: the two points above.
+- Acceptance IDs affected: AC-META-1, AC-META-2, AC-META-4, AC-META-5 pass. AC-NEG-1 and AC-NEG-4 also pass, since they read only the
+  fixtures.
