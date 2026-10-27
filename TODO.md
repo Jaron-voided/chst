@@ -112,7 +112,7 @@ IDs will FAIL here, because the features don't exist yet.
     diff <(./check.sh --list-ids) <(grep -oE '^#### AC-[A-Z0-9-]+' ACCEPTANCE.md | cut -c6-)`.
     The 63 FAIL are the missing checks. The 19 N/A are the 13 Extended IDs and 6 IDs
     excluded on Linux. The 3 NOT RUN are the two full-only IDs and the done-only ID.
-- [ ] **H-2 Shared shell helpers**
+- [x] **H-2 Shared shell helpers**
   - Depends: H-1.
   - `tools/acceptance/`: `expect_exit`, `jqn`, `cargo_test_nonempty`, `sha256`,
     `mk_sparse`, `free_bytes`, `fixture_file`, and the `$CHST`, `$CHST_CORE`, `$FX`, `$GEN`,

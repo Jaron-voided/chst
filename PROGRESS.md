@@ -22,3 +22,11 @@ Append-only log, one entry per task. Results are in EVIDENCE.md, not here.
   Extended IDs and 7 OS-excluded ones on Linux (AC-ROB-4W, AC-SAFE-5, -9, -10, -11, AC-PACK-7, -8). The total
   of 19 is right, so the Verify line passes.
 - Acceptance IDs affected: none pass yet (no scripts).
+
+### H-2 Shared shell helpers — 5f3a54e
+- Added `tools/acceptance/lib.sh`: the §1.2 helpers and conventions, plus `pass_only` and `ci_pass`. It sets no
+  shell options and avoids bash 4 features (macOS ships bash 3.2).
+- `mk_sparse` falls back to `os.truncate` through `python3.14` where `truncate` is missing (stock macOS).
+- `fixture_file` reads the size of a sparse recipe from its `file_length`.
+- Open issues: `ci_pass` and the Windows branch of `mk_sparse` (`fsutil`) can't be tried locally.
+- Acceptance IDs affected: none directly.
