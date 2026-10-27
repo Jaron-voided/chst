@@ -70,6 +70,16 @@ IDs will FAIL here, because the features don't exist yet.
   - Depends: H-2.
   - Each script is the ACCEPTANCE §3 script exactly as written. A script that is missing
     makes its ID FAIL.
+  - **TODO coverage preflight.** In fast mode (plain `./check.sh`) and in full mode,
+    `check.sh` runs `python3.14 -I tools/todo_coverage.py` before any ID. The script
+    exists already and is kept in the repo.
+    - Its output goes to `target/acceptance/logs/todo-coverage.log`.
+    - If it exits non-zero, `check.sh` exits 1.
+    - It's a harness preflight, not an acceptance ID, so it never appears in `--list-ids`
+      or in `results`. AC-META-1 requires `--list-ids` to match ACCEPTANCE.md exactly.
+    - It fails when an ID is unowned, owned twice, or unknown; when a Re-check bullet lists
+      an ID that the same task has under Checks; when a task mentions an ID on neither
+      bullet; and on ranges.
   - Checks: AC-META-1, AC-META-2, AC-META-4, AC-META-5. The last three test only the
     fixtures, which already exist, so they should pass as soon as their scripts do.
 - [ ] **H-5 Python helper scripts** (standard library only, run as `python3.14 -I`)
