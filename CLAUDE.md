@@ -1,13 +1,13 @@
 # Project instructions
 
-## Current phase: PLANNING
-Change to IMPLEMENTATION only after I approve the plan and it's tagged plan-v1.
+## Current phase: IMPLEMENTATION
+Set to IMPLEMENTATION when I approve the plan and tag it plan-v1. (Done.)
 
-In PLANNING:
+While the phase is PLANNING (inactive once the phase is IMPLEMENTATION):
 - For each design decision, give options, trade-offs, and a recommendation, then wait for my
   choice and record it in the decision log in DESIGN.md.
 - Draft only the planning documents (DESIGN.md, FORMAT_SPEC.md, ACCEPTANCE.md, TODO.md,
-  EVIDENCE.md) and fixtures/.
+  EVIDENCE.md) and fixtures/ and tools/ (the TODO coverage check).
 - Do not write implementation code. The one exception is the fixture generator in fixtures/gen/.
 - Open items go in DESIGN.md §9 until plan-v1. From plan-v1 on, they go under "Needs decision"
   in PROGRESS.md.
