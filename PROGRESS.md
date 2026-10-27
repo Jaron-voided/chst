@@ -127,3 +127,30 @@ Append-only log, one entry per task. Results are in EVIDENCE.md, not here.
 - Acceptance IDs affected: AC-XP-2 passes.
 - **Status: the TODO box stays unticked.** The first half of the Verify line (`pass_only AC-XP-2`) passes. The second half
   (the three reports of the newest CI run) can't be run until the owner pushes and a run exists. Tick it after that.
+
+### CI-1 follow-up: diagnostics, nightly fallback, Node 24 actions, expect_exit 127 — commit "CI-1: diagnostics, nightly fallback, Node 24 actions, expect_exit 127"
+Applies fixes 1, 2, 3, 5 and 6 from the review of the first CI run (run 40584612828, commit 0054e3d). Fix 4 (dropping the Ubuntu
+disk cleanup) and SHA-pinning were skipped on request. No status logic, check script or expected result changed.
+- **Fix 1, diagnostics (check.yml):** a non-gating `Diagnostics` step (`continue-on-error`) prints the bash version, Python's version
+  and Unicode version, whether `compression.zstd` imports (it prints MISSING if not), the jq version, `rustup show`, and on Windows
+  `fsutil 8dot3name query C:`. The Ubuntu cleanup step now also prints `df -h /` before it deletes anything.
+- **Fix 2, nightly fallback (check.yml):** in full mode, the Linux and macOS fuzz-toolchain step uses D16's pin
+  `nightly-2026-10-01` when `fuzz/rust-toolchain.toml` doesn't exist yet. It installs it, lists the installed components, installs
+  cargo-fuzz 0.13.2 `--locked`, and runs `cargo fuzz --help`. While it's using the fallback, a failure is a `::warning::` and doesn't
+  fail the job; once `fuzz/rust-toolchain.toml` exists (C-8), a failure fails the job. The Windows try-step does the same, stays
+  non-gating, and runs the fuzz target only if `fuzz/fuzz_targets` exists.
+- **Fix 3, Node 24 actions (check.yml):** `checkout@v4`, `setup-python@v5` and `upload-artifact@v4` (twice) became `@v7`. Latest
+  releases (via read-only `gh api`) were v7.0.1, v7.1.0 and v7.0.2; their `action.yml` at tag `v7` says `using: node24`. Pinned by major
+  tag, not SHA.
+- **Fix 5, `expect_exit` (lib.sh):** a command that `command -v` can't find now gives exit 127 on every OS. macOS's bash 3.2 reported 1.
+  Runnable commands are unchanged, and a mismatch still returns 1.
+- **Fix 6, failure diagnostics (check.sh):** when a check fails, the first 4 KiB of `$W/err`, `$W/*.err` and `$W/*.log` are appended to its
+  log before `$W` is removed. This runs only after the exit code is known, so it can't change a status. AC-NEG-2's log now shows
+  `target/release/chst: No such file or directory`.
+- **Verified locally:** YAML parses and all 12 `run:` blocks pass `bash -n`. `expect_exit` tried with a missing command (wanted 127 passes,
+  wanted 0 fails), a runnable command (right and wrong code), and a shell function. The Verify lines of H-1 (in a copy with the scripts
+  removed, since H-1's counts assume none exist), H-2, H-3, H-4 and H-6, and `pass_only AC-XP-2`, all pass. A full `./check.sh` gives
+  10 PASS, 53 FAIL, 3 NOT RUN, 19 N/A, and every ID's status and exit code matches the Linux report of the first CI run.
+- **Not verified:** the workflow itself (it needs a push), and the new Node 24 action versions.
+- EVIDENCE.md is unchanged: no status changed.
+- Open issues: none.

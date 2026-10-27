@@ -176,6 +176,16 @@ run_check() {
       W="$w" bash -euo pipefail -c 'source tools/acceptance/lib.sh
 source "$1"' check "$script" >> "$log" 2>&1 || rc=$?
       chmod -R u+rwx "$w" 2> /dev/null || true
+      if [ "$rc" != 0 ]; then
+        # Diagnostics only: a script often sends a command's stderr to a file in $W, which would
+        # vanish with $W. Copy the first 4 KiB of each such file into the log.
+        for f in "$w"/err "$w"/*.err "$w"/*.log; do
+          if [ -f "$f" ]; then
+            echo "--- ${f#$w/} (from \$W)" >> "$log"
+            head -c 4096 "$f" >> "$log"
+          fi
+        done
+      fi
       rm -rf "$w"
       if [ "$rc" = 0 ]; then
         finish PASS 0

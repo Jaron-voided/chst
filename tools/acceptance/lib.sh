@@ -23,11 +23,16 @@ CHST_DET_SEED=${CHST_DET_SEED:-chst-det-1}
 PINNED_MANIFEST_HASH=$(sed -n 's/^PINNED_MANIFEST_HASH = //p' ACCEPTANCE.md | head -1)
 export FX GEN CHST CHST_CORE CHST_BIG_ROOT CHST_DET_SEED PINNED_MANIFEST_HASH
 
-# expect_exit N CMD…: run CMD, and fail unless its exit code is exactly N.
+# expect_exit N CMD…: run CMD, and fail unless its exit code is exactly N. A CMD that can't be
+# found or isn't executable counts as exit 127 on every OS (macOS's bash 3.2 reports 1 for it).
 expect_exit() {
   local want=$1 rc=0
   shift
-  "$@" || rc=$?
+  if command -v "$1" > /dev/null 2>&1; then
+    "$@" || rc=$?
+  else
+    rc=127
+  fi
   if [ "$rc" != "$want" ]; then
     echo "expect_exit: wanted exit $want, got $rc: $*" >&2
     return 1
