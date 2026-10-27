@@ -30,3 +30,12 @@ Append-only log, one entry per task. Results are in EVIDENCE.md, not here.
 - `fixture_file` reads the size of a sparse recipe from its `file_length`.
 - Open issues: `ci_pass` and the Windows branch of `mk_sparse` (`fsutil`) can't be tried locally.
 - Acceptance IDs affected: none directly.
+
+### H-3 `--self-test` — 25d4a29
+- `check.sh --self-test` builds a throwaway crate under `mktemp -d` and runs the five `SELFTEST-*` IDs through
+  `run_check`. The self-test exits 0 only if every ID reports its required status. The report keeps the actual
+  statuses (4 FAIL, 1 PASS). The IDs never reach `--list-ids` or a normal report.
+- Added `tools/acceptance/checks/AC-META-7.sh`, copied verbatim from ACCEPTANCE.md. The other 84 scripts come in H-4.
+- Each failing self-test ID was confirmed to fail for its own reason (0 tests passed, no script, command not found).
+- Open issues: none.
+- Acceptance IDs affected: AC-META-7.

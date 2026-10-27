@@ -128,7 +128,7 @@ IDs will FAIL here, because the features don't exist yet.
     test "$(fixture_file fixtures/core/invalid/HDR-2.expect.json)" = fixtures/core/invalid/HDR-2.chst;
     f=$(fixture_file fixtures/core/invalid/LIM-2.expect.json); test "$(wc -c < "$f" | tr -d ' ')" = 4294967385; test "$(head -c 4 "$f")" = CHST;
     mk_sparse "$W/s" 1048576; test "$(wc -c < "$W/s" | tr -d ' ')" = 1048576`.
-- [ ] **H-3 `--self-test`**
+- [x] **H-3 `--self-test`**
   - Depends: H-2.
   - Builds a throwaway crate in a fresh temporary directory and runs the five `SELFTEST-*`
     IDs through the same code path as real IDs. They never appear in `--list-ids` or in
