@@ -20,7 +20,7 @@ import sys
 from collections import defaultdict
 
 ID = re.compile(r'AC-[A-Z]+(?:-[A-Z]+)?-\d+W?\b')
-TASK = re.compile(r'- \[[ x]\] \*\*([A-Z]+-\d+)')
+TASK = re.compile(r'- \[[ x]\] \*\*([A-Z]+-\d+[a-z]?)')
 BULLET = re.compile(r'  - (Checks|Re-check)\b')
 
 
