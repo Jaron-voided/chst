@@ -1,0 +1,168 @@
+# CI for chst (DESIGN.md D17, ACCEPTANCE.md §1.3).
+#
+# Fast mode (./check.sh) runs on every push and pull request. Full mode (./check.sh --full) runs on a
+# manual trigger (workflow_dispatch); the final done run is a manually triggered full run.
+#
+# check.sh's exit code decides the job (the "Job result" step reads it from report.json, because
+# GitHub fails a step on any non-zero code):
+#   fast: 0 or 2 succeeds; full: 2 succeeds only if AC-XP-1 is the sole NOT RUN; 1 always fails.
+# Each runner uploads its report as acceptance-report-<os>. The macOS and Windows statuses in
+# EVIDENCE.md come only from these reports.
+
+name: check
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: never
+
+jobs:
+  check:
+    name: check (${{ matrix.os }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false # all three reports are wanted, even when one OS fails
+      matrix:
+        include:
+          - { os: linux, runner: ubuntu-latest }
+          - { os: macos, runner: macos-latest }
+          - { os: windows, runner: windows-latest }
+    defaults:
+      run:
+        shell: bash
+    steps:
+      # ACCEPTANCE §1.3: free the preinstalled toolchains first, so that AC-ROB-7 (5 GiB, about
+      # 10 GiB peak) has room.
+      - name: Free disk space (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost
+          sudo apt-get install -y time # GNU time, for AC-ROB-6
+          df -h /
+
+      # Fixtures are hashed (AC-META-2) and the scripts run under bash: no CRLF conversion on Windows.
+      - name: No line-ending conversion
+        run: git config --global core.autocrlf false
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      # Every check calls python3.14 by that name (D16). On Windows, setup-python only provides python.
+      - name: python3.14 command
+        run: |
+          if ! command -v python3.14 > /dev/null; then
+            mkdir -p "$HOME/bin"
+            printf '#!/usr/bin/env bash\nexec "%s" "$@"\n' "$(command -v python)" > "$HOME/bin/python3.14"
+            chmod +x "$HOME/bin/python3.14"
+            echo "$HOME/bin" >> "$GITHUB_PATH"
+          fi
+          PATH="$HOME/bin:$PATH" python3.14 --version
+
+      - name: jq 1.7 or later
+        run: |
+          if ! jq --version | grep -qE '^jq-1\.([7-9]|[1-9][0-9])'; then
+            case "$RUNNER_OS" in
+              Linux) sudo apt-get update && sudo apt-get install -y jq ;;
+              macOS) brew install jq ;;
+              Windows) choco install jq -y ;;
+            esac
+          fi
+          jq --version
+
+      # D16: the pinned stable toolchain. rust-toolchain.toml exists from task C-1.
+      - name: Rust toolchain (pinned)
+        run: |
+          if [ -f rust-toolchain.toml ]; then
+            ch=$(sed -n 's/^channel = "\(.*\)"$/\1/p' rust-toolchain.toml)
+            rustup toolchain install "$ch" --profile minimal -c rustfmt -c clippy
+          fi
+          rustc --version
+          cargo --version
+
+      # D16: the pinned nightly and cargo-fuzz 0.13.2 for AC-ROB-4, in full mode on Linux and macOS.
+      # fuzz/ exists from task C-8.
+      - name: Fuzz toolchain (full mode)
+        if: github.event_name == 'workflow_dispatch' && runner.os != 'Windows'
+        run: |
+          if [ -f fuzz/rust-toolchain.toml ]; then
+            tc=$(sed -n 's/^channel = "\(.*\)"$/\1/p' fuzz/rust-toolchain.toml)
+            rustup toolchain install "$tc" --profile minimal
+            cargo install cargo-fuzz --version 0.13.2 --locked
+          fi
+
+      - name: Scratch space for large checks
+        run: |
+          # AC-ROB-7 and the other heavy checks create a fresh directory under $CHST_BIG_ROOT.
+          # RUNNER_TEMP is on the large volume on every runner (D: on Windows).
+          root=$RUNNER_TEMP
+          if [ "$RUNNER_OS" = Windows ]; then root=$(cygpath -u "$RUNNER_TEMP"); fi
+          echo "CHST_BIG_ROOT=$root" >> "$GITHUB_ENV"
+          df -h "$root"
+
+      - name: Fast mode
+        id: fast
+        if: github.event_name != 'workflow_dispatch'
+        continue-on-error: true
+        run: ./check.sh
+
+      - name: Full mode
+        id: full
+        if: github.event_name == 'workflow_dispatch'
+        continue-on-error: true
+        run: ./check.sh --full
+
+      # ACCEPTANCE §1.3: Windows has no AC-ROB-4, so full mode tries cargo-fuzz there once. It is
+      # logged and never gates the job; the owner decides later whether to switch from AC-ROB-4W.
+      - name: Try cargo-fuzz on Windows (non-gating)
+        if: github.event_name == 'workflow_dispatch' && runner.os == 'Windows'
+        continue-on-error: true
+        run: |
+          if [ -f fuzz/rust-toolchain.toml ]; then
+            tc=$(sed -n 's/^channel = "\(.*\)"$/\1/p' fuzz/rust-toolchain.toml)
+            rustup toolchain install "$tc" --profile minimal
+            cargo install cargo-fuzz --version 0.13.2 --locked
+            cargo +"$tc" fuzz run open_verify -- -max_total_time=60 -rss_limit_mb=512 -timeout=10
+          else
+            echo "no fuzz/ yet (task C-8)"
+          fi
+
+      - name: Job result
+        if: always()
+        run: |
+          r=target/acceptance/report.json
+          if [ ! -f "$r" ]; then echo "no report: check.sh stopped before it ran the IDs"; exit 1; fi
+          mode=$(jq -r .mode "$r")
+          fails=$(jq '[.results[] | select(.status == "FAIL")] | length' "$r")
+          notrun=$(jq -r '[.results[] | select(.status == "NOT RUN") | .id] | sort | join(",")' "$r")
+          echo "mode $mode, $fails FAIL, NOT RUN: ${notrun:-none}"
+          if [ "$fails" != 0 ]; then exit 1; fi
+          if [ "$mode" = full ] && [ -n "$notrun" ] && [ "$notrun" != AC-XP-1 ]; then
+            echo "full mode may leave only AC-XP-1 NOT RUN"
+            exit 1
+          fi
+
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: acceptance-report-${{ matrix.os }}
+          path: target/acceptance/report.json
+          if-no-files-found: error
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: acceptance-logs-${{ matrix.os }}
+          path: target/acceptance/logs/
+          if-no-files-found: warn
