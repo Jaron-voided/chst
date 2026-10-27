@@ -827,7 +827,16 @@ Core · OS linux, macos · fast · Traces: EXT-5, D10
 test -z "$(find "$W/x" -perm -4000 -o -perm -2000 -o -perm -1000)"
 test "$(find "$W/x" -type f ! -perm 644 | wc -l)" -eq 0
 test "$(find "$W/x" -type d ! -perm 755 | wc -l)" -eq 0
+if [ "$CHST_OS" = linux ]; then                    # P2: a setgid parent leaks no S_ISGID into the tree
+  mkdir "$W/sg" && chmod 2775 "$W/sg"
+  (umask 022; $CHST extract $FX/core/valid/worked-example/container.chst -C "$W/sg/x")
+  test -z "$(find "$W/sg/x" -perm -2000)"
+  test "$(find "$W/sg/x" -type d ! -perm 755 | wc -l)" -eq 0
+fi
 ```
+On Linux, a directory created under a setgid directory inherits S_ISGID. The extractor must
+clear it on staging (EXT-4's `fchmod(handle, 0700)`) and on every directory it creates
+(EXT-5), so the extracted tree, including its root, has no setgid bit (P2).
 
 #### AC-SAFE-5 — Non-ASCII case collisions are caught by the filesystem
 Core · OS macos, windows · fast · Traces: EXT-2, D8
@@ -876,11 +885,12 @@ release builds never contain it. The hook points (F19):
   never reopens by name, there's no window, and the test asserts success instead.
 
 In every case the test asserts that nothing outside staging was created or modified. On
-failure it also asserts that the destination is gone and that nothing the extractor created
-remains. Staging must be gone too, unless it still holds the link the hook planted: cleanup
-removes only objects the extractor created, so it leaves that link, and the directory
-holding it, in place (FORMAT_SPEC EXT-4 Cleanup, M1). On success, the test asserts that
-every file is inside the destination.
+failure it also asserts that the destination is gone, and that every object the extractor
+created *inside* staging is gone. Cleanup removes only objects the extractor created
+(FORMAT_SPEC EXT-4 Cleanup, M1), so it leaves the link the hook planted in place. That means
+the staging directory itself, and any directory on the path to the link, must remain;
+staging must be gone only if the hook planted nothing that's still there. On success, the
+test asserts that every file is inside the destination.
 
 #### AC-SAFE-9 — Extraction never creates alternate data streams
 Core · OS windows · fast · Traces: EXT-9, PATH-7
@@ -954,20 +964,30 @@ cargo_test_nonempty --release -p chst-fs --features test-hooks --test staging_re
 - with a 250-byte destination name, the staging name is at most 255 bytes, and its prefix
   is truncated at a character boundary (N4);
 - two extractions use different names;
-- its mode is 0700 on Unix, or its DACL grants only the current user on Windows;
+- its mode is 0700 on Unix, or its DACL grants only the current user on Windows. On Unix
+  this also holds when the test runs with umask 0277, which masks owner bits, and when the
+  destination's parent is setgid: `fchmod(handle, 0700)` leaves `st_mode & 0o7777` equal
+  to 0700 (P2);
+- at a second hook, just before the final rename, staging's mode is still 0700 on Unix, or
+  its DACL is still private on Windows (P1);
 - if the test pre-creates a directory with the exact name the next staging directory will
   use (forced through the hook's random source), the result is
   `refused/extract.collision`, and nothing is written into the pre-created directory (N5);
-- after a successful extraction, the destination root has mode `0755 & ~umask` on Unix.
-  On Windows, the destination and every extracted file carry exactly the inheritable ACEs
-  of the destination's parent and not the private staging ACE (N6).
+- after a successful extraction, the destination root has mode `0755 & ~umask` on Unix,
+  set only after the rename (P1). On Windows, the destination and every extracted file
+  carry exactly the inheritable ACEs of the destination's parent and not the private
+  staging ACE (N6).
 
-`staging_swap` (N2): just before the staging directory's final permissions are set, a hook
-renames the staging directory away and puts a symlink (a junction on Windows) to an
-outside directory under its name. The test asserts that the result is
-`refused/extract.unsafe-object`, the outside directory's permissions and contents are
-unchanged, nothing was moved to the destination, and the moved-away staging directory was
-emptied through its handle.
+`staging_swap` (N2): after every entry is written and just before the pre-rename identity
+check, a hook tries to rename the staging directory away and put a symlink (a junction on
+Windows) to an outside directory under its name.
+- On Linux and macOS, the swap succeeds. The result must be
+  `refused/extract.unsafe-object`. The outside directory's permissions and contents must be
+  unchanged, nothing may be moved to the destination, and the moved-away staging directory
+  must be emptied through its handle.
+- On Windows, staging is held without `FILE_SHARE_DELETE` (FORMAT_SPEC EXT-4, P4), so the
+  swap is refused. The extractor's own rename through its handle then succeeds: the
+  extracted tree is at the destination, and nothing outside staging changes.
 
 `staging_open_race` (M1): a hook runs between creating the staging directory and opening it.
 On Unix it renames the new directory away and puts something else under its name. There are
@@ -976,9 +996,9 @@ outside directory, and a regular file. In each, the result must be
 `refused/extract.unsafe-object`, and the object under the staging name must be unchanged
 (contents and permissions). Nothing may be written anywhere, and no destination may appear.
 On Windows, where creating and opening are one step, the hook runs right after it and
-attempts the same swap. The result must be `refused/extract.unsafe-object`, or success if
-Windows refuses the swap because the directory is open; either way nothing outside staging
-changes.
+attempts the same swap. Staging is held without `FILE_SHARE_DELETE` (P4), so the swap is
+refused. The extractor's own rename through its handle then succeeds: the extracted tree is
+at the destination, and nothing outside staging changes.
 A replacement owned by another user, which the ownership check exists for, can't be
 created by a single-user test; that case is reasoned from FORMAT_SPEC EXT-4, not tested.
 
@@ -990,9 +1010,12 @@ sentinel files, under its name.
   `refused/extract.unsafe-object`. The outside directory must be left untouched at the
   destination, with every sentinel file unchanged, and the real staging directory must be
   emptied through its handle (EXT-4 Cleanup, exceptions).
-- On Windows, the rename goes through staging's own handle, so the real staging directory is
-  what moves. The result must be success, with the extracted tree at the destination and the
-  outside directory unchanged under the staging name.
+- On Windows, staging is held without `FILE_SHARE_DELETE` (P4), so the hook's rename is
+  refused, and the outside directory is never put under the staging name. The extractor's
+  own rename through its handle then succeeds: the extracted tree is at the destination, and
+  nothing outside staging changes.
+
+The Windows branches are unverified until the first Windows CI run (DESIGN §9i).
 
 #### AC-SAFE-15 — Cleanup never follows a link
 Core · OS all · fast · Traces: EXT-4, EXT-6, D10
@@ -1002,9 +1025,9 @@ cargo_test_nonempty --release -p chst-fs --features test-hooks --test cleanup_ra
 Extraction is made to fail late (the BLB-6 fixture `late-blob-hash`) (F18). Before cleanup
 runs, a hook replaces a directory inside staging with a symlink (a junction on Windows) to
 an outside directory full of sentinel files. After cleanup, every sentinel file must still
-exist, and nothing the extractor created may remain. Cleanup removes only objects the
-extractor created (FORMAT_SPEC EXT-4 Cleanup, M1), so the planted link, and the staging
-directory holding it, must be left in place.
+exist, and every object the extractor created *inside* staging must be gone. Cleanup
+removes only objects the extractor created (FORMAT_SPEC EXT-4 Cleanup, M1), so the planted
+link must be left in place, and so must the staging directory that holds it.
 
 ### 3.8 Pack behaviour
 
@@ -1388,6 +1411,7 @@ set +e; /usr/bin/time -f '%M' -o "$W/rss" timeout 10 $CHST verify --json "$W/tb.
 test $rc = 6 && test "$(jq -r .error.detail "$W/r.json")" = zstd.frame
 test "$(cat "$W/rss")" -lt 65536
 expect_exit 0 $CHST verify --max-ratio 18446744073709551615 $FX/extended/valid/zstd-compressed/container.chst   # M3
+expect_exit 0 $CHST verify --max-ratio 54738112978366623 $FX/extended/valid/zstd-compressed/container.chst      # P3
 ```
 The memory limit is measured on the whole process's peak RSS (F10), so libzstd's C
 allocations are included; a counting Rust allocator can't see them.
@@ -1406,6 +1430,9 @@ their headers, so no reader can reject them from the header alone (N10, M6):
 `--max-ratio 18446744073709551615` on `zstd-compressed` must pass: computed exactly, as
 LIM-6 requires, 8,800 isn't more than that limit times 337 stored bytes, so a reader whose
 64-bit multiply overflows into a violation fails here (M3).
+`--max-ratio 54738112978366623` is ⌈2⁶⁴/337⌉: a wrapping 64-bit multiply, which is what a
+plain `*` does in a Rust release build, turns 54738112978366623 × 337 into 335 < 8,800 and
+reports a spurious violation. The exact answer is no violation, exit 0 (P3).
 
 #### AC-X-ATTR-1 — Modification time and mode round-trip; setuid is never stored or set
 Extended:#16 · OS linux · fast · Traces: #16, ATT-1
@@ -1447,6 +1474,22 @@ The test asserts the following:
 - the result is `refused/extract.dest-exists`;
 - the planted directory is unchanged;
 - staging is gone completely, including both restricted directories and their contents.
+
+**The check-then-chmod race (P1).** The tree also holds a directory `d` with mode 0o777,
+containing a directory `x` with mode 0o077, which is the shape round 9 used to change a
+file outside staging. A second hook runs inside cleanup's "Restrictive modes" step, between
+the identity check on `x` and the chmod.
+- On Linux and macOS, the hook asserts that staging's own mode is still 0700 and owned by
+  the extractor's user. No other user can then reach `d`, so nobody but the extractor can
+  swap `x` (FORMAT_SPEC EXT-4, "Staging stays private").
+- On macOS, where `fchmodat` honours `AT_SYMLINK_NOFOLLOW`, the hook also swaps `x` for a
+  symlink to a mode-0600 file outside staging. That file's mode and contents must be
+  unchanged afterwards.
+- On Linux, the same-user swap isn't performed. rustix makes cleanup use the fallback that
+  follows links, which is safe only because of the privacy asserted above, and a hook
+  running as the extractor's own user isn't stopped by it. The swap itself would need a
+  second user, which a single-user test can't provide (DESIGN §9i).
+- In every case, nothing outside staging may change.
 
 Unless cleanup kept that directory's handle open from creation, it can't open a mode-0o000
 directory to `fchmod` it. So this exercises restoring owner permissions with `fchmodat`

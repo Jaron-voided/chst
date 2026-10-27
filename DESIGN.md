@@ -1,6 +1,6 @@
 # Chst — Design
 
-> Status: **DRAFT for independent review** (revised after review rounds 1–8; see §9, and the full review records in `reviews/`).
+> Status: **DRAFT for independent review** (revised after review rounds 1–9; see §9, and the full review records in `reviews/`).
 > The format is **Chst**, pronounced "chest". Its magic bytes are `CHST`, its file
 > extension is `.chst`, and the CLI binary is `chst`.
 >
@@ -436,6 +436,12 @@ Detailed byte layouts live in `FORMAT_SPEC.md`.
   Cleanup removes only objects whose identities the extractor recorded, so "deleted on any
   error" has stated exceptions when someone else's object is involved (M1, M9). Extraction
   reports step 11 exactly as verify would (M2).
+- **Amendment (review round 9, §9i):** staging stays 0700 (on Windows, private) until the final
+  rename and its identity check have passed, and only then gets its final permissions (P1).
+  The staging check uses `fchmod(handle, 0700)` and `st_mode & 0o777`, and every directory
+  the extractor creates has any inherited setgid bit cleared (P2). On Windows, staging is held
+  without `FILE_SHARE_DELETE` (P4). Extracting onto filesystems without Unix modes is refused,
+  a known v1 limitation (P5).
 
 ### D11 — Resource limits (amended in review rounds 1 and 6)
 - **Options:** (A) implementation limits only; (B) hard maxima in the spec only; (C) both.
@@ -837,6 +843,52 @@ Still open, for the next reviewer (until `plan-v1`), in addition to §9g's list:
     shows it works.
   - Whether `rustix` exposes it, and what `ubuntu-latest` and `macos-latest` do, is
     unverified until the first CI run. The spec's fallback covers a platform without it.
+  - **Settled in round 9 (§9i, P1):** rustix 1.1.4 doesn't expose it on Linux, so the
+    fallback is always taken there. The fallback's original justification ("staging is
+    private") was false, because staging became 0755 before the rename. Since P1, staging
+    stays 0700 until after the rename and its identity check, which makes the
+    justification true.
+
+## 9i. Review round 9 decisions (fourth independent review: 5 new findings)
+
+| # | Item | Owner decision |
+|---|---|---|
+| 1 | P1 | Fix 1. Staging stays at 0700 (on Windows, its private DACL) until the final rename has succeeded and the post-rename identity check has passed. Only then are the final permissions applied, through the handle. Fix 2 (removing the follow-the-link fallback) is skipped. Fix 3's hook is added to AC-X-ATTR-3. §12.6, "Final permissions", Cleanup's "Restrictive modes" and §9h now agree, and nothing says staging is 0755 before the rename. |
+| 2 | P2 | Compare `st_mode & 0o777` with 0700, so setuid, setgid and sticky are ignored. After `mkdirat`, call `fchmod(handle, 0700)`, so the umask can't matter. The extractor clears any inherited S_ISGID on every directory it creates (EXT-5), and the spec says so. A Linux test with a setgid parent is added (AC-SAFE-4). |
+| 3 | P3 | AC-X-ZSTD-2 adds `--max-ratio 54738112978366623` on `zstd-compressed`, expecting exit 0. |
+| 4 | P4 | On Windows, staging is opened without `FILE_SHARE_DELETE`. The Windows branches of the staging-race tests say: the swap is refused, then the extractor's own rename through its handle succeeds, and nothing outside staging changes. |
+| 5 | P5 | On filesystems without Unix modes (vfat, exFAT, CIFS, drvfs `/mnt/c` without `metadata`), extraction is refused with `extract.unsafe-object`, with a documented note. |
+| 6 | AC-SAFE-8, AC-SAFE-15 | The contradictory wording about whether staging must be gone is fixed. |
+
+How these were applied, where the planner had to choose:
+- **P1's fix-3 hook versus skipping fix 2.** With fix 2 skipped, Linux cleanup uses the
+  fallback that follows links, and the hook runs as the extractor's own user, whom 0700
+  doesn't stop. A same-user swap on Linux would therefore change the outside file even in a
+  correct implementation. So AC-X-ATTR-3's hook:
+  - asserts on Linux and macOS that staging is still 0700 and owned by the extractor's user
+    at that moment, which is what stops every other user;
+  - performs the real swap only on macOS, where `fchmodat` honours `AT_SYMLINK_NOFOLLOW`;
+  - requires that nothing outside staging changed, in every case.
+- **P4 also covers `staging_rename_race`.** Its Windows branch assumed the hook's rename
+  succeeds. Without `FILE_SHARE_DELETE` it can't, so it now gets the same "swap refused,
+  then success" branch as `staging_open_race` and `staging_swap`.
+- **P1 moves `staging_swap`'s hook point.** It used to fire "just before the final
+  permissions are set", but the final permissions now come after the rename. It now fires
+  just before the pre-rename identity check.
+- **P1 adds an outcome.** If setting the final permissions fails after the rename, the
+  result is `io`, and cleanup applies through the same handle. The directory is still 0700
+  at that point.
+
+Known v1 limitation (P5): **extracting onto filesystems without Unix modes** (vfat, exFAT,
+CIFS, drvfs without `metadata`) is refused. To be revisited after v1.
+
+Still open, for the next reviewer (until `plan-v1`), in addition to §9g's and §9h's lists:
+
+- **P4's Windows behaviour** is unverified until the first Windows CI run: that a handle
+  opened without `FILE_SHARE_DELETE` makes another process's rename fail, and that the
+  extractor's own `FileRenameInfo` rename through that handle succeeds.
+- **The Linux check-then-chmod swap** in AC-X-ATTR-3 isn't exercised, because it needs a
+  second user. Its safety rests on staging's 0700 mode, which the hook does assert.
 
 ## 10. Checkpoints
 

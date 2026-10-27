@@ -1,0 +1,22 @@
+glibc fchmodat(AT_SYMLINK_NOFOLLOW) probe (kernel 6.6.87.2-microsoft-standard-WSL2):
+  on a dir: ok
+  on a sym: ENOTSUP
+  [rustix, attack=False] at cleanup: staging 0o755, d 0o777 -> any local user can search staging and rename names inside d
+    fchmodat(d, "x", AT_SYMLINK_NOFOLLOW) -> ENOTSUP
+    fallback: fstatat NOFOLLOW sees the recorded directory, mode 0o77
+    fchmodat(d, "x", 0o777) without the flag -> ok
+    outside file /tmp/claude-1000/-home-jaron-projects-container-format-rs/4f10aca6-5add-4ba5-ac04-c19ddee93f25/scratchpad/chst-review-4/review-work/p1-do1h6ub9/outside/victim.txt: mode 0o600  ->  unchanged
+  [rustix, attack=True] at cleanup: staging 0o755, d 0o777 -> any local user can search staging and rename names inside d
+    fchmodat(d, "x", AT_SYMLINK_NOFOLLOW) -> ENOTSUP
+    fallback: fstatat NOFOLLOW sees the recorded directory, mode 0o77
+    fchmodat(d, "x", 0o777) without the flag -> ok
+    outside file /tmp/claude-1000/-home-jaron-projects-container-format-rs/4f10aca6-5add-4ba5-ac04-c19ddee93f25/scratchpad/chst-review-4/review-work/p1-h7_72y5p/outside/victim.txt: mode 0o777  ->  MODIFIED OUTSIDE STAGING
+  [glibc, attack=False] at cleanup: staging 0o755, d 0o777 -> any local user can search staging and rename names inside d
+    fchmodat(d, "x", AT_SYMLINK_NOFOLLOW) -> ok
+    outside file /tmp/claude-1000/-home-jaron-projects-container-format-rs/4f10aca6-5add-4ba5-ac04-c19ddee93f25/scratchpad/chst-review-4/review-work/p1-6tzs14_6/outside/victim.txt: mode 0o600  ->  unchanged
+  [glibc, attack=True] at cleanup: staging 0o755, d 0o777 -> any local user can search staging and rename names inside d
+    fchmodat(d, "x", AT_SYMLINK_NOFOLLOW) -> ENOTSUP
+    fallback: fstatat NOFOLLOW sees the recorded directory, mode 0o77
+    fchmodat(d, "x", 0o777) without the flag -> ok
+    outside file /tmp/claude-1000/-home-jaron-projects-container-format-rs/4f10aca6-5add-4ba5-ac04-c19ddee93f25/scratchpad/chst-review-4/review-work/p1-hxd_wmze/outside/victim.txt: mode 0o777  ->  MODIFIED OUTSIDE STAGING
+outside file modified: {('rustix', False): False, ('rustix', True): True, ('glibc', False): False, ('glibc', True): True}

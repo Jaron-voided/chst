@@ -386,6 +386,10 @@ The ENTRY_TABLE record size becomes 64. Bytes 0–47 are unchanged, followed by:
   so creating children can't change a parent's mtime and a read-only directory can't block
   its own children. Stored modes are applied as stored, masked with 0o777, and are **not**
   subject to the umask. On Windows, modes are ignored and mtimes are applied.
+  - All of this happens inside staging, before the final rename. Staging's own mode stays
+    0700 throughout (EXT-4, "Staging stays private", P1), so a stored mode of 0o777 on a
+    directory inside it never exposes that directory to other users before extraction has
+    finished.
 
 ### 12.7 Extended: KV metadata (`KV_METADATA`, optional)
 
@@ -565,7 +569,8 @@ staging and that no link is ever followed (N2).
 usage; opening and reading the input file (`io`); EXT-1; §13 steps 1–10, with LIM-5; SEL-1
 (selective extract); creating and holding the staging directory (EXT-4); then, per entry in
 canonical order, EXT-2 and EXT-8 as it's created, followed by §13 step 11 for its blob while
-the file is written (EXT-7); then the final rename. The first failure is the one reported.
+the file is written (EXT-7); then the final rename and its identity check; then the final
+permissions (EXT-4, P1). The first failure is the one reported.
 
 **Step 11 while writing (M2).** For each blob, the extractor reports step 11's rules in step
 11's order, so it reports what a verifier would. If the frame fails (ZST-1 or ZST-2, whether
@@ -599,16 +604,26 @@ BLB-6; otherwise it reports the ZST rule.
   - **Holding it (N2, M1):** the extractor holds the staging directory by an open handle,
     and confirms that the handle is the directory it just created:
     - Unix: `mkdirat` with mode 0700 relative to the parent's handle, then `openat` of the
-      same name with `O_DIRECTORY | O_NOFOLLOW`. `fstat` on the new handle MUST show a
-      directory owned by the effective user ID, with permission bits exactly 0700, and
-      reading it through the handle MUST find no entries other than `.` and `..`.
+      same name with `O_DIRECTORY | O_NOFOLLOW`, then `fchmod(handle, 0700)`, so the umask
+      can't matter and an inherited setgid bit is cleared (P2). `fstat` on the handle MUST
+      then show a directory owned by the effective user ID, with `st_mode & 0o777` equal to
+      0700 (setuid, setgid and sticky are ignored by this comparison), and reading it
+      through the handle MUST find no entries other than `.` and `..`. The `fchmod` fails on
+      a directory owned by another user, which is also a failed check.
     - Windows: create and open in one step, with `NtCreateFile` relative to the parent's
       handle, `FILE_CREATE`, `FILE_DIRECTORY_FILE` and `FILE_OPEN_REPARSE_POINT`, passing
-      the private DACL (below) in its security descriptor. No other object can then be
-      opened in its place.
+      the private DACL (below) in its security descriptor. Its ShareAccess MUST NOT include
+      `FILE_SHARE_DELETE` (P4), so no other process can rename or delete staging while the
+      extractor holds it. The handle includes `DELETE` access, so the extractor's own rename
+      through it still works. No other object can be opened in its place.
     - If the open fails (including at a link: `ELOOP`), or any of these checks fails, the
       result is `refused` / `extract.unsafe-object`, and nothing found under that name is
       touched or removed.
+    - **Filesystems without Unix modes (P5):** on vfat, exFAT, CIFS, or a WSL drvfs mount
+      (`/mnt/<drive>`) without the `metadata` option, modes are fixed by mount options, so
+      the `fchmod` or the mode check can't succeed. Extraction onto them is therefore
+      refused, as `refused` / `extract.unsafe-object`. This is a known v1 limitation
+      (§15.1), not a format rule.
     - The extractor records the handle's identity (device and inode, or volume serial
       number and file ID). Every later operation on staging uses that handle: the writes
       under it, its final permissions, and cleanup.
@@ -616,13 +631,23 @@ BLB-6; otherwise it reports the ZST rule.
       following links, to that identity; immediately after it, the destination MUST. On a
       mismatch the result is `refused` / `extract.unsafe-object`, and cleanup applies, with
       the exceptions listed there.
-  - **Final permissions (N6),** set through the handle just before the rename:
+  - **Staging stays private until it's the destination (P1).** Staging's own mode stays
+    0700 (on Windows, its private DACL) from creation until the final rename has succeeded
+    and the post-rename identity check has passed. So no other user can reach any name
+    inside it during extraction or during any cleanup, whatever modes §12.6 has applied to
+    directories inside it.
+  - **Final permissions (N6, P1),** set through the handle only after the final rename has
+    succeeded and the post-rename identity check has passed:
     - Unix: mode `0755 & ~umask`, in Core and Extended alike.
     - Windows: the staging directory's DACL is protected, with one non-inheritable ACE
       granting access only to the current user. Each object extracted into it is created
       with the inheritable ACEs of the destination's parent, so it doesn't inherit the
-      private ACE. Just before the rename, the staging DACL is replaced, through the
-      handle, by an unprotected DACL that inherits from the destination's parent.
+      private ACE. After the rename and the identity check, the staging DACL is replaced,
+      through the handle, by an unprotected DACL that inherits from the destination's
+      parent.
+    - If setting the final permissions fails, the result is `io`, and cleanup applies to
+      the renamed directory through the same handle. It's still mode 0700, and its name
+      is now the destination's.
   - **Finishing (F16):** on success, the staging directory is renamed to the destination
     with a rename that **MUST NOT replace an existing object**: `renameat2(RENAME_NOREPLACE)`
     on Linux, `renameatx_np(RENAME_EXCL)` on macOS, and
@@ -652,7 +677,10 @@ BLB-6; otherwise it reports the ZST rule.
       flag. Where it doesn't (the call fails with `EOPNOTSUPP` or `ENOTSUP`), the extractor
       first checks with `fstatat(AT_SYMLINK_NOFOLLOW)` that the name is a directory with
       the recorded identity, then calls `fchmodat` without the flag. That's safe because
-      staging is private (mode 0700), so nothing else can change names inside it.
+      staging's own mode is 0700 whenever cleanup runs ("Staging stays private", P1), so no
+      other user can change names inside it between the check and the call. On Linux with
+      `rustix`, the approved crate, this fallback is always the path taken: rustix returns
+      `EOPNOTSUPP` for `AT_SYMLINK_NOFOLLOW` on `fchmodat`.
     - **The staging name itself (M9):** last, cleanup removes the staging directory's own
       name from the parent, after checking with `fstatat(AT_SYMLINK_NOFOLLOW)` that the
       name still has staging's recorded identity. If it doesn't, the name is left alone.
@@ -672,6 +700,10 @@ BLB-6; otherwise it reports the ZST rule.
 - **EXT-5** In Core, files are created with mode 0644 and directories with 0755, both
   subject to the process umask. Modes are ignored on Windows. setuid, setgid and sticky
   bits MUST NOT be set.
+  - **Inherited setgid (P2):** on Linux, a directory created under a setgid directory
+    inherits S_ISGID. So the extractor checks every directory it creates with `fstat` on its
+    handle, and clears an inherited S_ISGID with `fchmod`, in Core and Extended alike.
+    Staging's own setgid bit is already cleared by EXT-4's `fchmod(handle, 0700)`.
 - **EXT-6** No filesystem object outside the staging directory may be created or modified,
   except the destination created by EXT-4's final rename (F20).
 - **EXT-7** Each file's content MUST be checked against its key (BLB-6) **while it is
@@ -711,8 +743,8 @@ BLB-6; otherwise it reports the ZST rule.
 | macOS | Case-insensitive APFS/HFS+ (default) | PATH-11 for ASCII; EXT-2 for everything else |
 | macOS | NFC vs NFD names | PATH-2 stores NFC only. W-9 handles decomposed source names. On extract, names are created in NFC; HFS+ may then list them decomposed, which is expected, not an error. Any tool comparing an extracted tree with an archive on macOS MUST compare NFC-normalised names. Since stored paths are unique NFC strings, normalisation-insensitive filesystems cannot produce a normalisation-only collision. |
 | macOS | HFS+ limits names to 255 UTF-16 units **after** decomposition (F40) | A valid segment can exceed that once decomposed: 127 × U+0390 is 254 bytes in NFC and 381 UTF-16 units in NFD. Extracting it onto HFS+ fails with `io`. That's a documented limitation, not a format rule. APFS has no such limit. |
-| Linux | Depends on the filesystem (F41) | Most Linux filesystems are case-sensitive with no normalisation, so a tree can hold both `é` and `É`. ext4 casefold directories and vfat, ntfs3 and CIFS mounts are case-insensitive, and EXT-2 catches collisions there. |
-| WSL | Windows drives under `/mnt/<drive>` (F41) | The Linux build applies the Unix rules only. The format's portability rules (PATH-7, PATH-9 and others) already make archives safe there. Run checks from the Linux filesystem. |
+| Linux | Depends on the filesystem (F41) | Most Linux filesystems are case-sensitive with no normalisation, so a tree can hold both `é` and `É`. ext4 casefold directories and vfat, ntfs3 and CIFS mounts are case-insensitive, and EXT-2 catches collisions there. Filesystems without Unix modes (vfat, exFAT, CIFS) can't hold a 0700 staging directory, so **extracting onto them is refused** (`refused` / `extract.unsafe-object`; EXT-4, P5). That's a known v1 limitation. Packing from them works. |
+| WSL | Windows drives under `/mnt/<drive>` (F41) | The Linux build applies the Unix rules only. The format's portability rules (PATH-7, PATH-9 and others) already make archives safe there. A drvfs mount without the `metadata` option has no Unix modes, so extracting onto it is refused, as on vfat (P5, a known v1 limitation). Run checks from the Linux filesystem. |
 
 ## 16. Error model [D12]
 
