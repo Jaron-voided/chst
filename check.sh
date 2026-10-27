@@ -7,6 +7,8 @@
 #   ./check.sh --list-ids      print every acceptance ID
 #   ./check.sh --self-test     run the harness's own self-test IDs (AC-META-7)
 #
+# Before any ID, fast, full and --only runs run the TODO coverage preflight (tools/todo_coverage.py).
+#
 # Every applicable ID runs its script, tools/acceptance/checks/<ID>.sh, under `bash -euo pipefail`
 # in a fresh $W. Statuses and exit codes are those of ACCEPTANCE.md §1.1. N/A comes only from two
 # facts read from ACCEPTANCE.md: CURRENT_CUT (§2) and each ID's OS line. A missing check script, a
@@ -97,6 +99,17 @@ rm -f "$OUT/report.json"
 mkdir -p "$LOGS"
 RES=$(mktemp)
 trap 'rm -f "$RES"' EXIT
+
+# Preflight: TODO.md must assign every acceptance ID to exactly one task. It's a harness check, not
+# an acceptance ID, so it isn't in --list-ids or in the results. It also runs under --only, so the
+# log exists after a development run.
+if [ "$MODE" != self-test ]; then
+  if ! python3.14 -I tools/todo_coverage.py > "$LOGS/todo-coverage.log" 2>&1; then
+    echo "check.sh: TODO coverage preflight failed:" >&2
+    cat "$LOGS/todo-coverage.log" >&2
+    exit 1
+  fi
+fi
 
 # --- build, done once and only when a script needs $CHST or $CHST_CORE ---
 BUILD=none # none | ok | failed

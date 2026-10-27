@@ -1,0 +1,5 @@
+d=$FX/core/valid/worked-example; $GEN materialize $d/tree.json "$W/t"
+expect_exit 8 $CHST pack --max-entries 4 "$W/t" -o "$W/a.chst" 2> "$W/err"
+grep -q 'error\[limit-exceeded/limit.entries\]' "$W/err" && test ! -e "$W/a.chst"
+expect_exit 8 $CHST pack --max-total-bytes 14 "$W/t" -o "$W/b.chst" && test ! -e "$W/b.chst"
+expect_exit 0 $CHST pack --max-entries 5 --max-total-bytes 15 "$W/t" -o "$W/c.chst"

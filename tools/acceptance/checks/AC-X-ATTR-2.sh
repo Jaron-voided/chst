@@ -1,0 +1,5 @@
+$GEN materialize $FX/core/valid/worked-example/tree.json "$W/t1"
+$GEN materialize --reverse $FX/core/valid/worked-example/tree.json "$W/t2"
+$CHST pack --attrs --deterministic --mtime 0 "$W/t1" -o "$W/a.chst"
+$CHST pack --attrs --deterministic --mtime 0 "$W/t2" -o "$W/b.chst"
+cmp "$W/a.chst" "$W/b.chst"
