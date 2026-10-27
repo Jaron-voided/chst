@@ -214,10 +214,8 @@ Nothing below starts before that approval.
   - Checks: AC-ROB-5, AC-ENG-7.
   - Re-check: AC-ROB-4 and AC-ROB-4W (owned by C-20). They're full-only, so a short local
     run here is only a smoke test.
-  - **Blocked on an owner decision (found while drafting TODO.md):** AC-ENG-7 part 3 greps
-    `crates/chst-format/tests/zstd_bombs.rs`, the Extended test crate written in X-1.
-    Under the Core cut that file doesn't exist, so AC-ENG-7 FAILs and Core can't be done.
-    This needs a decision before `plan-v1` (DESIGN §9).
+  - AC-ENG-7 checks only the counting-allocator users that exist, so `zstd_bombs.rs` (X-1)
+    isn't needed under the Core cut (DESIGN §9i, post-review edit).
 
 ### Writer and pack
 
@@ -365,8 +363,10 @@ so `$CHST_CORE` (`--no-default-features`) stays Core-only. Each task re-checks A
     4. one decoding pass capped at `raw_length` (ZST-2).
   - LIM-6 is computed exactly in at least 128 bits.
   - A blob is compressed only when that's smaller (ZST-3).
-  - `zstd_bombs` with the counting allocator.
+  - `crates/chst-format/tests/zstd_bombs.rs` with the counting allocator: `deny(unsafe_code)`,
+    and no `unsafe` of its own. AC-X-ZSTD-2 fails without it.
   - Checks: AC-X-ZSTD-1, AC-X-ZSTD-2.
+  - Re-check: AC-ENG-7 (owned by C-8). Under the Extended cut it requires `zstd_bombs.rs`.
 - [ ] **X-2 Entry attributes (#16)**
   - Depends: X-1.
   - `ENTRY_ATTRS`: 64-byte entry records (FLG-1 is one-way), ATT-1, mtime and mode, and

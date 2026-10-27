@@ -912,6 +912,19 @@ How Q1's "nothing under that name is touched" was kept:
 - Cleanup's first exception notes that the extractor's own directory may remain under the
   staging name if step 4 or 5 fails.
 
+**Post-review edit (owner decision, after review 6): AC-ENG-7 is conditional on the
+counting-allocator users that exist.** This wasn't raised by a reviewer. It was found while
+drafting TODO.md.
+- The problem: AC-ENG-7 part 3 grepped `crates/chst-format/tests/zstd_bombs.rs`, a test
+  crate that exists only for Extended (AC-X-ZSTD-2). Under the Core cut it fails, so Core
+  could never be done. **Reason for the change: Core must not need an Extended-only test file.**
+- AC-ENG-7 now checks each counting-allocator user that exists, and still fails if any file
+  has unsafe code outside the D18 exceptions. Under the Extended cut it also requires
+  `zstd_bombs.rs` to exist.
+- AC-X-ZSTD-2 MUST fail if `zstd_bombs.rs` doesn't exist, doesn't use the counting
+  allocator, or fails AC-ENG-7's checks for an allocator user. So the file can't be absent
+  in Extended, and neither ID can pass by skipping it.
+
 ## 10. Checkpoints
 
 Checkpoints and their order only. Tasks live in TODO.md once it exists.

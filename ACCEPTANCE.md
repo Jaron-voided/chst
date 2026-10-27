@@ -395,8 +395,14 @@ grep -qx '#!\[deny(unsafe_code)\]' $fsw
 grep -qx '#!\[deny(clippy::undocumented_unsafe_blocks, clippy::missing_safety_doc)\]' $fsw
 grep -B1 -A1 'allow(unsafe_code)' $fsw | grep -q 'cfg(windows)'
 grep -A1 'allow(unsafe_code)' $fsw | grep -qE '^\s*mod windows;'
-# 3. the counting-allocator exception: deny in its two users, allow only in the named file
-for f in $ca_users; do grep -qx '#!\[deny(unsafe_code)\]' "$f"; grep -q 'counting_alloc' "$f"; done
+# 3. the counting-allocator exception: deny in each of its two users that exists, allow only
+#    in the named file. zstd_bombs.rs is Extended-only, so under the Core cut it may be absent;
+#    under the Extended cut it must exist (AC-X-ZSTD-2 also requires it).
+if grep -qx 'CURRENT_CUT = Extended' ACCEPTANCE.md; then test -f crates/chst-format/tests/zstd_bombs.rs; fi
+for f in $ca_users; do
+  test -e "$f" || continue
+  grep -qx '#!\[deny(unsafe_code)\]' "$f"; grep -q 'counting_alloc' "$f"
+done
 grep -qx '#!\[allow(unsafe_code)\]' $ca
 test "$(grep -rln 'allow(unsafe_code)' crates fuzz --include='*.rs' | sort | tr '\n' ' ')" = "$ca $fsw "
 # 4. every unsafe item in the allocator file is preceded by a SAFETY comment
@@ -412,6 +418,10 @@ done
 Pass: exit 0.
 - Every crate root and integration-test crate has `forbid(unsafe_code)`, except `chst-fs`
   and the two test crates that use the counting allocator.
+- Each counting-allocator user **that exists** has `deny(unsafe_code)` and uses the
+  allocator; no unsafe code may appear in it (part 5). Core must not need an Extended-only
+  test file, so `zstd_bombs.rs` may be absent under the Core cut. Under the Extended cut it
+  must exist, and AC-X-ZSTD-2 fails without it, so neither ID can pass by skipping it.
 - `chst-fs` denies unsafe code, and the `// SAFETY:` lints, at crate level. Its only `allow`
   is on `#[cfg(windows)] mod windows;`.
 - The only other `allow(unsafe_code)` is in `crates/chst-format/tests/support/counting_alloc.rs`,
@@ -1402,6 +1412,12 @@ verify does (FORMAT_SPEC §15, "Step 11 while writing", M2).
 #### AC-X-ZSTD-2 — Decompression bombs and huge windows are contained
 Extended:#12 · OS linux · fast · Traces: ZST-1, ZST-2, LIM-6, D11
 ```sh
+z=crates/chst-format/tests/zstd_bombs.rs          # AC-ENG-7 skips a missing allocator user; this MUST NOT
+test -f $z                                         # exists
+grep -q 'counting_alloc' $z                        # registered with the counting allocator
+grep -qx '#!\[deny(unsafe_code)\]' $z              # AC-ENG-7 part 3
+grep -nw 'unsafe' $z > "$W/zu" || true             # AC-ENG-7 part 5: no unsafe beyond the deny line
+if grep -vE '^[0-9]+:#!\[deny\(unsafe_code\)\]$' "$W/zu"; then exit 1; fi
 for t in ZST-2-window:6:zstd.frame ZST-2-dictid:6:zstd.frame ZST-1:7:zstd.raw-length LIM-6:8:limit.ratio \
          ZST-2-no-fcs-overflow:6:zstd.frame ZST-2-bomb:6:zstd.frame; do
   IFS=: read -r n code det <<< "$t"
@@ -1416,6 +1432,11 @@ test "$(cat "$W/rss")" -lt 65536
 expect_exit 0 $CHST verify --max-ratio 18446744073709551615 $FX/extended/valid/zstd-compressed/container.chst   # M3
 expect_exit 0 $CHST verify --max-ratio 54738112978366623 $FX/extended/valid/zstd-compressed/container.chst      # P3
 ```
+The first lines fail unless `crates/chst-format/tests/zstd_bombs.rs` exists, uses the
+counting allocator, and passes AC-ENG-7's checks for an allocator user (D18 exception 1).
+AC-ENG-7 skips that file while it's absent, so Core never needs it; this check makes sure
+it can't be absent in Extended.
+
 The memory limit is measured on the whole process's peak RSS (F10), so libzstd's C
 allocations are included; a counting Rust allocator can't see them.
 `ZST-2-window` declares a 2 GiB window, which the reader must refuse from the frame header
