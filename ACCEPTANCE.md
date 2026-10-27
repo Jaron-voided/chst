@@ -1666,7 +1666,7 @@ reader has no runtime dependencies (D15): it uses `node:crypto` for SHA-256 and
 ## 5. Pinned fixture manifest
 
 ```
-PINNED_MANIFEST_HASH = <PENDING — set by the owner when the generated fixture set is first approved>
+PINNED_MANIFEST_HASH = 78702072659e29ad59f7bc877bbf4cffa29fcaad51d14b751384cbf55952585c
 ```
 
 Until this value is set, AC-META-2 FAILs. That's intentional: fixtures need owner approval
