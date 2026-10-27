@@ -176,7 +176,7 @@ IDs will FAIL here, because the features don't exist yet.
     echo x >> "$W/b/notes.txt"; if python3.14 -I tools/acceptance/tree_eq.py "$W/a" "$W/b"; then exit 1; fi;
     if python3.14 -I tools/acceptance/flip_sweep.py "$W/no-such-chst" fixtures/core/valid/empty/container.chst; then exit 1; fi;
     if python3.14 -I tools/acceptance/truncate_sweep.py "$W/no-such-chst" fixtures/core/valid/worked-example/container.chst; then exit 1; fi`.
-- [ ] **H-6 `--done` mode**
+- [x] **H-6 `--done` mode**
   - Depends: H-4.
   - Downloads the three `acceptance-report-<os>` reports with `gh` (read-only), imports each
     ID's per-OS status, then runs the done-only check. It exits 0 only if that check

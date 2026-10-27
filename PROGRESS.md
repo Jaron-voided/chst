@@ -77,3 +77,13 @@ Append-only log, one entry per task. Results are in EVIDENCE.md, not here.
 - Also fixed stray backslashes in the "Needs decision" entry written in H-4.
 - Open issues: none.
 - Acceptance IDs affected: AC-META-3, AC-META-6 pass.
+
+### H-6 `--done` mode — a4db6a6
+- `./check.sh --done <ci-run-id>` downloads `acceptance-report-*` with `gh run download` (read-only), takes each ID's status from the report
+  for this OS, runs AC-XP-1 for real with `$CI_RUN_ID` set, and exits by the usual rule (0 only if every ID is PASS or N/A). If the import
+  fails, every ID that applies reports FAIL. It skips the TODO preflight.
+- With no such run (`--done 1`: HTTP 404 from `gh`), it exits 1, AC-XP-1 is FAIL and the mode is `done`, as the Verify line expects.
+- I also tried the success path of the import with a fake `gh` (not in the repo): statuses came through, and an ID missing from the
+  report became FAIL.
+- Open issues: the real import and AC-XP-1's `gh run view` can only be tried after the first CI run.
+- Acceptance IDs affected: AC-XP-1 stays FAIL, until C-20.
