@@ -177,7 +177,12 @@ run_check() {
 source "$1"' check "$script" >> "$log" 2>&1 || rc=$?
       chmod -R u+rwx "$w" 2> /dev/null || true
       rm -rf "$w"
-      if [ "$rc" = 0 ]; then finish PASS 0; else finish FAIL "$rc"; fi
+      if [ "$rc" = 0 ]; then
+        finish PASS 0
+      else
+        echo "check.sh: $script exited $rc" >> "$log"
+        finish FAIL "$rc"
+      fi
     fi
   fi
   R_DUR=$((SECONDS - start))
