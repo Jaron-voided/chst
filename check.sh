@@ -3,6 +3,7 @@
 #
 #   ./check.sh                 fast mode: every applicable ID except the full-only and done-only ones
 #   ./check.sh --full          full mode: also the full-only IDs
+#   ./check.sh --done RUN-ID   import every ID's status from the CI run's three reports, then run AC-XP-1
 #   ./check.sh --only ID,ID    only the named IDs (development aid); every other ID is NOT RUN
 #   ./check.sh --list-ids      print every acceptance ID
 #   ./check.sh --self-test     run the harness's own self-test IDs (AC-META-7)
@@ -33,7 +34,7 @@ EXE=""
 if [ "$CHST_OS" = windows ]; then EXE=.exe; fi
 
 usage() {
-  echo "usage: ./check.sh [--full | --only ID,ID | --list-ids | --self-test]" >&2
+  echo "usage: ./check.sh [--full | --done CI-RUN-ID | --only ID,ID | --list-ids | --self-test]" >&2
   exit 64
 }
 
@@ -43,6 +44,7 @@ list_ids() {
 
 MODE=fast
 ONLY=""
+DONE_ID=""
 MODE_SET=0
 set_mode() {
   if [ "$MODE_SET" = 1 ]; then usage; fi
@@ -56,6 +58,13 @@ while [ $# -gt 0 ]; do
       [ $# -ge 2 ] || usage
       set_mode only
       ONLY=$2
+      shift
+      ;;
+    --done)
+      [ $# -ge 2 ] || usage
+      case "$2" in '' | *[!0-9]*) usage ;; esac
+      set_mode done
+      DONE_ID=$2
       shift
       ;;
     --list-ids) set_mode list-ids ;;
@@ -103,7 +112,7 @@ trap 'rm -f "$RES"' EXIT
 # Preflight: TODO.md must assign every acceptance ID to exactly one task. It's a harness check, not
 # an acceptance ID, so it isn't in --list-ids or in the results. It also runs under --only, so the
 # log exists after a development run.
-if [ "$MODE" != self-test ]; then
+if [ "$MODE" != self-test ] && [ "$MODE" != done ]; then
   if ! python3.14 -I tools/todo_coverage.py > "$LOGS/todo-coverage.log" 2>&1; then
     echo "check.sh: TODO coverage preflight failed:" >&2
     cat "$LOGS/todo-coverage.log" >&2
@@ -181,6 +190,30 @@ record() { # record ID STATUS EXIT DUR LOG
   echo "$2 $1"
 }
 
+# Done mode: import each ID's status from this OS's report of the CI run, using gh (read-only).
+# If the import fails, every ID that applies is FAIL: a status that can't be read is not a PASS.
+IMPORTED=""
+import_reports() {
+  local d
+  d=$(mktemp -d)
+  if gh run download "$DONE_ID" --pattern 'acceptance-report-*' --dir "$d" > "$LOGS/done-import.log" 2>&1 &&
+    [ -f "$d/acceptance-report-$CHST_OS/report.json" ]; then
+    mkdir -p "$OUT"
+    cp "$d/acceptance-report-$CHST_OS/report.json" "$OUT/imported-report.json"
+    IMPORTED=$OUT/imported-report.json
+  else
+    echo "check.sh: can't import the reports of CI run $DONE_ID, see $LOGS/done-import.log" >&2
+  fi
+  rm -rf "$d"
+}
+imported_status() { # imported_status ID -> PASS | FAIL | NOT RUN | N/A
+  local st=""
+  if [ -n "$IMPORTED" ]; then
+    st=$(jq -r --arg id "$1" '[.results[] | select(.id == $id) | .status][0] // ""' "$IMPORTED")
+  fi
+  case "$st" in PASS | FAIL | "NOT RUN" | "N/A") echo "$st" ;; *) echo FAIL ;; esac
+}
+
 has_os() { # has_os "linux,macos" -> 0 when it covers this OS
   case ",$1," in *,all,* | *,"$CHST_OS",*) return 0 ;; esac
   return 1
@@ -222,6 +255,10 @@ self_test() {
 if [ "$MODE" = self-test ]; then
   self_test
 else
+  if [ "$MODE" = done ]; then
+    import_reports
+    export CI_RUN_ID=$DONE_ID
+  fi
   for id in $(list_ids); do
     row=$(awk -F'\t' -v id="$id" '$1 == id' <<< "$META")
     tier=$(cut -f2 <<< "$row")
@@ -231,11 +268,13 @@ else
       record "$id" "N/A" "" 0 ""
     elif ! has_os "$os"; then
       record "$id" "N/A" "" 0 ""
+    elif [ "$MODE" = done ] && [ "$id" != AC-XP-1 ]; then
+      record "$id" "$(imported_status "$id")" "" 0 ""
     elif [ "$MODE" = only ] && ! echo ",$ONLY," | grep -q ",$id,"; then
       record "$id" "NOT RUN" "" 0 ""
     elif [ "$kind" = full ] && [ "$MODE" != full ] && [ "$MODE" != only ]; then
       record "$id" "NOT RUN" "" 0 ""
-    elif [ "$kind" = done ] && [ "$MODE" != only ]; then
+    elif [ "$kind" = done ] && [ "$MODE" != only ] && [ "$MODE" != done ]; then
       record "$id" "NOT RUN" "" 0 ""
     else
       run_check "$id" "$CHECKS/$id.sh"
