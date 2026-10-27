@@ -154,3 +154,25 @@ disk cleanup) and SHA-pinning were skipped on request. No status logic, check sc
 - **Not verified:** the workflow itself (it needs a push), and the new Node 24 action versions.
 - EVIDENCE.md is unchanged: no status changed.
 - Open issues: none.
+
+### CI-1 follow-up: fuzz probe — commit "CI-1: fuzz probe"
+Run #3 (full mode, commit 5057d70) showed that the D16 nightly (`nightly-2026-10-01`, components `cargo`, `rust-std`, `rustc`) and
+cargo-fuzz 0.13.2 install on all three runners, but not whether `cargo fuzz run` can build and run a target. This adds a probe for that.
+Only `.github/workflows/check.yml` changed. `check.sh`, the check scripts, the status logic and the expected results are untouched.
+- **Linux and macOS (`Fuzz toolchain (full mode)`):** while the D16 fallback is in use (no `fuzz/rust-toolchain.toml`), after the
+  toolchain setup it runs a probe: `cargo new --lib $RUNNER_TEMP/fuzz-probe --vcs none`, then in that directory
+  `cargo +"$tc" fuzz init` and `cargo +"$tc" fuzz run fuzz_target_1 -- -runs=1000`. `$RUNNER_TEMP` is outside the checkout, so no repo
+  file is touched. A failure prints a `::warning::` and doesn't fail the job. Once `fuzz/rust-toolchain.toml` exists (C-8), the probe
+  doesn't run, because the real fuzz targets take over.
+- **Windows (`Try cargo-fuzz on Windows (non-gating)`):** the same probe, with the path converted by `cygpath -u`. The step stays
+  `continue-on-error`, and a failure prints `fuzz probe FAILED: ...` and lets the step finish.
+- **Verified locally:** the YAML parses and all `run:` blocks pass `bash -n`. With stub `rustup`, `cargo` and `cygpath` commands, both steps
+  were run once with everything succeeding (`fuzz probe ok`, step exit 0) and once with the fuzz run failing (a warning on Linux/macOS,
+  `fuzz probe FAILED` on Windows, step exit 0). The Linux/macOS step with `fuzz/rust-toolchain.toml` present doesn't run the probe.
+  `pass_only AC-XP-2` passes. A full `./check.sh` gives 10 PASS, 53 FAIL, 3 NOT RUN, 19 N/A, and every status and exit code is identical to
+  the Linux report of the first CI run. Against run #3, the only differences are AC-ROB-4 and AC-ROB-7, which are NOT RUN in fast mode and
+  FAIL in full mode.
+- **Not verified:** the probe against the real nightly and cargo-fuzz. That needs a full-mode run after the push, and it's what
+  this change is for. In particular the Windows MSVC AddressSanitizer case is unknown.
+- EVIDENCE.md is unchanged: no status changed.
+- Open issues: none.

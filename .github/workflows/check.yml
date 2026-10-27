@@ -122,10 +122,20 @@ jobs:
               cargo +"$tc" fuzz --help > /dev/null &&
               echo "fuzz toolchain ok: $tc"
           }
+          # Probe: build and run a throwaway fuzz target, in $RUNNER_TEMP and so outside the repo.
+          # It shows whether the nightly and its components can really fuzz, before C-8.
+          probe_fuzz() {
+            probe=$RUNNER_TEMP/fuzz-probe
+            rm -rf "$probe"
+            cargo new --lib "$probe" --vcs none &&
+              (cd "$probe" && cargo +"$tc" fuzz init && cargo +"$tc" fuzz run fuzz_target_1 -- -runs=1000) &&
+              echo "fuzz probe ok: $tc on $RUNNER_OS"
+          }
           if [ "$real" = 1 ]; then
             setup_fuzz
           else
             setup_fuzz || echo "::warning::D16's nightly pin $tc, or cargo-fuzz 0.13.2, did not install on $RUNNER_OS"
+            probe_fuzz || echo "::warning::the fuzz probe (cargo fuzz init and run) failed with $tc on $RUNNER_OS"
           fi
 
       - name: Scratch space for large checks
@@ -164,6 +174,12 @@ jobs:
           rustup +"$tc" component list --installed
           cargo install cargo-fuzz --version 0.13.2 --locked
           cargo +"$tc" fuzz --help > /dev/null && echo "cargo-fuzz runs on Windows with $tc"
+          # Probe: build and run a throwaway fuzz target, in $RUNNER_TEMP and so outside the repo.
+          probe=$(cygpath -u "$RUNNER_TEMP")/fuzz-probe
+          rm -rf "$probe"
+          cargo new --lib "$probe" --vcs none &&
+            (cd "$probe" && cargo +"$tc" fuzz init && cargo +"$tc" fuzz run fuzz_target_1 -- -runs=1000) &&
+            echo "fuzz probe ok: $tc on Windows" || echo "fuzz probe FAILED: $tc on Windows"
           if [ -d fuzz/fuzz_targets ]; then
             cargo +"$tc" fuzz run open_verify -- -max_total_time=60 -rss_limit_mb=512 -timeout=10
           else
