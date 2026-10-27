@@ -87,3 +87,17 @@ Append-only log, one entry per task. Results are in EVIDENCE.md, not here.
   report became FAIL.
 - Open issues: the real import and AC-XP-1's `gh run view` can only be tried after the first CI run.
 - Acceptance IDs affected: AC-XP-1 stays FAIL, until C-20.
+
+### H-7 First honest local run — bf44911
+- `./check.sh` on Linux (WSL, ext4, not `/mnt`), at commit 200f44b with a clean tree: **9 PASS, 54 FAIL, 3 NOT RUN, 19 N/A** (85 IDs).
+  EVIDENCE.md's Linux column was filled from `report.json` with `local` in the CI column. The macOS and Windows columns are untouched
+  (NOT RUN), because only a CI run can set them.
+- PASS: AC-META-1, -2, -3, -4, -5, -6, -7, and AC-NEG-1 and AC-NEG-4 (these two read only the fixtures).
+- NOT RUN: AC-ROB-4 and AC-ROB-7 (full-only), AC-XP-1 (done-only). N/A: 12 Extended IDs, and 7 IDs whose OS line excludes Linux.
+- FAIL: the other 54. Each log shows a missing feature: no `Cargo.toml`, no `crates/`, no `rust-toolchain.toml`, no binary, no workflow
+  file. None is a harness fault.
+- A failing check's log was sometimes empty, because the script's own `test` fails silently under `-e` (AC-NEG-2 expects exit 6 and
+  gets 127). So `check.sh` now appends "<script> exited N" to the log of a failing check.
+- The Verify's EVIDENCE comparison was shown to fail on a tampered cell.
+- Open issues: none.
+- Acceptance IDs affected: all rows' Linux cells.

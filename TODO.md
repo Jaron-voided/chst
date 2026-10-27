@@ -186,7 +186,7 @@ IDs will FAIL here, because the features don't exist yet.
   - Verify (no such CI run exists):
     `set +e; ./check.sh --done 1 > /dev/null; rc=$?; set -e; test $rc = 1;
     jq -e '.mode == "done" and ([.results[] | select(.id == "AC-XP-1" and .status == "FAIL")] | length) == 1' target/acceptance/report.json`.
-- [ ] **H-7 First honest local run**
+- [x] **H-7 First honest local run**
   - Depends: H-1 … H-6.
   - Run `./check.sh` on Linux (WSL), from the Linux filesystem.
   - Fill every EVIDENCE.md Linux cell from `report.json`, with `local` in the CI column.
