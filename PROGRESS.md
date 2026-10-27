@@ -125,3 +125,5 @@ Append-only log, one entry per task. Results are in EVIDENCE.md, not here.
 - Open issues: action versions (`checkout@v4`, `setup-python@v5`, `upload-artifact@v4`) are my choice, by major tag, and I couldn't check
   them against GitHub. The owner may want them pinned to commit SHAs.
 - Acceptance IDs affected: AC-XP-2 passes.
+- **Status: the TODO box stays unticked.** The first half of the Verify line (`pass_only AC-XP-2`) passes. The second half
+  (the three reports of the newest CI run) can't be run until the owner pushes and a run exists. Tick it after that.

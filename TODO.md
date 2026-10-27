@@ -199,7 +199,7 @@ IDs will FAIL here, because the features don't exist yet.
     jq -r '.results[] | "\(.id)\t\(.status)"' $r | while IFS=$'\t' read -r id st; do
       test "$(grep -E "^\| $id \|" EVIDENCE.md | awk -F'|' '{gsub(/^ +| +$/, "", $3); print $3}')" = "$st"; done`.
     EVIDENCE.md's Linux column must match the report, row by row.
-- [x] **CI-1 CI workflow** (`.github/workflows/check.yml`, D17)
+- [ ] **CI-1 CI workflow** (`.github/workflows/check.yml`, D17)
   - Depends: H-7.
   - Triggers: `push`, `pull_request` and `workflow_dispatch`.
   - Runners: `ubuntu-latest`, `macos-latest` and `windows-latest`, all with `shell: bash`.
