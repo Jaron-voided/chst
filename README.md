@@ -4,7 +4,7 @@ Chst is a new, versioned container file format (`.chst`) with a Rust library and
 
 ## Status
 
-The specification, 167 test fixtures, six review rounds and the acceptance harness are complete, and CI runs on Linux, macOS and Windows.
+The specification, 167 test fixtures, six review rounds and the acceptance harness are complete. CI runs the checks on Linux, macOS and Windows (reports are in each run's artifacts); EVIDENCE.md's macOS and Windows columns are not filled in from CI yet.
 
 **The Rust implementation has not started. Nothing here is usable as a tool yet.** Most acceptance checks report FAIL for that reason, and `EVIDENCE.md` records that honestly: on Linux, 10 of 85 criteria pass (they check only the fixtures, the documents and the harness), 53 fail, 3 are not run in fast mode, and 19 are N/A. Its macOS and Windows columns are not yet filled in from CI.
 
@@ -48,7 +48,7 @@ The planned CLI is `chst pack`, `list`, `inspect`, `verify` and `extract`.
 
 ## Running the checks
 
-You need `bash`, `jq` 1.7 or later, and `python3.14` (with `compression.zstd`) on your `PATH`. Run from the repository root, on a Linux filesystem if you're in WSL.
+You need `bash`, `jq` 1.7 or later, and `python3.14` (with `compression.zstd`) on your `PATH`. `jq` and `python3.14` are needed only to run the project's own checks and rebuild the fixtures, not to use the `chst` tool. Run from the repository root, on a Linux filesystem if you're in WSL.
 
 ```sh
 ./check.sh                       # fast mode: every applicable criterion
