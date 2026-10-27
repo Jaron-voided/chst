@@ -101,3 +101,27 @@ Append-only log, one entry per task. Results are in EVIDENCE.md, not here.
 - The Verify's EVIDENCE comparison was shown to fail on a tampered cell.
 - Open issues: none.
 - Acceptance IDs affected: all rows' Linux cells.
+
+### CI-1 CI workflow — d677036
+- Added `.github/workflows/check.yml`. Not run: the owner pushes. What it does:
+  - **Triggers and runners:** `push`, `pull_request` and `workflow_dispatch`; `ubuntu-latest`, `macos-latest` and `windows-latest`, all
+    `shell: bash`, `fail-fast: false`. Fast mode (`./check.sh`) runs on push and PR, `./check.sh --full` on manual trigger.
+  - **Job result (D17):** GitHub fails a step on any non-zero exit, so the check step has `continue-on-error` and a final "Job result" step
+    applies the rule from `report.json`: any FAIL fails; in full mode, a NOT RUN other than AC-XP-1 fails; no report fails. I ran that step's
+    script against seven crafted reports, one for each rule.
+  - **Every runner:** Python 3.14 from `setup-python` (on Windows, a `python3.14` shim script in `$HOME/bin`), `jq` 1.7 or later (installed
+    if missing), the toolchain from `rust-toolchain.toml` once it exists (C-1), `CHST_BIG_ROOT=$RUNNER_TEMP`, GNU `time` on Ubuntu, and the
+    disk-space cleanup on Ubuntu as the first step.
+  - **Full mode:** the pinned nightly and `cargo-fuzz` 0.13.2 `--locked` on Linux and macOS, and a non-gating, `continue-on-error` cargo-fuzz
+    try on Windows. The nightly, cargo-fuzz and Rust steps skip when `fuzz/` or `rust-toolchain.toml` doesn't exist yet (before C-1 and C-8).
+  - **Artifacts:** `acceptance-report-<os>` holds `report.json` alone, as AC-XP-1 expects. Logs go to `acceptance-logs-<os>`.
+- `git config --global core.autocrlf false` runs before checkout. Windows runners default to CRLF conversion, which would break the
+  fixture hashes (AC-META-2) and the shell scripts. I used this step rather than a `.gitattributes` file, which would be a new repo file.
+- Checked locally: the YAML parses, every `run:` block passes `bash -n`, and `pass_only AC-XP-2` passes. EVIDENCE.md's Linux column was
+  refreshed from a new fast run at d677036 (10 PASS, 53 FAIL, 3 NOT RUN, 19 N/A).
+- Not verified, since it needs the owner's push: the second half of the Verify line (three complete 85-result reports from the first run),
+  and everything about the runners. The open items of DESIGN §9g–§9i (runner feasibility, nightly components, the Windows
+  `FILE_SHARE_DELETE` behaviour, whether the Windows and Ubuntu Python 3.14 builds include `compression.zstd`) are to be recorded here from the first run.
+- Open issues: action versions (`checkout@v4`, `setup-python@v5`, `upload-artifact@v4`) are my choice, by major tag, and I couldn't check
+  them against GitHub. The owner may want them pinned to commit SHAs.
+- Acceptance IDs affected: AC-XP-2 passes.
