@@ -416,3 +416,59 @@ Not a TODO task: an owner decision and owner-approved spec changes, shown as a d
   18 decisions and 21 rules, none untraced.
 - Acceptance IDs affected: none. EVIDENCE.md is unchanged.
 - Next: C-4, in a fresh session.
+
+### C-4 Blobs, entries, paths and canonical form — 1fdb8ad
+- Added `chst-format/src/tables.rs`: `parse_tables(opened, sections, limits, purpose)` (also `Opened::tables`) runs §13 step 10, (a) to (p),
+  as one pass per item in order. Each per-record item checks every rule of one record before the next record. It returns the blob table,
+  the entries (directory, or file with its blob's index) and the paths, for C-5.
+  - **What a Core reader checks.** It knows no flag, so BLB-2 rejects every encoding but 0. ZST-2, ZST-3 and LIM-6 apply only to encoding 1
+    and never run, and neither do FLG-1, ATT-1 or KV-1 ((m) to (o)).
+  - **`Purpose`** (List, Inspect, Verify, Extract) decides LIM-5: only Verify and Extract check it. The sum is checked u64; overflow
+    exceeds every limit.
+  - **Allocation.** Per-blob and per-entry vectors are allocated only after step 9 (SEC-1 bounds the counts by the index, and LIM-3 bounds the
+    entries), and every one is fallible (`io.memory`).
+  - **Lookups without extra passes.** ENT-4 reuses BLB-5's key-sorted index for a binary search. ENT-6 binary-searches the canonically sorted
+    entries. PATH-11 sorts entry indexes by fold key.
+  - **CAN-2 needs no set:** keys are unique after BLB-5, so the blobs referenced so far are exactly `0..seen`.
+- Added `chst-format/src/paths.rs`: PATH-1 to PATH-10 in §13's order 1, 2, 4, 3, 5, 6, 7, 8, 9, 10. PATH-2 is
+  `unicode_normalization::is_nfc` (the authoritative check: the quick check, then full NFC on "maybe"). Paths in error messages are escaped,
+  so a bidi or control character in a hostile name can't change what's printed.
+- Added `chst-format/tests/unicode_tables.rs` (AC-ENG-8, `forbid(unsafe_code)`). It asserts `UNICODE_VERSION == (16, 0, 0)` and that U+113CE
+  has ccc 9. It reads the entry paths of `core/invalid/PATH-2-unicode16` directly (steps 1 to 9, then its own decoding of the entry table)
+  and asserts that exactly one is not NFC, `docs/x` U+0301 U+113CE. Then it asserts that the reader rejects the file with `path.nfc` for all
+  four purposes.
+- Added `reader_step_10` to `task_reader.rs`, in Verify mode so LIM-5 runs with its `args`. All 128 files are classified on the first run:
+  108 rejected with exactly their expected detail, exit and category, including all 23 `core/attacks`, and 20 passing.
+- 44 unit tests in `chst-format` (17 new in `tables`, 8 in `paths`), built from hand-made tables. Step 10 never reads blob data, so a test can
+  declare blobs of 2^62 or 2^63 bytes without allocating them.
+- **Mutation checks: 93 one-at-a-time mutations, all caught in the end.** I used a throwaway script in the session scratchpad, not in the repo.
+  It applies each mutation as exact replacements, each of which must match once. It requires the mutant to compile, runs the `chst-format`
+  tests and `reader_step_10` separately, and restores both files from saved copies. A hash check confirmed the sources were identical
+  afterwards.
+  - **What was mutated:** every rule turned off or narrowed (each PATH-6 code point or range, each PATH-7 character, each PATH-9 name
+    family); off-by-one limits (PATH-3, PATH-10, LIM-5); wrapping instead of checked arithmetic (BLB-4, ENT-5, LIM-5); LIM-5 for the wrong
+    purposes, or counting each blob once; ENT-6 or PATH-9 or PATH-8 on the wrong segment; NFC by the quick check alone; records read at
+    the base size; 13 order changes between the step-10 items and between the path rules; and per-rule passes in place of per-record ones
+    for (a) and (d).
+  - **First run: 86 caught, 7 survived.** All seven were real gaps in my tests, not equivalent mutants:
+    - **CAN-3 allowing a gap, or allowing an overlap.** Each of my cases also broke the other direction later in the walk, so they were still
+      caught as CAN-3. Paths sharing pool bytes (`ab` and `bc` in the pool `abc`), and an unused byte between paths (`a` and `c` in `axc`),
+      had no test, and each mutant accepts its case completely.
+    - **BLB-4 with a wrapping add.** My overflow case was rejected later anyway; it needs a wrap that lands on an otherwise exact tiling.
+    - **Blob records always read at 64 bytes.** No fixture has a wider blob table, and my helper only built 64-byte records.
+    - **Three order swaps** (BLB-5 before BLB-4, ENT-6 before CAN-1, PATH-10 before PATH-9), for lack of a case that breaks both rules.
+  - I added a test for each, including wider blob (72) and entry (64) records under an unknown optional flag, with the extra bytes filled.
+    **Second full run: 93 of 93 caught.** 23 mutants are caught only by the unit tests, not by the fixtures (for example the PATH-7
+    characters no fixture uses, LIM-5 overflow and purpose, and most order swaps). One, entry records read at 48 bytes, is caught only by
+    the fixtures (compat `unknown-optional-wider-entries`).
+- **AC-ENG-8 can fail.** Offline, with the crate pinned to 0.1.23 (Unicode 15.1), both of its tests fail. The PATH-2-unicode16 path is judged
+  NFC there, which is the disagreement F12 describes. With 0.1.25 (17.0), the version assertion fails. `Cargo.toml` and `Cargo.lock` were
+  restored from saved copies, and `git diff` shows them unchanged.
+- **Test mistakes found while writing (not code faults):** my PATH-3 boundary case lengthened the last segment to 256 bytes, so it tested the
+  segment limit instead of the path limit; and a huge-blob tiling case ran in Verify mode and hit LIM-5. Both tests were corrected.
+- Verify: `pass_only AC-ENG-8; CHST_LIM2=… cargo_test_nonempty --release -p chst-cli --test task_reader -- reader_step_` exits 0
+  (`reader_step_8`, `_9`, `_10`). clippy `-D warnings` over all targets and `cargo fmt --check` are clean.
+- Clean-tree fast run at 1fdb8ad: 17 PASS, 46 FAIL, 3 NOT RUN, 19 N/A. The only status that changed is AC-ENG-8 (FAIL → PASS).
+- EVIDENCE.md: the AC-ENG-8 row (Linux PASS, `local`). macOS and Windows stay NOT RUN until a CI run covers this commit.
+- Open issues: none.
+- Acceptance IDs affected: AC-ENG-8 (PASS on Linux).

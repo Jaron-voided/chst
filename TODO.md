@@ -278,7 +278,7 @@ Nothing below starts before that approval.
     `CHST_LIM2=$(fixture_file fixtures/core/invalid/LIM-2.expect.json) cargo_test_nonempty --release -p chst-cli --test task_reader -- reader_step_`.
     That runs `reader_step_8` and `reader_step_9`: 32 rejections in total, and 96 files
     passing steps 1–9.
-- [ ] **C-4 Blobs, entries, paths and canonical form** (§13 step 10, the Core rules)
+- [x] **C-4 Blobs, entries, paths and canonical form** (§13 step 10, the Core rules)
   - Depends: C-3.
   - Step 10 (a) … (p), in that exact order. FLG-1, ATT-1 and KV-1 apply only where the
     reader knows the flag, which a Core reader doesn't.

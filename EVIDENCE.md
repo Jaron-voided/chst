@@ -25,7 +25,7 @@ This is the only record of check results. Its format and rules are defined in
 | AC-ENG-4 | PASS | PASS | PASS | ./check.sh --only AC-ENG-4 | 3025d6212bfbdc33e58e24113124502743d090b7 | https://github.com/Jaron-voided/chst/actions/runs/40699772200 |
 | AC-ENG-5 | PASS | PASS | PASS | ./check.sh --only AC-ENG-5 | 8543aa65e18edab129667ec22f1e6e7cbc982d5f | https://github.com/Jaron-voided/chst/actions/runs/40694068794 |
 | AC-ENG-6 | PASS | PASS | PASS | ./check.sh --only AC-ENG-6 | 8543aa65e18edab129667ec22f1e6e7cbc982d5f | https://github.com/Jaron-voided/chst/actions/runs/40694068794 |
-| AC-ENG-8 | FAIL | FAIL | FAIL | ./check.sh --only AC-ENG-8 | b94ca4141da1c9e56858828e491caffa580eb3d2 | https://github.com/Jaron-voided/chst/actions/runs/40689182770 |
+| AC-ENG-8 | PASS | NOT RUN | NOT RUN | ./check.sh --only AC-ENG-8 | 1fdb8ad6f567bb26c52f44cfd925d201b88d9b7e | local |
 | AC-ENG-7 | FAIL | FAIL | FAIL | ./check.sh --only AC-ENG-7 | b94ca4141da1c9e56858828e491caffa580eb3d2 | https://github.com/Jaron-voided/chst/actions/runs/40689182770 |
 | AC-POS-1 | FAIL | FAIL | FAIL | ./check.sh --only AC-POS-1 | b94ca4141da1c9e56858828e491caffa580eb3d2 | https://github.com/Jaron-voided/chst/actions/runs/40689182770 |
 | AC-POS-2 | FAIL | FAIL | FAIL | ./check.sh --only AC-POS-2 | b94ca4141da1c9e56858828e491caffa580eb3d2 | https://github.com/Jaron-voided/chst/actions/runs/40689182770 |
