@@ -369,7 +369,7 @@ DESIGN.md's decision log row 18 now says so, and cites run 40689182770. Only tha
 - EVIDENCE.md: the AC-ENG-2 and AC-ENG-4 rows now carry this run. Nothing to fix in C-2.
 - Acceptance IDs affected: AC-ENG-2, AC-ENG-4 (PASS on all three OSes).
 
-### C-3 Sections
+### C-3 Sections — 008019b
 - Added `chst-format/src/sections.rs`: `parse_sections(index, header, limits)` (also `Opened::sections(&limits)`), which runs §13 step 9 as
   one pass per rule over the index, in §13's order: SEC-1 frames every section (checked `u32 * u64` product, then `usize` conversion, then
   the bounds), SEC-2 (unsupported, so a later `malformed` file isn't reached), SEC-3, SEC-4 for every section, SEC-5 for every section, then
@@ -391,5 +391,6 @@ DESIGN.md's decision log row 18 now says so, and cites run 40689182770. Only tha
   ten again: all caught.
 - Verify: `CHST_LIM2=… cargo_test_nonempty --release -p chst-cli --test task_reader -- reader_step_` passes (`reader_step_8` and `reader_step_9`).
 - C-3 has no acceptance ID of its own. Local fast run: AC-ENG-1 to -6 and the rest unchanged (16 PASS), clippy with `-D warnings` is clean.
+- Clean-tree fast run at 008019b: 16 PASS, 47 FAIL, 3 NOT RUN, 19 N/A, the same as before C-3.
 - Open issues: none.
 - Acceptance IDs affected: none directly. EVIDENCE.md is unchanged, because no status changed.
