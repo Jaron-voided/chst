@@ -32,21 +32,21 @@ This is the only record of check results. Its format and rules are defined in
 | AC-POS-3 | FAIL | FAIL | FAIL | ./check.sh --only AC-POS-3 | b94ca4141da1c9e56858828e491caffa580eb3d2 | https://github.com/Jaron-voided/chst/actions/runs/40689182770 |
 | AC-POS-4 | FAIL | FAIL | FAIL | ./check.sh --only AC-POS-4 | b94ca4141da1c9e56858828e491caffa580eb3d2 | https://github.com/Jaron-voided/chst/actions/runs/40689182770 |
 | AC-NEG-1 | PASS | PASS | PASS | ./check.sh --only AC-NEG-1 | b94ca4141da1c9e56858828e491caffa580eb3d2 | https://github.com/Jaron-voided/chst/actions/runs/40689182770 |
-| AC-NEG-2 | FAIL | FAIL | FAIL | ./check.sh --only AC-NEG-2 | b94ca4141da1c9e56858828e491caffa580eb3d2 | https://github.com/Jaron-voided/chst/actions/runs/40689182770 |
+| AC-NEG-2 | PASS | NOT RUN | NOT RUN | ./check.sh --only AC-NEG-2 | 8f2b4ce73dbc8e1c2cb7c599a9a5107fd7eafd2c | local |
 | AC-NEG-3 | FAIL | FAIL | FAIL | ./check.sh --only AC-NEG-3 | b94ca4141da1c9e56858828e491caffa580eb3d2 | https://github.com/Jaron-voided/chst/actions/runs/40689182770 |
 | AC-NEG-4 | PASS | PASS | PASS | ./check.sh --only AC-NEG-4 | b94ca4141da1c9e56858828e491caffa580eb3d2 | https://github.com/Jaron-voided/chst/actions/runs/40689182770 |
 | AC-DET-1 | FAIL | FAIL | FAIL | ./check.sh --only AC-DET-1 | b94ca4141da1c9e56858828e491caffa580eb3d2 | https://github.com/Jaron-voided/chst/actions/runs/40689182770 |
-| AC-DET-2 | FAIL | FAIL | FAIL | ./check.sh --only AC-DET-2 | b94ca4141da1c9e56858828e491caffa580eb3d2 | https://github.com/Jaron-voided/chst/actions/runs/40689182770 |
+| AC-DET-2 | PASS | NOT RUN | NOT RUN | ./check.sh --only AC-DET-2 | 8f2b4ce73dbc8e1c2cb7c599a9a5107fd7eafd2c | local |
 | AC-DET-3 | FAIL | FAIL | FAIL | ./check.sh --only AC-DET-3 | b94ca4141da1c9e56858828e491caffa580eb3d2 | https://github.com/Jaron-voided/chst/actions/runs/40689182770 |
-| AC-ROB-1 | FAIL | FAIL | FAIL | ./check.sh --only AC-ROB-1 | b94ca4141da1c9e56858828e491caffa580eb3d2 | https://github.com/Jaron-voided/chst/actions/runs/40689182770 |
-| AC-ROB-2 | FAIL | FAIL | FAIL | ./check.sh --only AC-ROB-2 | b94ca4141da1c9e56858828e491caffa580eb3d2 | https://github.com/Jaron-voided/chst/actions/runs/40689182770 |
+| AC-ROB-1 | PASS | NOT RUN | NOT RUN | ./check.sh --only AC-ROB-1 | 8f2b4ce73dbc8e1c2cb7c599a9a5107fd7eafd2c | local |
+| AC-ROB-2 | PASS | NOT RUN | NOT RUN | ./check.sh --only AC-ROB-2 | 8f2b4ce73dbc8e1c2cb7c599a9a5107fd7eafd2c | local |
 | AC-ROB-3 | FAIL | FAIL | FAIL | ./check.sh --only AC-ROB-3 | b94ca4141da1c9e56858828e491caffa580eb3d2 | https://github.com/Jaron-voided/chst/actions/runs/40689182770 |
 | AC-ROB-4 | FAIL | FAIL | N/A | ./check.sh --only AC-ROB-4 | b94ca4141da1c9e56858828e491caffa580eb3d2 | https://github.com/Jaron-voided/chst/actions/runs/40689182770 |
 | AC-ROB-4W | N/A | N/A | FAIL | ./check.sh --only AC-ROB-4W | b94ca4141da1c9e56858828e491caffa580eb3d2 | https://github.com/Jaron-voided/chst/actions/runs/40689182770 |
 | AC-ROB-5 | FAIL | FAIL | FAIL | ./check.sh --only AC-ROB-5 | b94ca4141da1c9e56858828e491caffa580eb3d2 | https://github.com/Jaron-voided/chst/actions/runs/40689182770 |
 | AC-ROB-6 | FAIL | N/A | N/A | ./check.sh --only AC-ROB-6 | b94ca4141da1c9e56858828e491caffa580eb3d2 | https://github.com/Jaron-voided/chst/actions/runs/40689182770 |
 | AC-ROB-7 | FAIL | FAIL | FAIL | ./check.sh --only AC-ROB-7 | b94ca4141da1c9e56858828e491caffa580eb3d2 | https://github.com/Jaron-voided/chst/actions/runs/40689182770 |
-| AC-ROB-8 | FAIL | FAIL | FAIL | ./check.sh --only AC-ROB-8 | b94ca4141da1c9e56858828e491caffa580eb3d2 | https://github.com/Jaron-voided/chst/actions/runs/40689182770 |
+| AC-ROB-8 | PASS | NOT RUN | NOT RUN | ./check.sh --only AC-ROB-8 | 8f2b4ce73dbc8e1c2cb7c599a9a5107fd7eafd2c | local |
 | AC-ROB-9 | FAIL | FAIL | FAIL | ./check.sh --only AC-ROB-9 | b94ca4141da1c9e56858828e491caffa580eb3d2 | https://github.com/Jaron-voided/chst/actions/runs/40689182770 |
 | AC-SAFE-1 | FAIL | FAIL | FAIL | ./check.sh --only AC-SAFE-1 | b94ca4141da1c9e56858828e491caffa580eb3d2 | https://github.com/Jaron-voided/chst/actions/runs/40689182770 |
 | AC-SAFE-2 | FAIL | FAIL | FAIL | ./check.sh --only AC-SAFE-2 | b94ca4141da1c9e56858828e491caffa580eb3d2 | https://github.com/Jaron-voided/chst/actions/runs/40689182770 |
@@ -78,8 +78,8 @@ This is the only record of check results. Its format and rules are defined in
 | AC-LIM-1 | FAIL | FAIL | FAIL | ./check.sh --only AC-LIM-1 | b94ca4141da1c9e56858828e491caffa580eb3d2 | https://github.com/Jaron-voided/chst/actions/runs/40689182770 |
 | AC-LIM-2 | FAIL | FAIL | FAIL | ./check.sh --only AC-LIM-2 | b94ca4141da1c9e56858828e491caffa580eb3d2 | https://github.com/Jaron-voided/chst/actions/runs/40689182770 |
 | AC-LIM-4 | FAIL | FAIL | FAIL | ./check.sh --only AC-LIM-4 | b94ca4141da1c9e56858828e491caffa580eb3d2 | https://github.com/Jaron-voided/chst/actions/runs/40689182770 |
-| AC-LIM-3 | FAIL | N/A | N/A | ./check.sh --only AC-LIM-3 | b94ca4141da1c9e56858828e491caffa580eb3d2 | https://github.com/Jaron-voided/chst/actions/runs/40689182770 |
-| AC-CLI-1 | FAIL | FAIL | FAIL | ./check.sh --only AC-CLI-1 | b94ca4141da1c9e56858828e491caffa580eb3d2 | https://github.com/Jaron-voided/chst/actions/runs/40689182770 |
+| AC-LIM-3 | PASS | N/A | N/A | ./check.sh --only AC-LIM-3 | 8f2b4ce73dbc8e1c2cb7c599a9a5107fd7eafd2c | local |
+| AC-CLI-1 | PASS | NOT RUN | NOT RUN | ./check.sh --only AC-CLI-1 | 8f2b4ce73dbc8e1c2cb7c599a9a5107fd7eafd2c | local |
 | AC-CLI-2 | FAIL | FAIL | N/A | ./check.sh --only AC-CLI-2 | b94ca4141da1c9e56858828e491caffa580eb3d2 | https://github.com/Jaron-voided/chst/actions/runs/40689182770 |
 | AC-CLI-3 | FAIL | FAIL | FAIL | ./check.sh --only AC-CLI-3 | b94ca4141da1c9e56858828e491caffa580eb3d2 | https://github.com/Jaron-voided/chst/actions/runs/40689182770 |
 | AC-COMPAT-1 | FAIL | FAIL | FAIL | ./check.sh --only AC-COMPAT-1 | b94ca4141da1c9e56858828e491caffa580eb3d2 | https://github.com/Jaron-voided/chst/actions/runs/40689182770 |

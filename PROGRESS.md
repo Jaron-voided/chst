@@ -602,7 +602,7 @@ Owner's choice (a) after the C-5 review. Not a TODO task; nothing in `check.sh`,
   "Needs decision", because CLAUDE.md is protected.
 - Acceptance IDs affected: none.
 
-### C-6a CLI: argument parsing and `verify` — commit "C-6a: argument parsing and verify"
+### C-6a CLI: argument parsing and `verify` — 8f2b4ce
 - `chst-cli` now depends on `lexopt` 0.3 (0.3.2 in `Cargo.lock`, the only new package) and on `serde_json` as a normal dependency, both
   on D15's list. AC-ENG-5 and AC-ENG-3 pass.
 - `src/args.rs`: `chst <command> FILE [--json] [limits]` with `lexopt`. The command must come first; options and FILE in any order after
@@ -631,3 +631,6 @@ Owner's choice (a) after the C-5 review. Not a TODO task; nothing in `check.sh`,
 - Open issues: the detail-code item under "Needs decision".
 - Acceptance IDs affected: AC-NEG-2, AC-CLI-1, AC-LIM-3, AC-ROB-1, AC-ROB-2, AC-ROB-8 (PASS on Linux); AC-DET-2 (PASS early); AC-ENG-3,
   AC-NEG-1, AC-NEG-4 stay PASS.
+- Clean-tree fast run at 8f2b4ce: 24 PASS, 39 FAIL, 3 NOT RUN, 19 N/A, the same as before committing. EVIDENCE.md: the seven rows that
+  changed (AC-NEG-2, AC-CLI-1, AC-LIM-3, AC-ROB-1, AC-ROB-2, AC-ROB-8, AC-DET-2) now have Linux PASS (`local`); their macOS and Windows cells
+  are NOT RUN until a CI run covers this commit (AC-LIM-3's stay N/A, its OS line being Linux only).
