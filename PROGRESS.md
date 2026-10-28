@@ -67,7 +67,7 @@ Append-only log, one entry per task. Results are in EVIDENCE.md, not here.
   than by spec rule. Recommendation: (a), and also rewrite C-3's 10 and C-4's 93 mutations as `C-3.toml` and `C-4.toml` against the
   current code, so all three tasks can be re-run. Needs the owner's approval before anything is committed.
 
-- **The mutation-suite rule in CLAUDE.md** (owner asked for the rule "where future sessions will see it, CLAUDE.md if that's allowed").
+- **RESOLVED (owner chose (a); applied to CLAUDE.md by the owner's instruction): the mutation-suite rule in CLAUDE.md** (owner asked for the rule "where future sessions will see it, CLAUDE.md if that's allowed").
   CLAUDE.md is protected, so I may only propose a diff. The rule is in TODO.md now ("How this file works", the "Mutation suites" bullet),
   which every session reads before it picks a task. Proposed diff for CLAUDE.md, "Implementation rules", after the "Never delete, skip,
   ignore, or loosen a test" bullet:
@@ -81,7 +81,7 @@ Append-only log, one entry per task. Results are in EVIDENCE.md, not here.
   Options: (a) apply it, so the rule sits next to the other test rules; (b) leave it in TODO.md only. Recommendation: (a). TODO.md ranks
   below CLAUDE.md and is edited every task, so the rule is easier to lose there.
 
-- **Detail codes the CLI needs but the spec doesn't define** (found in C-6a; nothing blocked). Appendix C says usage errors use detail
+- **RESOLVED (owner chose (a); added to FORMAT_SPEC Appendix A): detail codes the CLI needs but the spec doesn't define** (found in C-6a; nothing blocked). Appendix C says usage errors use detail
   codes beginning `usage.`, but FORMAT_SPEC defines only `usage.limit` and `usage.pattern`. C-6a uses, provisionally (in
   `crates/chst-cli/src/args.rs` and `main.rs`): `usage.command` (no command, or an unknown one), `usage.option` (an option the command
   doesn't take, or a value given to one that takes none), `usage.argument` (FILE missing, or one operand too many), and `io.write`
@@ -634,3 +634,14 @@ Owner's choice (a) after the C-5 review. Not a TODO task; nothing in `check.sh`,
 - Clean-tree fast run at 8f2b4ce: 24 PASS, 39 FAIL, 3 NOT RUN, 19 N/A, the same as before committing. EVIDENCE.md: the seven rows that
   changed (AC-NEG-2, AC-CLI-1, AC-LIM-3, AC-ROB-1, AC-ROB-2, AC-ROB-8, AC-DET-2) now have Linux PASS (`local`); their macOS and Windows cells
   are NOT RUN until a CI run covers this commit (AC-LIM-3's stay N/A, its OS line being Linux only).
+
+### Owner decisions applied: usage/io detail codes and the mutation-suite rule — commit "C-6a: apply the owner's decisions on detail codes and the mutation-suite rule"
+Not a TODO task: two "Needs decision" items, applied on the owner's explicit instruction.
+- **FORMAT_SPEC Appendix A:** four rows after `io.memory`, in the same italic-label form: `io.write` (the tool can't write its output),
+  `usage.command`, `usage.option` and `usage.argument`, each with the meaning the CLI already uses (`crates/chst-cli/src/args.rs` and
+  `main.rs`). No rule ID changed, and the code needed no change. `internal.not-implemented` is not added: it's temporary and goes away as
+  the remaining commands land.
+- **CLAUDE.md:** the proposed bullet, as proposed, after the "Never delete, skip, ignore, or loosen a test" rule. The same rule stays in
+  TODO.md's "How this file works".
+- Checks after the change: `tools/todo_coverage.py` passes; AC-META-1 to -7, AC-NEG-1, AC-NEG-2, AC-NEG-4 and AC-CLI-1 PASS.
+- Acceptance IDs affected: none. EVIDENCE.md is unchanged.

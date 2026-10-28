@@ -1020,6 +1020,10 @@ SHA-256 of the whole 556-byte file, for fixture checking only:
 | **EXT-4** | refused | `extract.dest-exists` (at the final rename); `extract.collision` (staging name exists); `extract.unsafe-object` (staging can't be confirmed as the directory just created, or a staging identity mismatch); `io` / `extract.no-atomic-rename` |
 | *(I/O failure)* | io | `io.read`: the reader can't read or seek its input, or the input ends early. Writers and extractors define their own `io` details as they need them |
 | *(memory failure)* | io | `io.memory`: the reader can't allocate the memory it needs, such as for the index |
+| *(output failure)* | io | `io.write`: the tool can't write its output (stdout) |
+| *(usage: command)* | usage | `usage.command`: no command is given, or the command is unknown (Appendix C) |
+| *(usage: option)* | usage | `usage.option`: an option the command doesn't take, or a value given to an option that takes none (Appendix C) |
+| *(usage: operand)* | usage | `usage.argument`: a required operand such as FILE is missing, or there are more operands than the command takes (Appendix C) |
 | **W-1**, **W-2**, **W-9**, **EXT-3**, **EXT-5**, **EXT-6**, **EXT-9**, **EXT-10** | (requirement; no error of its own) | — |
 | *(retired)* LIM-1 | — | — (§10.1) |
 

@@ -61,6 +61,9 @@ You may add new checks; changing or removing an existing one needs my approval.
 - You may add implementation tasks needed to meet approved requirements. Never add features or expand scope.
 - Never delete, skip, ignore, or loosen a test or check to make it pass. Placeholder or empty tests
   never count as passing.
+- Mutation suites (tools/mutants/): a task that changes code a suite mutates updates the suite and
+  re-runs it before the task is ticked; a task that adds tested code adds its own suite. Every mutant
+  that isn't skipped must be caught, and a mutant is skipped only with a written reason.
 - EVIDENCE.md is the only record of check results: one row per acceptance ID, with a status for
   each OS (PASS / FAIL / NOT RUN / N/A), the command, the commit, and the CI run link. macOS and
   Windows statuses come only from the linked CI run. Never mark anything passing if its check
