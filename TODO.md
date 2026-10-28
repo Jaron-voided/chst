@@ -110,8 +110,8 @@ IDs will FAIL here, because the features don't exist yet.
     `set +e; ./check.sh > /dev/null; rc=$?; set -e; test $rc = 1;
     jq -e '.schema == "chst-acceptance/1" and .mode == "fast" and .os == "linux" and .cut == "core" and (.results | length) == 85 and ([.results[] | select(.status == "FAIL")] | length) == 63 and ([.results[] | select(.status == "N/A")] | length) == 19 and ([.results[] | select(.status == "NOT RUN")] | length) == 3' target/acceptance/report.json;
     diff <(./check.sh --list-ids) <(grep -oE '^#### AC-[A-Z0-9-]+' ACCEPTANCE.md | cut -c6-)`.
-    The 63 FAIL are the missing checks. The 19 N/A are the 13 Extended IDs and 6 IDs
-    excluded on Linux. The 3 NOT RUN are the two full-only IDs and the done-only ID.
+    The 63 FAIL are the missing checks. The 19 N/A are the 12 Extended IDs and 7 IDs
+    whose OS line excludes Linux. The 3 NOT RUN are the two full-only IDs and the done-only ID.
 - [x] **H-2 Shared shell helpers**
   - Depends: H-1.
   - `tools/acceptance/`: `expect_exit`, `jqn`, `cargo_test_nonempty`, `sha256`,
@@ -158,12 +158,12 @@ IDs will FAIL here, because the features don't exist yet.
     test "$(ls tools/acceptance/checks/*.sh | wc -l | tr -d ' ')" = 85`.
 - [x] **H-5 Python helper scripts** (standard library only, run as `python3.14 -I`)
   - Depends: H-4.
-  - [ ] `trace.py` (AC-META-3)
-  - [ ] `spec_hexdump.py` (AC-META-6)
-  - [ ] `inspect_check.py` (for AC-POS-3)
-  - [ ] `tree_eq.py` (for AC-POS-4)
-  - [ ] `flip_sweep.py` (for AC-ROB-1)
-  - [ ] `truncate_sweep.py` (for AC-ROB-2)
+  - [x] `trace.py` (AC-META-3)
+  - [x] `spec_hexdump.py` (AC-META-6)
+  - [x] `inspect_check.py` (for AC-POS-3)
+  - [x] `tree_eq.py` (for AC-POS-4)
+  - [x] `flip_sweep.py` (for AC-ROB-1)
+  - [x] `truncate_sweep.py` (for AC-ROB-2)
   - Each one's pass and fail behaviour is exactly as its criterion describes. A helper that
     can't find its target reports FAIL.
   - Checks: AC-META-3, AC-META-6.
@@ -550,6 +550,18 @@ Until then, every ID below is N/A. Each feature is added behind a default-on Car
 so `$CHST_CORE` (`--no-default-features`) stays Core-only. Each task re-checks AC-COMPAT-1
 (owned by C-6c).
 
+- [ ] **X-0 AC-X-TS-2 states its script** (owner-gated; before `CURRENT_CUT` changes)
+  - Depends: C-20.
+  - ACCEPTANCE.md gives AC-X-TS-2 no code block, only prose ("the same script as the CLI
+    negative-fixture and compat checks, with `node ts-reader/dist/cli.js` in place of `$CHST`"). Until it does, the
+    check script `tools/acceptance/checks/AC-X-TS-2.sh` is one I derived from that prose
+    (PROGRESS.md H-4), so it isn't the document's.
+  - Claude proposes the text as a diff. The owner applies it to ACCEPTANCE.md, which is
+    protected, and the check script is then compared with it.
+  - Checks: none.
+  - Re-check: AC-X-TS-2 (owned by X-8).
+  - Verify (fails until ACCEPTANCE.md has exactly one `sh` block under that heading):
+    `awk '/^#### AC-X-TS-2/ {f=1; next} /^#### / {f=0} f && /^```sh/ {n++} END {exit n == 1 ? 0 : 1}' ACCEPTANCE.md`.
 - [ ] **X-1 Zstandard blobs (#12)**
   - Depends: C-20, the cut change.
   - `zstd` feature in `chst-format`: ZST-1 … ZST-3, and step 11's order:

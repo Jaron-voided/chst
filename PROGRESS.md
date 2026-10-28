@@ -4,7 +4,7 @@ Append-only log, one entry per task. Results are in EVIDENCE.md, not here.
 
 ## Needs decision
 
-- **AC-X-TS-2 has no script in ACCEPTANCE.md** (§3.13). I derived `tools/acceptance/checks/AC-X-TS-2.sh` from its prose (see H-4).
+- **AC-X-TS-2 has no script in ACCEPTANCE.md** (§3.13). *Owner agreed to (b); tracked as TODO X-0. Open until ACCEPTANCE.md changes.* I derived `tools/acceptance/checks/AC-X-TS-2.sh` from its prose (see H-4).
   Options: (a) keep the derived script; (b) have ACCEPTANCE.md state the script. Recommendation: (b) before the cut becomes
   Extended, so the script is the document's, not mine. It's N/A under Core, so nothing is blocked.
 
@@ -176,3 +176,35 @@ Only `.github/workflows/check.yml` changed. `check.sh`, the check scripts, the s
   this change is for. In particular the Windows MSVC AddressSanitizer case is unknown.
 - EVIDENCE.md is unchanged: no status changed.
 - Open issues: none.
+
+### Pre-`checks-v1` review items — commit "CI-1: evidence from run 40592564145, TODO corrections"
+Owner's seven requests before approving `checks-v1`. Nothing in `check.sh`, a check script, ACCEPTANCE.md, DESIGN.md or fixtures changed.
+- **AC-NEG-1 and AC-NEG-4 are not vacuous, so I left them alone.** Neither script runs `$CHST` (`grep -c CHST` gives 0 for both). They check
+  that the fixture set is complete (a fixture for every FORMAT_SPEC rule, the named sub-condition fixtures) and that each `expect.json`
+  documents its base, its mutation and its rule. They pass because those fixtures exist, never because a command failed. Mutation test on a
+  copy of `fixtures/`: with `PATH-6-alm.expect.json` removed, AC-NEG-1 exits 1 ("missing sub-condition fixture PATH-6-alm"); with one
+  `mutation` field emptied, AC-NEG-4 exits 1. The check on exit codes, category and detail is AC-NEG-2, and it FAILs now (no binary).
+  Tightening these two to need `$CHST` would duplicate AC-NEG-2 and change protected ACCEPTANCE.md text, so I didn't.
+- **The 53 FAILs by reason** (fast run at c091a72, from each ID's own log): all fit "the product doesn't exist yet".
+  - 16: no Cargo workspace (`could not find Cargo.toml`): AC-ENG-1, -3, -4, -8, AC-DET-3, AC-ROB-3, -5, AC-SAFE-8, -12, -13, -14, -15,
+    AC-PACK-3, -10, -12, AC-LIM-1.
+  - 4: a repo file the task creates is missing: AC-ENG-2 and AC-ENG-7 (`crates/*/src/lib.rs`), AC-ENG-5 (`Cargo.lock` not tracked), AC-ENG-6
+    (`rust-toolchain.toml`).
+  - 33: no `chst` binary (`target/release/chst: No such file`, or `wanted exit N, got 127`): AC-POS-1 to -4, AC-NEG-2, -3, AC-DET-1, -2,
+    AC-ROB-1, -2, -6, -8, -9, AC-SAFE-1, -2, -3, -4, -6, -7, AC-PACK-1, -2, -4, -5, -6, -9, -11, AC-LIM-2, -3, -4, AC-CLI-1, -2, -3,
+    AC-COMPAT-1.
+  - A grep of all 53 logs for missing tools, Python tracebacks, shell syntax errors and unbound variables found nothing. None doesn't fit.
+    AC-DET-2 and AC-LIM-4 exit 4 because `jq -e` gets empty input after the binary is missing; the cause is still the missing binary.
+- **12/7 vs 13/6:** counted from ACCEPTANCE.md: 12 Extended IDs, and 7 Core IDs whose OS line excludes Linux (AC-ROB-4W, AC-SAFE-5, -9, -10,
+  -11, AC-PACK-7, -8): 19. ACCEPTANCE.md was right; TODO.md's H-1 Verify prose said 13 and 6, and now says 12 and 7.
+- **H-5 sub-task boxes ticked.** All six scripts exist, and H-5's own Verify commands were re-run and pass (tree_eq on equal and unequal
+  trees, flip_sweep and truncate_sweep rejecting a missing CHST, AC-META-3 and AC-META-6 PASS).
+- **X-0 added to TODO.md** (AC-X-TS-2 script to be stated in ACCEPTANCE.md before the cut changes). Its Verify fails today, as it should.
+- **EVIDENCE.md** is now filled from run 40592564145 (fast mode, commit c091a72, clean tree): three complete 85-result reports (linux
+  10 PASS, 53 FAIL; macos 9 PASS, 50 FAIL; windows 9 PASS, 49 FAIL), checked row by row. AC-META-7 (the `--self-test`) is PASS on all
+  three. The jobs are red only at the "Job result" step, as designed. The stale "Initial state" line is removed. The OS differences are all
+  OS-line N/A (e.g. AC-META-5 is Linux-only).
+- **Not done:** the full-mode run with the fuzz probe. `gh workflow run` was refused in this session, so no full-mode run exists at or after
+  7a69b42. Run 40587076660 (full mode) is at 5057d70, before the probe. The Windows MSVC AddressSanitizer answer and the fuzz-scope decision
+  in DESIGN (request 4) wait for that run.
+- Acceptance IDs affected: none changed status.
