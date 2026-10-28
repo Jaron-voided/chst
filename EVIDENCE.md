@@ -20,9 +20,9 @@ This is the only record of check results. Its format and rules are defined in
 | AC-META-6 | PASS | PASS | PASS | ./check.sh --only AC-META-6 | b94ca4141da1c9e56858828e491caffa580eb3d2 | https://github.com/Jaron-voided/chst/actions/runs/40689182770 |
 | AC-META-7 | PASS | PASS | PASS | ./check.sh --only AC-META-7 | b94ca4141da1c9e56858828e491caffa580eb3d2 | https://github.com/Jaron-voided/chst/actions/runs/40689182770 |
 | AC-ENG-1 | PASS | PASS | PASS | ./check.sh --only AC-ENG-1 | 8543aa65e18edab129667ec22f1e6e7cbc982d5f | https://github.com/Jaron-voided/chst/actions/runs/40694068794 |
-| AC-ENG-2 | FAIL | FAIL | FAIL | ./check.sh --only AC-ENG-2 | b94ca4141da1c9e56858828e491caffa580eb3d2 | https://github.com/Jaron-voided/chst/actions/runs/40689182770 |
+| AC-ENG-2 | PASS | NOT RUN | NOT RUN | ./check.sh --only AC-ENG-2 | 483e1b58ef0d0dfb9640ccf06fde28ab59decda1 | local |
 | AC-ENG-3 | PASS | PASS | PASS | ./check.sh --only AC-ENG-3 | 8543aa65e18edab129667ec22f1e6e7cbc982d5f | https://github.com/Jaron-voided/chst/actions/runs/40694068794 |
-| AC-ENG-4 | FAIL | FAIL | FAIL | ./check.sh --only AC-ENG-4 | b94ca4141da1c9e56858828e491caffa580eb3d2 | https://github.com/Jaron-voided/chst/actions/runs/40689182770 |
+| AC-ENG-4 | PASS | NOT RUN | NOT RUN | ./check.sh --only AC-ENG-4 | 483e1b58ef0d0dfb9640ccf06fde28ab59decda1 | local |
 | AC-ENG-5 | PASS | PASS | PASS | ./check.sh --only AC-ENG-5 | 8543aa65e18edab129667ec22f1e6e7cbc982d5f | https://github.com/Jaron-voided/chst/actions/runs/40694068794 |
 | AC-ENG-6 | PASS | PASS | PASS | ./check.sh --only AC-ENG-6 | 8543aa65e18edab129667ec22f1e6e7cbc982d5f | https://github.com/Jaron-voided/chst/actions/runs/40694068794 |
 | AC-ENG-8 | FAIL | FAIL | FAIL | ./check.sh --only AC-ENG-8 | b94ca4141da1c9e56858828e491caffa580eb3d2 | https://github.com/Jaron-voided/chst/actions/runs/40689182770 |

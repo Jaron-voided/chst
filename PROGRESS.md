@@ -320,7 +320,7 @@ DESIGN.md's decision log row 18 now says so, and cites run 40689182770. Only tha
 - Open issues: none new.
 - Acceptance IDs affected: AC-ENG-1, AC-ENG-3, AC-ENG-5, AC-ENG-6 (PASS on all three OSes).
 
-### C-2 Header, trailer and structure hash
+### C-2 Header, trailer and structure hash — 483e1b5
 - `chst-format`: `error.rs` (the nine §16 categories with exit codes, the detail codes for steps 1 to 8, and an `Error` that displays as
   `error[<category>/<detail>]: <message>`), `limits.rs` (LIM-3 to LIM-6 with their defaults), `format.rs` (header and trailer parsing at
   constant offsets in fixed-size arrays, so no input can make them fail), `reader.rs` (`open`: §13 steps 1 to 8 in order, with all
@@ -354,5 +354,6 @@ DESIGN.md's decision log row 18 now says so, and cites run 40689182770. Only tha
   `usize::MAX` bytes fails at once with `CapacityOverflow` (more than `isize::MAX`), before the allocator is asked for anything; a 16-byte
   request succeeds. The test is portable, because on a narrower `usize` the conversion fails instead.
 - Verify: `pass_only AC-ENG-2,AC-ENG-4` and `CHST_LIM2=… reader_step_8` both pass. The META and NEG checks still pass after the spec edits.
-- Fast run (local): AC-ENG-1 to -6 PASS (16 PASS in all with AC-ENG-4).
+- Fast run on the clean tree at 483e1b5: 16 PASS, 47 FAIL, 3 NOT RUN, 19 N/A. AC-ENG-1 to -6 are PASS.
+- EVIDENCE.md: the AC-ENG-2 and AC-ENG-4 rows (Linux PASS, `local`); macOS and Windows stay NOT RUN until a CI run covers this commit.
 - Acceptance IDs affected: AC-ENG-2, AC-ENG-4 (PASS). EVIDENCE.md follows in the next commit, from a clean-tree run.
