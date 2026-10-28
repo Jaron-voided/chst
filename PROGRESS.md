@@ -497,7 +497,7 @@ Not a TODO task: an owner decision and owner-approved spec changes, shown as a d
 - EVIDENCE.md: the AC-ENG-8 row now carries this run.
 - Acceptance IDs affected: AC-ENG-8 (PASS on all three OSes).
 
-### C-5 Step 11 and structured reports — commit "C-5: step 11 and structured reports"
+### C-5 Step 11 and structured reports — 1652c9c
 - Added `chst-format/src/blobs.rs`: `check_blobs`, §13 step 11. BLB-6 runs per blob in table order, and the first blob whose data doesn't
   match its key is reported as `integrity` / `blob.hash` (new detail constant; FORMAT_SPEC Appendix A already lists it). Data is read
   through one 64 KiB stack buffer (`BLOB_BUFFER_LEN`), so memory doesn't grow with a blob's size (G6). An input that ends inside a blob is
@@ -549,3 +549,5 @@ Not a TODO task: an owner decision and owner-approved spec changes, shown as a d
 - C-5 has no acceptance ID of its own. EVIDENCE.md is unchanged.
 - Open issues: the mutation-suite item under "Needs decision".
 - Acceptance IDs affected: none directly (C-6a to C-6c build on these reports: AC-POS-2, AC-POS-3, AC-NEG-3, AC-CLI-3 and others).
+- Clean-tree fast run at 1652c9c: 17 PASS, 46 FAIL, 3 NOT RUN, 19 N/A (exit 1, as expected while features are missing); the TODO coverage
+  preflight passes with C-5 ticked. No status changed.
