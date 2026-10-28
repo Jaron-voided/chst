@@ -458,9 +458,9 @@ Not a TODO task: an owner decision and owner-approved spec changes, shown as a d
     - **Blob records always read at 64 bytes.** No fixture has a wider blob table, and my helper only built 64-byte records.
     - **Three order swaps** (BLB-5 before BLB-4, ENT-6 before CAN-1, PATH-10 before PATH-9), for lack of a case that breaks both rules.
   - I added a test for each, including wider blob (72) and entry (64) records under an unknown optional flag, with the extra bytes filled.
-    **Second full run: 93 of 93 caught.** 23 mutants are caught only by the unit tests, not by the fixtures (for example the PATH-7
-    characters no fixture uses, LIM-5 overflow and purpose, and most order swaps). One, entry records read at 48 bytes, is caught only by
-    the fixtures (compat `unknown-optional-wider-entries`).
+    **Second full run: 93 of 93 caught.** 47 are caught by both the unit tests and `reader_step_10`. 45 are caught only by the unit tests,
+    not by the fixtures: for example the PATH-7 characters no fixture uses, LIM-5 overflow and purpose, the per-record order, and most order
+    swaps. One, a blob offset allowed beyond the running offset (BLB-4), is caught only by the fixtures.
 - **AC-ENG-8 can fail.** Offline, with the crate pinned to 0.1.23 (Unicode 15.1), both of its tests fail. The PATH-2-unicode16 path is judged
   NFC there, which is the disagreement F12 describes. With 0.1.25 (17.0), the version assertion fails. `Cargo.toml` and `Cargo.lock` were
   restored from saved copies, and `git diff` shows them unchanged.
