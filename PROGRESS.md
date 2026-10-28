@@ -357,3 +357,14 @@ DESIGN.md's decision log row 18 now says so, and cites run 40689182770. Only tha
 - Fast run on the clean tree at 483e1b5: 16 PASS, 47 FAIL, 3 NOT RUN, 19 N/A. AC-ENG-1 to -6 are PASS.
 - EVIDENCE.md: the AC-ENG-2 and AC-ENG-4 rows (Linux PASS, `local`); macOS and Windows stay NOT RUN until a CI run covers this commit.
 - Acceptance IDs affected: AC-ENG-2, AC-ENG-4 (PASS). EVIDENCE.md follows in the next commit, from a clean-tree run.
+
+### C-2 CI result — run 40699772200 (fast, commit 3025d62)
+- Complete 85-result reports on all three OSes, clean tree. AC-ENG-2 and AC-ENG-4 are PASS on Linux, macOS and Windows, and AC-ENG-1, -3, -5
+  and -6 stay PASS everywhere. The jobs are red only at the "Job result" step, by design.
+- **Line endings on Windows: not a problem.** AC-ENG-2's exact-line `forbid` match passes there, so the checkout is LF (the workflow's
+  "No line-ending conversion" step).
+- **LIM-2 fixture cost on Windows: not noticeable.** `reader_step_8` runs in 0.01s there. AC-ENG-4 takes 9s on Windows against 4s on Linux and
+  macOS, mostly the 6.9s compile; Windows is about 2x slower throughout (AC-ENG-1 12s vs 6s; all checks 83s vs 28s and 26s). The per-ID
+  `duration_s` in the reports is the source.
+- EVIDENCE.md: the AC-ENG-2 and AC-ENG-4 rows now carry this run. Nothing to fix in C-2.
+- Acceptance IDs affected: AC-ENG-2, AC-ENG-4 (PASS on all three OSes).
