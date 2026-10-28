@@ -214,6 +214,15 @@ Detailed byte layouts live in `FORMAT_SPEC.md`.
     archives are often moved through tools that may treat them as text. Only the technique
     is borrowed: the bytes and their position are Chst's.
   - The reviewer can still judge whether either goes beyond using a technique.
+- **Amendment (readiness audit after `plan-v1`, owner-approved):** D1 is confirmed for v1,
+  after an independent, read-only audit of FORMAT_SPEC.md and the code at 42e318e. There are
+  no per-record headers: every name and every blob boundary is reached through the index,
+  which only the trailer locates. Damage inside the data region stays local, because each
+  blob is checked against its own key (BLB-6). Damage to the index or the trailer, including
+  truncation, can't be recovered from within the format, because the names and the blob
+  boundaries are lost with it. Recovering damaged archives is out of scope for Chst and is
+  left to external tools. FORMAT_SPEC.md Appendix D (non-normative) lists the byte-level
+  anchors such a tool can rely on.
 
 ### D2 — Entry→data mapping: content-addressed blobs
 - **Options:** (A) each entry owns one data region; (B) entry table plus a numbered blob

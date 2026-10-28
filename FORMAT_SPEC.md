@@ -1,6 +1,7 @@
 # Chst Container Format Specification — Version 1.0
 
-> Status: **DRAFT for independent review.** Normative and language-neutral.
+> Status: **Approved at `plan-v1`.** Implementation is in progress. Normative and
+> language-neutral; Appendix D is non-normative.
 > Rationale lives in [`DESIGN.md`](DESIGN.md) (decision IDs D1–D13 are cited in brackets).
 > "Chst" is a working name.
 
@@ -1154,3 +1155,50 @@ allowed, for example `--max-entries 0` accepts only an empty container (N23).
   written as `\u{X}`, with X in lowercase hex and no leading zeros.
 - `\` itself is written as `\\`.
 - So U+200B ZERO WIDTH SPACE appears as `\u{200b}`.
+
+## Appendix D — Recovery notes (non-normative)
+
+This appendix is for external tools that try to recover data from a damaged container. It
+adds no rules and changes none. Chst itself doesn't recover damaged containers: a reader
+reports the first violation and stops (§13), and recovery is out of scope [D1].
+
+There are no per-record headers [D1]. Every name and every blob boundary is reached through
+the index, and only the trailer locates the index. Damage inside the data region stays
+local, because each blob is checked against its own key (BLB-6). Damage to the index or the
+trailer, including truncation, loses the names and the blob boundaries, and nothing in the
+format can restore them.
+
+**Anchors.** Each of these holds in any file that was valid before it was damaged, and each
+is guaranteed by the rules or sections cited. Integers are little-endian (§2).
+
+| Anchor | Where, and what to expect | Guaranteed by |
+|---|---|---|
+| Header magic | Bytes 0–7: `43 48 53 54 0D 0A 1A 00`. A valid file is at least 88 bytes. | HDR-1, HDR-2 |
+| Trailer magic | The last 8 bytes: `00 1A 0A 0D 54 53 48 43`. The trailer is the last 56 bytes of the file. | TRL-1, §5 |
+| Index location | Trailer bytes 0–7 are `index_offset` and 8–15 are `index_length`. `index_offset` is at least 32, `index_offset + index_length` is exactly where the trailer starts, and `index_length` is at most 2³². | TRL-2, LIM-2 |
+| Structure hash | Trailer bytes 16–47: SHA-256 of the header, the index and trailer bytes 0–15, in that order. It confirms a candidate header, index and trailer together, but it can't help rebuild a damaged index. | TRL-3, §12.4 |
+| Section headers | The index starts with a section header, and its sections lie back to back and fill it exactly. Each header is a 4-byte `type`, a 4-byte `record_size` and an 8-byte `record_count`, and its payload is `record_size × record_count` bytes. The first three sections are BLOB_TABLE, ENTRY_TABLE and PATH_POOL, in that order, so their headers start with the type bytes `01 00 00 80`, `02 00 00 80` and `03 00 00 80`. Any further sections have strictly ascending types, none of them one of those three. | §6, SEC-1, SEC-3 |
+| Record sizes | BLOB_TABLE's `record_size` is at least 64, ENTRY_TABLE's at least 48, and PATH_POOL's exactly 1. For a reader that implements every flag of this version, they are exactly 64 and 48 (64 with `ENTRY_ATTRS`). A later minor version may widen BLOB_TABLE and ENTRY_TABLE records with a new optional flag, so a scanner should accept larger sizes. | SEC-4, SEC-5, §12.3 |
+| Blob layout | The blobs' stored bytes lie back to back from offset 32, in blob-table order. The last blob ends exactly at `index_offset`, so the index follows the data region directly. The first blob record's `offset` field is 32. Nothing lies between blobs, so the data alone doesn't show where one blob ends. | §3, BLB-4 |
+| Blob keys | Each blob record's `key` is SHA-256 of that blob's stored bytes (for an encoded blob, of the encoded bytes), and no two keys are equal. A blob whose boundaries are known can be checked on its own, and each file entry's `blob_key` names its blob. | BLB-5, BLB-6, ENT-4, §12.4 |
+| Order | Entries are sorted by their path bytes. Blob records, and so the blobs in the data region, follow the order in which the sorted entries first reference them. The path pool holds the paths back to back in entry order, with no separators. | CAN-1, CAN-2, CAN-3 |
+
+No anchor above rests only on how the current writer happens to work. Each one follows from
+a rule or from the layout of §2, §3, §5 or §6.
+
+**False matches.** Section-header patterns, and both magics, can also occur inside file data
+or inside the path pool. A scanner has to confirm a candidate against the structure around
+it:
+- a section header's payload has to end exactly where the next section header starts, and
+  that header has to have the next expected type;
+- in a BLOB_TABLE with records, the first record's `offset` field has to read 32;
+- where the header, the index and the trailer all survive, the structure hash settles it.
+
+**Truncation** removes the trailer first, then the end of the index. While the whole index
+survives, a scanner can find it by its first section header and confirm it as above. The
+structure hash is lost with the trailer.
+
+**What the anchors can't give back.** Without the blob table, the blob boundaries are lost,
+because the data region holds stored bytes and nothing else. With a surviving entry table,
+blobs can only be matched to their keys by trying candidate ranges. Without the entry table
+or the path pool, the names are lost.
