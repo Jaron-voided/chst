@@ -8,7 +8,7 @@ Append-only log, one entry per task. Results are in EVIDENCE.md, not here.
   Options: (a) keep the derived script; (b) have ACCEPTANCE.md state the script. Recommendation: (b) before the cut becomes
   Extended, so the script is the document's, not mine. It's N/A under Core, so nothing is blocked.
 
-- **Fuzz scope and DESIGN decision 18 (Windows).** The first full-mode run with the fuzz probe (run 40689182770, commit b94ca41) shows
+- **RESOLVED: owner chose (a); recorded in DESIGN decision 18.** **Fuzz scope and DESIGN decision 18 (Windows).** The first full-mode run with the fuzz probe (run 40689182770, commit b94ca41) shows
   cargo-fuzz works on Linux and macOS and not on Windows. DESIGN D18's decision 18 already approves the Windows fallback (AC-ROB-4W)
   "provisionally, until the first full CI run", so this run settles it; no Core work is blocked either way.
   - **Evidence.** Windows: the nightly and cargo-fuzz 0.13.2 install, and `cargo fuzz init` and the build succeed. The fuzz binary then won't
@@ -245,3 +245,10 @@ Nothing in `check.sh`, the check scripts, ACCEPTANCE.md, DESIGN.md or fixtures c
   the run doesn't print kernel versions. Still open.
 - Open issues: the fuzz-scope item under "Needs decision".
 - Acceptance IDs affected: AC-ROB-4, AC-ROB-4W and AC-ROB-7 moved from NOT RUN to FAIL (they ran for the first time); no PASS changed.
+
+### CI-1: fuzz scope decision recorded
+Owner chose option (a): decision 18 is confirmed. cargo-fuzz covers Linux and macOS (AC-ROB-4) and Windows uses the AC-ROB-4W fallback.
+DESIGN.md's decision log row 18 now says so, and cites run 40689182770. Only that row changed.
+- Left as written: two "provisional" notes remain in ACCEPTANCE.md (§1.3's table, line 137, and AC-ROB-4W's heading, line 675). They're
+  protected and now out of date; the owner may want to approve dropping the word. DESIGN §9g's list (line 801) is a historical review note.
+- Acceptance IDs affected: none.

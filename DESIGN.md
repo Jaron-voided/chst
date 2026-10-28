@@ -732,7 +732,7 @@ Two layers, detailed in `ACCEPTANCE.md`:
 | 15 | §10 | Lists only checkpoints and their order. Tasks go in TODO.md. |
 | 16 | Prior art | The index at the end and the magic's line-ending bytes are credited in D1. |
 | 17 | Large-file test | 4 GiB + 1 MiB on macOS, and on Windows if needed (ACCEPTANCE.md AC-ROB-7). No paid runners. |
-| 18 | Windows fuzzing | The fallback (AC-ROB-4W) is approved provisionally, until the first full CI run. |
+| 18 | Windows fuzzing | The fallback (AC-ROB-4W) is approved provisionally, until the first full CI run. **Confirmed** by the owner after full-mode run 40689182770 (commit b94ca41): cargo-fuzz works on Linux and macOS, and on Windows the fuzz binary exits `0xc0000135` before running. So cargo-fuzz covers Linux and macOS (AC-ROB-4), and Windows uses the fallback (AC-ROB-4W). |
 | 19 | CI triggers | Fast on push and pull request, full on manual trigger and for the final done run (D17). |
 
 ## 9c. Review round 3 decisions
