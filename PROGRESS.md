@@ -368,3 +368,28 @@ DESIGN.md's decision log row 18 now says so, and cites run 40689182770. Only tha
   `duration_s` in the reports is the source.
 - EVIDENCE.md: the AC-ENG-2 and AC-ENG-4 rows now carry this run. Nothing to fix in C-2.
 - Acceptance IDs affected: AC-ENG-2, AC-ENG-4 (PASS on all three OSes).
+
+### C-3 Sections
+- Added `chst-format/src/sections.rs`: `parse_sections(index, header, limits)` (also `Opened::sections(&limits)`), which runs §13 step 9 as
+  one pass per rule over the index, in §13's order: SEC-1 frames every section (checked `u32 * u64` product, then `usize` conversion, then
+  the bounds), SEC-2 (unsupported, so a later `malformed` file isn't reached), SEC-3, SEC-4 for every section, SEC-5 for every section, then
+  LIM-3 on the entry count. Nothing is allocated in proportion to the number of sections: the passes re-walk the index. The result is the
+  three required tables with their payload ranges, for C-4.
+- **A Core reader's flag knowledge is "none".** `KNOWN_OPTIONAL_FLAGS = 0` (next to `KNOWN_REQUIRED_FLAGS`): SEC-5 fixes the record size only if
+  the header sets no flag this reader doesn't know. So the compat files `unknown-optional-wider-entries`, `entry-attrs` and `kv-metadata` pass
+  in a Core reader (their wider records and the `KV_METADATA` section, type `0x10`, are accepted and skipped), and `SEC-5` and `SEC-5-entry`,
+  which set no flag, are rejected. The Extended features change these constants later.
+- 9 unit tests, with hand-built indexes: payload ranges, the SEC-1 failures (cut-off header, payload past the end, overflow, a product that
+  wraps to exactly 2^64), and the order of the passes (SEC-1 before SEC-2, SEC-2 before SEC-3, SEC-4 before SEC-5, the layout before LIM-3).
+- `reader_step_9` in `task_reader.rs`: the running total is 32 rejections (19 + 13) with 96 files passing, as TODO.md says.
+- **Mutation checks, all caught** (ten, one at a time, each restored by a `trap`): SEC-2 off; SEC-5 off; SEC-5 without the unknown-flag
+  exemption; SEC-3 allowing equal types; SEC-3 allowing a repeated required type; the SEC-4 blob minimum off by one; the path pool allowing any
+  size; LIM-3 off by one; SEC-1 allowing a payload one byte past the end; SEC-1 with a wrapping product. The last one was **not caught** at
+  first: my overflow cases wrapped to a huge value that still didn't fit, and the 2^60 fixture only fails later by coincidence (the framing
+  after the wrapped section goes wrong). I added the case `65536 * 2^48 = 2^64`, which wraps to 0, and it is caught. After a refactor (the
+  three required sections are taken one at a time by `take_required`, which removed a `Vec` and an impossible `Internal` branch) I ran all
+  ten again: all caught.
+- Verify: `CHST_LIM2=… cargo_test_nonempty --release -p chst-cli --test task_reader -- reader_step_` passes (`reader_step_8` and `reader_step_9`).
+- C-3 has no acceptance ID of its own. Local fast run: AC-ENG-1 to -6 and the rest unchanged (16 PASS), clippy with `-D warnings` is clean.
+- Open issues: none.
+- Acceptance IDs affected: none directly. EVIDENCE.md is unchanged, because no status changed.

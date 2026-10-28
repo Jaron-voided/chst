@@ -24,6 +24,13 @@ pub struct Opened {
     pub index: Vec<u8>,
 }
 
+impl Opened {
+    /// Step 9 of §13: frames and checks the sections of the index.
+    pub fn sections(&self, limits: &Limits) -> Result<crate::sections::Sections, Error> {
+        crate::sections::parse_sections(&self.index, &self.header, limits)
+    }
+}
+
 fn read_array<R: Read, const N: usize>(src: &mut R) -> Result<[u8; N], Error> {
     let mut buf = [0u8; N];
     src.read_exact(&mut buf).map_err(|e| Error::io(&e))?;

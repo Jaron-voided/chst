@@ -59,7 +59,13 @@ pub mod detail {
     pub const TRL_MAGIC: &str = "trl.magic";
     pub const TRL_INDEX_RANGE: &str = "trl.index-range";
     pub const TRL_HASH: &str = "trl.hash";
+    pub const SEC_BOUNDS: &str = "sec.bounds";
+    pub const SEC_UNKNOWN_CRITICAL: &str = "sec.unknown-critical";
+    pub const SEC_LAYOUT: &str = "sec.layout";
+    pub const SEC_RECORD_SIZE_MIN: &str = "sec.record-size-min";
+    pub const SEC_RECORD_SIZE: &str = "sec.record-size";
     pub const LIM_INDEX_SIZE: &str = "lim.index-size";
+    pub const LIMIT_ENTRIES: &str = "limit.entries";
     pub const LIMIT_INDEX_SIZE: &str = "limit.index-size";
     /// The reader can't read or seek its input (FORMAT_SPEC Appendix A).
     pub const IO_READ: &str = "io.read";

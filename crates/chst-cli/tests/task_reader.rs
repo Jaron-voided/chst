@@ -30,7 +30,7 @@ const EXPECT_FILES: usize = 118;
 const VALID_FILES: usize = 10;
 
 /// The number of files whose first violation is at step N or lower (TODO.md).
-const REJECTED_THROUGH: [(u8, usize); 1] = [(8, 19)];
+const REJECTED_THROUGH: [(u8, usize); 2] = [(8, 19), (9, 32)];
 
 struct Case {
     label: String,
@@ -252,6 +252,12 @@ fn reader_through_step_8(file: &mut File, limits: &Limits) -> Result<(), Error> 
     chst_format::open(file, limits).map(|_| ())
 }
 
+fn reader_through_step_9(file: &mut File, limits: &Limits) -> Result<(), Error> {
+    chst_format::open(file, limits)?
+        .sections(limits)
+        .map(|_| ())
+}
+
 fn run_step(n: u8, reader: fn(&mut File, &Limits) -> Result<(), Error>) {
     let cases = load_cases();
     assert_eq!(
@@ -297,4 +303,9 @@ fn run_step(n: u8, reader: fn(&mut File, &Limits) -> Result<(), Error>) {
 #[test]
 fn reader_step_8() {
     run_step(8, reader_through_step_8);
+}
+
+#[test]
+fn reader_step_9() {
+    run_step(9, reader_through_step_9);
 }

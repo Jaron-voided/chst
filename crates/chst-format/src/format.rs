@@ -21,10 +21,23 @@ pub const HASH_ALG_SHA256: u8 = 1;
 pub const MAX_INDEX_LENGTH: u64 = 1 << 32;
 /// The `required_flags` bits this reader implements. A Core reader implements none (§12.1).
 pub const KNOWN_REQUIRED_FLAGS: u64 = 0;
+/// The `optional_flags` bits this reader implements. A Core reader implements none (§12.1).
+pub const KNOWN_OPTIONAL_FLAGS: u64 = 0;
+
+/// Length of a section header (§6).
+pub const SECTION_HEADER_LEN: usize = 16;
+/// Bit 31 of a section `type`: a reader that doesn't know the section can't read the file.
+pub const MUST_UNDERSTAND: u32 = 0x8000_0000;
+pub const SECTION_BLOB_TABLE: u32 = 0x8000_0001;
+pub const SECTION_ENTRY_TABLE: u32 = 0x8000_0002;
+pub const SECTION_PATH_POOL: u32 = 0x8000_0003;
+/// Base record sizes (§12.3). The path pool's is exactly 1.
+pub const BLOB_RECORD_SIZE: u32 = 64;
+pub const ENTRY_RECORD_SIZE: u32 = 48;
 
 /// Copies `M` bytes starting at `at`. Bytes beyond the end of `bytes` read as zero, which
 /// can't happen for the constant offsets used here (the unit tests cover every field).
-fn field<const N: usize, const M: usize>(bytes: &[u8; N], at: usize) -> [u8; M] {
+pub(crate) fn field<const N: usize, const M: usize>(bytes: &[u8; N], at: usize) -> [u8; M] {
     let mut out = [0u8; M];
     for (o, b) in out.iter_mut().zip(bytes.iter().skip(at)) {
         *o = *b;

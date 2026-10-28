@@ -269,7 +269,7 @@ Nothing below starts before that approval.
     `pass_only AC-ENG-2,AC-ENG-4;
     CHST_LIM2=$(fixture_file fixtures/core/invalid/LIM-2.expect.json) cargo_test_nonempty --release -p chst-cli --test task_reader -- reader_step_8`.
     That's 19 rejections, each with its exact detail, and 109 files passing steps 1–8.
-- [ ] **C-3 Sections** (§13 step 9)
+- [x] **C-3 Sections** (§13 step 9)
   - Depends: C-2.
   - SEC-1 … SEC-5, then LIM-3 before any per-entry allocation. Stop at HDR-6 and SEC-2
     (unsupported, never malformed).
