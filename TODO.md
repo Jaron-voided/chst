@@ -291,7 +291,7 @@ Nothing below starts before that approval.
     CHST_LIM2=$(fixture_file fixtures/core/invalid/LIM-2.expect.json) cargo_test_nonempty --release -p chst-cli --test task_reader -- reader_step_`.
     That's 108 rejections, including all 23 `core/attacks`, and the 20 step-11 or
     passing files pass steps 1–10.
-- [ ] **C-5 Step 11 and structured reports**
+- [x] **C-5 Step 11 and structured reports**
   - Depends: C-4.
   - Streaming BLB-6 per blob in table order, with bounded memory (G6).
   - List and inspect stop after step 10 (F34).

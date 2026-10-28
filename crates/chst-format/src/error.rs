@@ -70,6 +70,7 @@ pub mod detail {
     pub const BLOB_LAYOUT: &str = "blob.layout";
     pub const BLOB_DUPLICATE_KEY: &str = "blob.duplicate-key";
     pub const BLOB_UNREFERENCED: &str = "blob.unreferenced";
+    pub const BLOB_HASH: &str = "blob.hash";
     pub const ENTRY_TYPE: &str = "entry.type";
     pub const ENTRY_RESERVED: &str = "entry.reserved";
     pub const ENTRY_DIR_KEY: &str = "entry.dir-key";

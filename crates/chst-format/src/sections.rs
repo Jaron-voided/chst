@@ -116,6 +116,30 @@ fn walk(index: &[u8]) -> Walk<'_> {
     Walk { index, at: 0 }
 }
 
+/// A section of an index, in file order.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SectionHeader {
+    /// The offset of the section header within the index.
+    pub at: usize,
+    pub ty: u32,
+    pub record_size: u32,
+    pub record_count: u64,
+    /// The payload's byte range within the index.
+    pub payload: Range<usize>,
+}
+
+/// Every section of an index that has passed step 9, in file order. It ends at the first
+/// section SEC-1 can't frame, which can't happen after step 9.
+pub fn section_headers(index: &[u8]) -> impl Iterator<Item = SectionHeader> + '_ {
+    walk(index).map_while(Result::ok).map(|s| SectionHeader {
+        at: s.payload.start.saturating_sub(SECTION_HEADER_LEN),
+        ty: s.ty,
+        record_size: s.record_size,
+        record_count: s.record_count,
+        payload: s.payload,
+    })
+}
+
 fn is_known(ty: u32) -> bool {
     [SECTION_BLOB_TABLE, SECTION_ENTRY_TABLE, SECTION_PATH_POOL].contains(&ty)
 }

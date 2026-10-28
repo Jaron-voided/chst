@@ -51,6 +51,22 @@ Append-only log, one entry per task. Results are in EVIDENCE.md, not here.
   (c) no detail (empty), which breaks the `error[...]` format. Recommendation: (a), recorded in FORMAT_SPEC Appendix A. No check depends on it
   yet (AC-CLI-1 asserts only exit 3). Needs the owner's approval, because it adds a code to the spec's output.
 
+- **Keeping the mutation suites in the repo** (owner's request during C-5; nothing committed yet). C-3 and C-4 used throwaway scripts in
+  the session scratchpad, so their mutations can't be re-run after later changes. For C-5 I wrote the proposed form and used it:
+  `tools/mutants/mutate.py` (Python 3.14 standard library only) runs a suite file, `tools/mutants/<task>.toml`. Each mutant is one or
+  more exact text replacements; an old text that doesn't occur exactly once is an error before anything is changed, so a suite that has
+  gone stale fails loudly instead of skipping. The unmutated code must pass every command first. Each mutant must compile, and is
+  caught if any of the suite's commands fails (a timeout counts as caught). Sources are restored after every mutant, also on Ctrl-C,
+  and their SHA-256 is compared with the originals at the end. Exit 0 only if every mutant was caught. Run:
+  `python3.14 -I tools/mutants/mutate.py tools/mutants/C-5.toml [--only TEXT] [--list]`. The files are in the session scratchpad
+  for review.
+  Options: (a) add `tools/mutants/` as standalone tools, run by hand whenever the mutated files change, with results logged in
+  PROGRESS.md; not a check, so `check.sh`, ACCEPTANCE.md and EVIDENCE.md don't change; (b) as (a), plus a new `check.sh` mode or a
+  manual CI job that runs every suite (a new check: slow, about 5 minutes for C-5's 43 mutants locally, and every code change that
+  touches a mutated line means updating the suite); (c) `cargo-mutants`, which isn't on D15's list and generates mutants by syntax rather
+  than by spec rule. Recommendation: (a), and also rewrite C-3's 10 and C-4's 93 mutations as `C-3.toml` and `C-4.toml` against the
+  current code, so all three tasks can be re-run. Needs the owner's approval before anything is committed.
+
 ## Log
 
 ### H-1 `check.sh` runner core — 7987503
@@ -480,3 +496,56 @@ Not a TODO task: an owner decision and owner-approved spec changes, shown as a d
   full-only; their rows keep full-mode run 40689182770.
 - EVIDENCE.md: the AC-ENG-8 row now carries this run.
 - Acceptance IDs affected: AC-ENG-8 (PASS on all three OSes).
+
+### C-5 Step 11 and structured reports — commit "C-5: step 11 and structured reports"
+- Added `chst-format/src/blobs.rs`: `check_blobs`, §13 step 11. BLB-6 runs per blob in table order, and the first blob whose data doesn't
+  match its key is reported as `integrity` / `blob.hash` (new detail constant; FORMAT_SPEC Appendix A already lists it). Data is read
+  through one 64 KiB stack buffer (`BLOB_BUFFER_LEN`), so memory doesn't grow with a blob's size (G6). An input that ends inside a blob is
+  `io.read`. A Core reader only ever sees stored blobs (BLB-2), so the ZST parts of step 11 never apply.
+- Added `chst-format/src/report.rs`: `list`, `inspect` and `verify`, each from a `Read + Seek` source. List and inspect run steps 1 to 10
+  with their own `Purpose` (so no LIM-5) and never step 11 (F34); verify runs all eleven. They return library values, and the CLI will
+  render them (D13): list entries (path, type, size, stored size, encoding, key), the verify summary (counts, byte totals as `u128`, and flag
+  names), and the inspect report (header, data region, every section with its fields and records, trailer). JSON encoding (number or
+  decimal string, hex) is left to the CLI.
+  - **What the reader implements shapes the report (F33).** Flag names follow `KNOWN_REQUIRED_FLAGS` and `KNOWN_OPTIONAL_FLAGS`: a bit
+    gets its §12.1 name only if the reader implements it, so a Core reader names every set bit `bit<N>`. Section names are given only to
+    the three required types, so KV_METADATA is `unknown`; entry records wider than 48 bytes show the rest as `extra`.
+- `sections.rs` gained `section_headers`, an iterator over every section of a checked index (inspect also needs the ones after the
+  required three). It allocates nothing.
+- Tests: 12 new unit tests (5 in `blobs`, 7 in `report`), built on a test-only builder of complete files with real blob data and structure
+  hashes. They cover blob order, changes at chunk boundaries, a source that records the largest read asked of it (at most 64 KiB), a
+  truncated input, the summary's counting, flag naming with and without the reader implementing the flag, LIM-5 only for verify, and
+  inspect covering every byte with values that equal the bytes they cover, including wider records and unknown sections with empty and
+  non-empty payloads.
+- `task_reader.rs`: `reader_step_11` (verify over all 128 files: 110 rejected, each with its exact detail, exit and category, and 18 pass)
+  and `reports`. `reports` checks the 16 containers (10 `core/valid`, 6 exit-0 `compat`) as TODO.md says: list entries against
+  `list.json` and verify summaries against `verify.json`. **Beyond TODO.md** it also compares each inspect report with `inspect.json`
+  (`file_length`, `header`, `data`, `sections`, `trailer`), and it checks that list and inspect succeed on `core/invalid/BLB-6` while verify
+  rejects it with `blob.hash`. The test renders the library values to JSON by Appendix B's rules itself, independently of the CLI.
+- **Mutation checks: 43 mutants, all caught**, with the proposed `tools/mutants/mutate.py` and a `C-5.toml` suite (see "Needs decision";
+  not committed). Commands: the `chst-format` unit tests, and `reader_step_` plus `reports`. What was mutated: BLB-6 off, wrong order,
+  first blob only, seek one byte late, one byte short, whole blob buffered, chunk not capped, short read ignored, wrong category or
+  detail; step 11 skipped by verify or run by list or inspect; LIM-5 for list or inspect, or not for verify; each summary count and total;
+  optional flags named from the required bits; the known-flag check ignored or never true; wrong bit number; bit 63 missed; encoding
+  inverted; key not listed; KV_METADATA named; empty payload shown; path pool as hex; `extra` dropped; record offset and index; data region
+  length; a trailer offset; section offsets relative to the index; section length without the header; integers read big-endian;
+  `minor_version` showing the major version; `stored_length` and `raw_length` swapped; `path_length` read as 8 bytes; and
+  `section_headers` giving the payload start. 35 are caught by both commands, 7 only by the unit tests (blob order, the three G6 and short
+  read mutants, LIM-5 for list and for inspect, and an implemented flag left unnamed), and 1 only by the fixtures (the swapped blob
+  fields, whose values are equal in Core because BLB-3 makes them so).
+  - **Not mutated, equivalent in Core:** `stored_bytes` summing `raw_length` and the list `size` using `stored_length`. BLB-3 makes the two
+    lengths equal for every blob a Core reader accepts, so no test can tell them apart until ZSTD (Phase X).
+  - **Failures along the way (real):** (1) one mutant didn't compile (my replacement for "extracted_bytes counts each blob once" was badly
+    typed); I rewrote it, and it is caught. (2) **A bug in the runner:** it restored files with `shutil.copy2`, which keeps their old mtime,
+    so cargo didn't rebuild after a restore and the next baseline ran the last mutant's build (three inspect unit tests failed on
+    unmutated code, at the line `section-header-at` breaks). I found it because the baseline failed although the sources' SHA-256 matched
+    the saved copies. Within a run the results were valid, since every mutant writes a new mtime and so forces a rebuild; only the state
+    after a run was stale. The runner now restores contents only and sets a new mtime. I ran the whole suite again after the fix, and
+    again after a final lint fix in the test file: 43 of 43 caught both times, sources byte-identical afterwards, and the unit tests pass
+    on the restored code.
+- Verify: `CHST_LIM2=$(fixture_file …) cargo_test_nonempty --release -p chst-cli --test task_reader -- reader_step_ reports` passes (5 tests:
+  `reader_step_8` to `_11` and `reports`). clippy `-D warnings` over the workspace and all targets, and `cargo fmt --check`, are clean.
+- Local fast run before committing: 17 PASS, 46 FAIL, 3 NOT RUN, 19 N/A; every status is the same as the Linux report of CI run 40733189070.
+- C-5 has no acceptance ID of its own. EVIDENCE.md is unchanged.
+- Open issues: the mutation-suite item under "Needs decision".
+- Acceptance IDs affected: none directly (C-6a to C-6c build on these reports: AC-POS-2, AC-POS-3, AC-NEG-3, AC-CLI-3 and others).
