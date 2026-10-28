@@ -290,3 +290,14 @@ DESIGN.md's decision log row 18 now says so, and cites run 40689182770. Only tha
   CI run covers this commit. Other rows keep the results of the earlier CI runs.
 - Open issues: the AC-ENG-2 item under "Needs decision".
 - Acceptance IDs affected: AC-ENG-1, AC-ENG-5, AC-ENG-6 (PASS); AC-ENG-3 (PASS early).
+
+### C-1 CI result — run 40694068794 (fast, commit 8543aa6)
+- Complete 85-result reports on all three OSes, clean tree. AC-ENG-1, -3, -5 and -6 are PASS on Linux, macOS and Windows. AC-ENG-1 includes
+  clippy with the SAFETY lints and `mod windows;` compiling on Windows. AC-ENG-2, -4, -7 and -8 FAIL on all three, as expected (their tasks
+  don't exist yet). The jobs are red only at the "Job result" step. The only PASS differences between the OSes are AC-META-5, which has a
+  Linux-only OS line.
+- EVIDENCE.md: the four C-1 rows now carry this run (macOS and Windows from CI). Other rows keep their earlier CI results, which this run
+  doesn't change (every other status is the same).
+- AC-ENG-2 fix (a) is approved by the owner and prepared, but not committed: the owner asked to see the diff first.
+- Open issues: none new.
+- Acceptance IDs affected: AC-ENG-1, AC-ENG-3, AC-ENG-5, AC-ENG-6 (PASS on all three OSes).
