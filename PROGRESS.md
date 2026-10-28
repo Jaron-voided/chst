@@ -394,3 +394,25 @@ DESIGN.md's decision log row 18 now says so, and cites run 40689182770. Only tha
 - Clean-tree fast run at 008019b: 16 PASS, 47 FAIL, 3 NOT RUN, 19 N/A, the same as before C-3.
 - Open issues: none.
 - Acceptance IDs affected: none directly. EVIDENCE.md is unchanged, because no status changed.
+
+### D1 confirmed after the readiness audit; recovery notes — 6d4a3f2
+Not a TODO task: an owner decision and owner-approved spec changes, shown as a diff before committing.
+- **Owner decision:** an independent, read-only audit of FORMAT_SPEC.md and the code at 42e318e confirmed D1: no per-record headers; names and
+  blob boundaries are reached only through the index, which only the trailer locates. Damage inside file data stays local (blob keys,
+  BLB-6), but damage to the index or trailer, including truncation, loses names and boundaries. The owner kept D1 for v1 and put recovery
+  of damaged archives out of scope for Chst, to be handled by a separate tool.
+- **DESIGN.md:** an owner-approved amendment at the end of D1 records the above.
+- **FORMAT_SPEC.md Appendix D, "Recovery notes (non-normative)":** the byte-level anchors an external recovery tool can rely on, each with the
+  rule that guarantees it: header magic (HDR-1, HDR-2), trailer magic (TRL-1), index location (TRL-2, LIM-2), structure hash (TRL-3), section
+  headers (§6, SEC-1, SEC-3), record sizes (SEC-4, SEC-5), blob layout from offset 32 (§3, BLB-4), blob keys (BLB-5, BLB-6, ENT-4) and order
+  (CAN-1 to CAN-3). The owner approved the last two rows I added beyond the requested list. No anchor needed a new rule: section order, the
+  owner's example of a possible gap, is fixed by SEC-3. The one conditional anchor is the exact record sizes, which hold only for a reader that
+  knows every flag (SEC-5), so the appendix tells scanners to accept larger sizes. It also says section-header patterns and both magics can
+  occur inside file data or the path pool, and how a scanner confirms a candidate. No rule ID was added or changed; the appendix has no
+  capitalised RFC 2119 keywords and no bold rule IDs.
+- **FORMAT_SPEC.md status line:** "Approved at `plan-v1`. Implementation is in progress. Normative and language-neutral; Appendix D is
+  non-normative." (The owner reworded my "except Appendix D", which read as if the appendix weren't language-neutral.)
+- Checks after the change: `tools/todo_coverage.py` passes; AC-META-1 to -7, AC-NEG-1 and AC-NEG-4 PASS; `trace.py` still counts 28 features,
+  18 decisions and 21 rules, none untraced.
+- Acceptance IDs affected: none. EVIDENCE.md is unchanged.
+- Next: C-4, in a fresh session.
