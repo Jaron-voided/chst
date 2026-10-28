@@ -356,8 +356,9 @@ The CLI holds no format or safety logic (D13). Its output, text and `--json`, go
   - Verify: `pass_only AC-ROB-3,AC-LIM-1`.
 - [ ] **C-8 Fuzzing, and the unsafe-code audit**
   - Depends: C-7.
-  - `fuzz/` with its own `rust-toolchain.toml` (the nightly pin) and `Cargo.lock`, and
-    targets over `chst-format`.
+  - The `fuzz/` skeleton already exists from C-1: its manifest, `rust-toolchain.toml` (the
+    nightly pin), `Cargo.lock` and an empty library. C-8 adds the cargo-fuzz targets over
+    `chst-format`.
   - `fuzz_regressions` test over `fixtures/fuzz-regressions/` (AC-ROB-5).
   - `random_sweep` for the Windows fallback.
   - If `fuzz_target!` trips `forbid(unsafe_code)`, commit the compiler error as
