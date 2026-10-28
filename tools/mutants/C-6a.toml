@@ -1,0 +1,243 @@
+# Mutation suite for C-6a: argument parsing, verify, and the error and exit-code paths of the CLI
+# (crates/chst-cli/src). Run from the repository root:
+#   python3.14 -I tools/mutants/mutate.py tools/mutants/C-6a.toml
+
+build = "cargo build --locked --release -p chst-cli && cargo test --locked --release --no-run -p chst-cli --bins"
+
+[commands]
+unit = "cargo test --locked --release -p chst-cli --bins"
+acceptance = "pass_only AC-ENG-3,AC-NEG-1,AC-NEG-2,AC-NEG-4,AC-CLI-1,AC-LIM-3,AC-ROB-1,AC-ROB-2,AC-ROB-8"
+
+# ---- Limit values (M12, N23) ----
+
+[[mutant]]
+id = "limit-leading-zero"
+what = "a limit with a leading zero is accepted"
+file = "crates/chst-cli/src/args.rs"
+old = "        && (text == \"0\" || !text.starts_with('0'));"
+new = ";"
+
+[[mutant]]
+id = "limit-lone-zero-refused"
+what = "a lone 0 is refused"
+file = "crates/chst-cli/src/args.rs"
+old = "(text == \"0\" || !text.starts_with('0'))"
+new = "!text.starts_with('0')"
+
+[[mutant]]
+id = "limit-any-characters"
+what = "a limit isn't restricted to ASCII digits (u64 parsing accepts '+5')"
+file = "crates/chst-cli/src/args.rs"
+old = "        && text.bytes().all(|b| b.is_ascii_digit())\n"
+new = "\n"
+
+[[mutant]]
+id = "limit-empty-accepted"
+what = "an empty limit reads as 0"
+edit = [
+  { file = "crates/chst-cli/src/args.rs", old = "    let canonical = !text.is_empty()\n        && text", new = "    let canonical = text" },
+  { file = "crates/chst-cli/src/args.rs", old = "    text.parse::<u64>().map_err(|_| bad())", new = "    if text.is_empty() {\n        return Ok(0);\n    }\n    text.parse::<u64>().map_err(|_| bad())" },
+]
+
+[[mutant]]
+id = "limit-overflow-saturates"
+what = "a limit beyond 2^64 - 1 is taken as 2^64 - 1"
+file = "crates/chst-cli/src/args.rs"
+old = "    text.parse::<u64>().map_err(|_| bad())"
+new = "    Ok(text.parse::<u64>().unwrap_or(u64::MAX))"
+
+[[mutant]]
+id = "limit-wrong-field"
+what = "--max-entries sets the index limit"
+file = "crates/chst-cli/src/args.rs"
+old = "\"--max-entries\" => limits.max_entries = n,"
+new = "\"--max-entries\" => limits.max_index_bytes = n,"
+
+[[mutant]]
+id = "limit-total-ignored"
+what = "--max-total-bytes is ignored"
+file = "crates/chst-cli/src/args.rs"
+old = "\"--max-total-bytes\" => limits.max_total_bytes = n,"
+new = "\"--max-total-bytes\" => {}"
+
+[[mutant]]
+id = "limit-missing-value-is-option"
+what = "a limit flag without a value is usage.option"
+file = "crates/chst-cli/src/args.rs"
+old = ".map_err(|_| usage(USAGE_LIMIT, format!(\"{flag} needs a value\")))?;"
+new = ".map_err(|_| usage(USAGE_OPTION, format!(\"{flag} needs a value\")))?;"
+
+[[mutant]]
+id = "limit-bad-value-is-option"
+what = "a bad limit value has another detail"
+file = "crates/chst-cli/src/args.rs"
+old = '''        usage(
+            USAGE_LIMIT,
+            format!('''
+new = '''        usage(
+            USAGE_OPTION,
+            format!('''
+
+# ---- Commands, operands, options ----
+
+[[mutant]]
+id = "command-unknown-is-verify"
+what = "an unknown command runs verify"
+file = "crates/chst-cli/src/args.rs"
+old = "            \"verify\" => Command::Verify,\n            \"inspect\" => Command::Inspect,\n            \"extract\" => Command::Extract,\n            _ => return None,"
+new = "            \"inspect\" => Command::Inspect,\n            \"extract\" => Command::Extract,\n            _ => Command::Verify,"
+
+[[mutant]]
+id = "command-case-insensitive"
+what = "command names are matched without case"
+file = "crates/chst-cli/src/args.rs"
+old = "let command = name.to_str().and_then(Command::from_name)"
+new = "let command = name.to_str().map(str::to_ascii_lowercase).as_deref().and_then(Command::from_name)"
+
+[[mutant]]
+id = "missing-file-is-empty-path"
+what = "a missing FILE becomes an empty path (an I/O error, exit 3)"
+file = "crates/chst-cli/src/args.rs"
+old = "        file.ok_or_else(|| usage(USAGE_ARGUMENT, format!(\"{} needs a FILE\", command.as_str())))?;"
+new = "        file.unwrap_or_default();"
+
+[[mutant]]
+id = "extra-operand-ignored"
+what = "a second FILE is ignored"
+file = "crates/chst-cli/src/args.rs"
+old = "            Arg::Value(v) if file.is_none() => file = Some(v),"
+new = "            Arg::Value(v) => {\n                if file.is_none() {\n                    file = Some(v);\n                }\n            }"
+
+[[mutant]]
+id = "unknown-option-ignored"
+what = "an unknown option is ignored"
+file = "crates/chst-cli/src/args.rs"
+old = "            other => {\n                return Err("
+new = "            other => {\n                if true {\n                    continue;\n                }\n                return Err("
+
+[[mutant]]
+id = "unimplemented-runs"
+what = "the commands that aren't implemented yet are let through"
+file = "crates/chst-cli/src/args.rs"
+old = "    if command != Command::Verify {"
+new = "    if command == Command::Pack {"
+
+[[mutant]]
+id = "json-prescan-off"
+what = "a failure is JSON only if --json came before the error"
+file = "crates/chst-cli/src/args.rs"
+old = "        .any(|a| a == \"--json\");"
+new = "        .any(|a| a == \"--json\" && false);"
+
+[[mutant]]
+id = "json-flag-ignored"
+what = "--json doesn't select JSON output"
+file = "crates/chst-cli/src/args.rs"
+old = "            Arg::Long(\"json\") => json = true,"
+new = "            Arg::Long(\"json\") => json = false,"
+
+# ---- main.rs: running verify, output, exit codes ----
+
+[[mutant]]
+id = "open-error-category"
+what = "a file that can't be opened is not-a-container"
+file = "crates/chst-cli/src/main.rs"
+old = '''        Error::new(
+            Category::Io,
+            chst_format::error::detail::IO_READ,'''
+new = '''        Error::new(
+            Category::NotAContainer,
+            chst_format::error::detail::IO_READ,'''
+
+[[mutant]]
+id = "exit-always-1"
+what = "every failure exits 1"
+file = "crates/chst-cli/src/main.rs"
+old = "ExitCode::from(e.exit_code())"
+new = "ExitCode::from(1)"
+
+[[mutant]]
+id = "no-error-line"
+what = "the error line isn't written to stderr"
+file = "crates/chst-cli/src/main.rs"
+old = "            let _ = writeln!(std::io::stderr().lock(), \"chst: {e}\");"
+new = "            let _ = &e;"
+
+[[mutant]]
+id = "error-line-prefix"
+what = "the error line lacks its 'chst: ' prefix"
+file = "crates/chst-cli/src/main.rs"
+old = "writeln!(std::io::stderr().lock(), \"chst: {e}\")"
+new = "writeln!(std::io::stderr().lock(), \"{e}\")"
+
+[[mutant]]
+id = "no-json-on-failure"
+what = "a failure prints no JSON report"
+file = "crates/chst-cli/src/main.rs"
+old = "                (true, Some(c)) => line(&render::failure_json(c.as_str(), &e)),"
+new = "                (true, Some(_)) => String::new(),"
+
+[[mutant]]
+id = "json-ignored-on-success"
+what = "verify prints text even with --json"
+file = "crates/chst-cli/src/main.rs"
+old = "            Ok(if inv.json {"
+new = "            Ok(if false {"
+
+[[mutant]]
+id = "limits-not-passed"
+what = "verify runs with the default limits"
+file = "crates/chst-cli/src/main.rs"
+old = "chst_format::verify(&mut file, &inv.limits)?"
+new = "chst_format::verify(&mut file, &chst_format::Limits::default())?"
+
+# ---- render.rs ----
+
+[[mutant]]
+id = "int-no-strings"
+what = "integers beyond 2^53 - 1 stay numbers"
+file = "crates/chst-cli/src/render.rs"
+old = "        Ok(small) if n <= MAX_SAFE_INTEGER => Value::from(small),"
+new = "        Ok(small) => Value::from(small),"
+
+[[mutant]]
+id = "int-off-by-one"
+what = "2^53 - 1 itself becomes a string"
+file = "crates/chst-cli/src/render.rs"
+old = "if n <= MAX_SAFE_INTEGER"
+new = "if n < MAX_SAFE_INTEGER"
+
+[[mutant]]
+id = "failure-ok-true"
+what = "a failure report says ok"
+file = "crates/chst-cli/src/render.rs"
+old = "m.insert(\"ok\".into(), json!(error.is_none()));"
+new = "m.insert(\"ok\".into(), json!(true));"
+
+[[mutant]]
+id = "failure-detail-category"
+what = "the error object's detail is its category"
+file = "crates/chst-cli/src/render.rs"
+old = "                \"detail\": e.detail(),"
+new = "                \"detail\": e.category().as_str(),"
+
+[[mutant]]
+id = "failure-extra-field"
+what = "a failure report carries a field beyond the common ones"
+file = "crates/chst-cli/src/render.rs"
+old = "    Value::Object(envelope(command, Some(error)))"
+new = "    let mut m = envelope(command, Some(error));\n    m.insert(\"summary\".into(), Value::Null);\n    Value::Object(m)"
+
+[[mutant]]
+id = "summary-files-dirs-swapped"
+what = "files and directories change places in the summary"
+file = "crates/chst-cli/src/render.rs"
+old = "        \"files\": int(s.files),\n        \"directories\": int(s.directories),"
+new = "        \"files\": int(s.directories),\n        \"directories\": int(s.files),"
+
+[[mutant]]
+id = "text-no-flags"
+what = "the text summary leaves out the flags"
+file = "crates/chst-cli/src/render.rs"
+old = "        if !flags.is_empty() {"
+new = "        if false && !flags.is_empty() {"

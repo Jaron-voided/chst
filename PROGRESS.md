@@ -81,6 +81,19 @@ Append-only log, one entry per task. Results are in EVIDENCE.md, not here.
   Options: (a) apply it, so the rule sits next to the other test rules; (b) leave it in TODO.md only. Recommendation: (a). TODO.md ranks
   below CLAUDE.md and is edited every task, so the rule is easier to lose there.
 
+- **Detail codes the CLI needs but the spec doesn't define** (found in C-6a; nothing blocked). Appendix C says usage errors use detail
+  codes beginning `usage.`, but FORMAT_SPEC defines only `usage.limit` and `usage.pattern`. C-6a uses, provisionally (in
+  `crates/chst-cli/src/args.rs` and `main.rs`): `usage.command` (no command, or an unknown one), `usage.option` (an option the command
+  doesn't take, or a value given to one that takes none), `usage.argument` (FILE missing, or one operand too many), and `io.write`
+  (stdout can't be written; Appendix A lets writers define their own `io` details). Two temporary ones go away as tasks land:
+  `internal.not-implemented` (exit 70) for `pack`, `list`, `inspect` and `extract` until C-6b, C-6c, C-9 and C-14. No check depends on
+  any of them: AC-CLI-1 asserts only exit 2.
+  Also a reporting choice: with `--json`, a failure prints the JSON failure report whenever the command is known, even if the error comes
+  before `--json` on the line; an unknown command gets only the stderr line, because a report's `command` field needs a command.
+  Options: (a) add the four codes to FORMAT_SPEC Appendix A as they are; (b) one code, `usage.syntax`, for every usage error other than
+  `usage.limit` and `usage.pattern` (simpler, less useful to scripts); (c) leave them out of the spec as tool-specific. Recommendation:
+  (a), as was done for `io.read` and `io.memory` in C-2. Needs the owner's approval (protected FORMAT_SPEC.md).
+
 ## Log
 
 ### H-1 `check.sh` runner core — 7987503
@@ -588,3 +601,33 @@ Owner's choice (a) after the C-5 review. Not a TODO task; nothing in `check.sh`,
 - **The rule for later tasks** is in TODO.md ("How this file works", "Mutation suites"). A CLAUDE.md diff is proposed under
   "Needs decision", because CLAUDE.md is protected.
 - Acceptance IDs affected: none.
+
+### C-6a CLI: argument parsing and `verify` — commit "C-6a: argument parsing and verify"
+- `chst-cli` now depends on `lexopt` 0.3 (0.3.2 in `Cargo.lock`, the only new package) and on `serde_json` as a normal dependency, both
+  on D15's list. AC-ENG-5 and AC-ENG-3 pass.
+- `src/args.rs`: `chst <command> FILE [--json] [limits]` with `lexopt`. The command must come first; options and FILE in any order after
+  it; `--` ends the options. Limit flags take ASCII digits only, no sign, no whitespace, no leading zeros except a lone `0`, from 0 to
+  2^64 − 1 (M12, N23); anything else, a missing value included, is `usage` / `usage.limit`. Every usage error exits 2 and opens nothing.
+  `--json` is found by a scan before parsing (before any `--`), so a usage error is reported as JSON however the line is ordered.
+- `src/render.rs`: reports through `serde_json::Value`: the common fields of Appendix B, the failure report with only those, and the verify
+  `summary`. Integers beyond 2^53 − 1 become decimal strings. Text mode prints a one-line summary, plus a line for any flags set.
+- `src/main.rs`: opens FILE (`io` / `io.read` if it can't, exit 3), runs `chst_format::verify` with the parsed limits, prints the report,
+  and on failure writes `chst: error[<category>/<detail>]: <message>` as the first stderr line and exits with the category's code (§16).
+  A stdout write failure is `io` / `io.write`. Nothing in the CLI panics on a broken pipe (no `println!`).
+- The commands not implemented yet (`pack`, `list`, `inspect`, `extract`) fail as the C-1 stub did, with exit 70, a code no check expects.
+- Detail codes not in the spec are under "Needs decision".
+- Tests: 12 CLI unit tests (the parser, every M12 case and more, usage details, `--json` ordering, the renderer, `run` for JSON, text,
+  limits and a missing file). By hand: every mode's output looks right; `verify --json` equals `verify.json` (message aside) for all 16
+  containers that have one.
+- **Mutation suite `tools/mutants/C-6a.toml`: 31 mutants.** Commands: the CLI unit tests, and the Verify line's `pass_only` over the
+  nine IDs. First run: **30 of 31 caught; `json-ignored-on-success` survived** (verify printing text despite `--json`). No C-6a check reads
+  a successful `verify --json`, and `run` had no unit test. I added three unit tests for `run`. Full re-run: **31 of 31 caught** (14 only by
+  the unit tests, 4 only by the acceptance checks), sources byte-identical afterwards.
+- Verify: `pass_only AC-ENG-3,AC-NEG-1,AC-NEG-2,AC-NEG-4,AC-CLI-1,AC-LIM-3,AC-ROB-1,AC-ROB-2,AC-ROB-8` passes (all nine PASS on the first
+  run, before and after the test additions). clippy `-D warnings` over the workspace and `cargo fmt --check` are clean.
+- Local fast run before committing: 24 PASS, 39 FAIL, 3 NOT RUN, 19 N/A. Changed from CI run 40733189070 (all FAIL → PASS): AC-NEG-2,
+  AC-CLI-1, AC-LIM-3, AC-ROB-1, AC-ROB-2, AC-ROB-8, and **AC-DET-2**, which belongs to a later task but only runs `verify --json` on
+  `dedup` and checks two counts, so it passes honestly and early.
+- Open issues: the detail-code item under "Needs decision".
+- Acceptance IDs affected: AC-NEG-2, AC-CLI-1, AC-LIM-3, AC-ROB-1, AC-ROB-2, AC-ROB-8 (PASS on Linux); AC-DET-2 (PASS early); AC-ENG-3,
+  AC-NEG-1, AC-NEG-4 stay PASS.

@@ -319,7 +319,7 @@ Nothing below starts before that approval.
 The CLI holds no format or safety logic (D13). Its output, text and `--json`, goes through
 `serde_json::Value`.
 
-- [ ] **C-6a CLI: argument parsing and `verify`**
+- [x] **C-6a CLI: argument parsing and `verify`**
   - Depends: C-5.
   - `lexopt` parsing per Appendix C:
     - limit flags take ASCII digits only, with no sign, no whitespace, and no leading zeros
