@@ -1,0 +1,82 @@
+# Mutation suite for C-3: §13 step 9 (sections.rs).
+# Rebuilt during C-5 from the ten mutations described for C-3 in PROGRESS.md.
+# Run from the repository root: python3.14 -I tools/mutants/mutate.py tools/mutants/C-3.toml
+
+build = "cargo test --locked --release --no-run -p chst-format -p chst-cli"
+
+[commands]
+unit = "cargo test --locked --release -p chst-format"
+fixtures = 'CHST_LIM2=$(fixture_file fixtures/core/invalid/LIM-2.expect.json) cargo test --locked --release -p chst-cli --test task_reader -- reader_step_ reports'
+
+[[mutant]]
+id = "sec2-off"
+what = "SEC-2 never fails"
+file = "crates/chst-format/src/sections.rs"
+old = "if !is_known(section.ty) && section.ty & MUST_UNDERSTAND != 0 {"
+new = "if false && !is_known(section.ty) && section.ty & MUST_UNDERSTAND != 0 {"
+
+[[mutant]]
+id = "sec5-off"
+what = "SEC-5 never fails"
+file = "crates/chst-format/src/sections.rs"
+old = "if wrong {"
+new = "if false && wrong {"
+
+[[mutant]]
+id = "sec5-no-exemption"
+what = "SEC-5 applies even when the header sets a flag the reader doesn't know"
+file = "crates/chst-format/src/sections.rs"
+old = "if knows_every_flag {"
+new = "if true || knows_every_flag {"
+
+[[mutant]]
+id = "sec3-equal-types"
+what = "SEC-3 allows two extra sections of the same type"
+file = "crates/chst-format/src/sections.rs"
+old = "previous.is_some_and(|p| section.ty <= p)"
+new = "previous.is_some_and(|p| section.ty < p)"
+
+[[mutant]]
+id = "sec3-repeated-required"
+what = "SEC-3 allows a required type again after the first three"
+file = "crates/chst-format/src/sections.rs"
+old = "if is_known(section.ty) {"
+new = "if false && is_known(section.ty) {"
+
+[[mutant]]
+id = "sec4-blob-minimum"
+what = "SEC-4 allows a 63-byte blob record"
+file = "crates/chst-format/src/sections.rs"
+old = "section.record_size < BLOB_RECORD_SIZE,"
+new = "section.record_size < BLOB_RECORD_SIZE - 1,"
+
+[[mutant]]
+id = "sec4-pool-any-size"
+what = "SEC-4 allows any PATH_POOL record size"
+file = "crates/chst-format/src/sections.rs"
+old = "SECTION_PATH_POOL => section.record_size != 1,"
+new = "SECTION_PATH_POOL => false,"
+
+[[mutant]]
+id = "lim3-plus-one"
+what = "LIM-3 allows one entry more than the limit"
+file = "crates/chst-format/src/sections.rs"
+old = "if entry.record_count > limits.max_entries {"
+new = "if entry.record_count > limits.max_entries.saturating_add(1) {"
+
+[[mutant]]
+id = "sec1-one-past-end"
+what = "SEC-1 allows a payload one byte past the index"
+file = "crates/chst-format/src/sections.rs"
+old = ".filter(|end| *end <= index.len())"
+new = ".filter(|end| *end <= index.len() + 1)"
+
+[[mutant]]
+id = "sec1-wrapping-product"
+what = "SEC-1 multiplies with wrapping"
+file = "crates/chst-format/src/sections.rs"
+old = '''    let end = u64::from(record_size)
+        .checked_mul(record_count)
+        .and_then'''
+new = '''    let end = Some(u64::from(record_size).wrapping_mul(record_count))
+        .and_then'''

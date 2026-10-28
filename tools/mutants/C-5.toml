@@ -1,0 +1,366 @@
+# Mutation suite for C-5: step 11 (blobs.rs) and the reports (report.rs, sections.rs).
+# Run from the repository root: python3.14 -I tools/mutants/mutate.py tools/mutants/C-5.toml
+
+build = "cargo test --locked --release --no-run -p chst-format -p chst-cli"
+
+[commands]
+unit = "cargo test --locked --release -p chst-format"
+fixtures = 'CHST_LIM2=$(fixture_file fixtures/core/invalid/LIM-2.expect.json) cargo test --locked --release -p chst-cli --test task_reader -- reader_step_ reports'
+
+# ---- Step 11 (blobs.rs) ----
+
+[[mutant]]
+id = "blb6-off"
+what = "BLB-6 never fails"
+file = "crates/chst-format/src/blobs.rs"
+old = "if hasher.finalize().as_slice() != blob.key.as_slice() {"
+new = "if false && hasher.finalize().as_slice() != blob.key.as_slice() {"
+
+[[mutant]]
+id = "blb6-reverse-order"
+what = "blobs checked in reverse table order"
+file = "crates/chst-format/src/blobs.rs"
+old = "for (i, blob) in tables.blobs.iter().enumerate() {"
+new = "for (i, blob) in tables.blobs.iter().enumerate().rev() {"
+
+[[mutant]]
+id = "blb6-first-blob-only"
+what = "only blob 0 is checked"
+file = "crates/chst-format/src/blobs.rs"
+old = "for (i, blob) in tables.blobs.iter().enumerate() {"
+new = "for (i, blob) in tables.blobs.iter().enumerate().take(1) {"
+
+[[mutant]]
+id = "blb6-seek-off-by-one"
+what = "the blob is read from offset + 1"
+file = "crates/chst-format/src/blobs.rs"
+old = "src.seek(SeekFrom::Start(blob.offset))"
+new = "src.seek(SeekFrom::Start(blob.offset + 1))"
+
+[[mutant]]
+id = "blb6-one-byte-short"
+what = "the last byte of each blob isn't hashed"
+file = "crates/chst-format/src/blobs.rs"
+old = "let mut left = blob.stored_length;"
+new = "let mut left = blob.stored_length.saturating_sub(1);"
+
+[[mutant]]
+id = "blb6-buffers-whole-blob"
+what = "the whole blob is read into memory (G6)"
+file = "crates/chst-format/src/blobs.rs"
+old = '''    let mut left = blob.stored_length;
+    while left > 0 {'''
+new = '''    let mut all = Vec::new();
+    (&mut *src).take(blob.stored_length).read_to_end(&mut all).map_err(|e| Error::io(&e))?;
+    hasher.update(&all);
+    let _ = &buf;
+    let mut left = 0u64;
+    while left > 0 {'''
+
+[[mutant]]
+id = "blb6-chunk-unbounded"
+what = "the chunk size isn't capped by the buffer"
+file = "crates/chst-format/src/blobs.rs"
+old = "l.min(BLOB_BUFFER_LEN)"
+new = "l"
+
+[[mutant]]
+id = "blb6-short-read-ignored"
+what = "a read that ends early is ignored"
+file = "crates/chst-format/src/blobs.rs"
+old = "src.read_exact(chunk).map_err(|e| Error::io(&e))?;"
+new = "let _ = src.read_exact(chunk);"
+
+[[mutant]]
+id = "blb6-wrong-category"
+what = "BLB-6 reported as malformed"
+file = "crates/chst-format/src/blobs.rs"
+old = '''
+            Category::Integrity,
+            detail::BLOB_HASH,'''
+new = '''
+            Category::Malformed,
+            detail::BLOB_HASH,'''
+
+[[mutant]]
+id = "blb6-wrong-detail"
+what = "BLB-6 reported with another detail"
+file = "crates/chst-format/src/blobs.rs"
+old = '''
+            Category::Integrity,
+            detail::BLOB_HASH,'''
+new = '''
+            Category::Integrity,
+            detail::BLOB_LAYOUT,'''
+
+# ---- Which steps each command runs (report.rs) ----
+
+[[mutant]]
+id = "verify-skips-step-11"
+what = "verify doesn't run step 11"
+file = "crates/chst-format/src/report.rs"
+old = "    check_blobs(src, &tables)?;\n"
+new = "\n"
+
+[[mutant]]
+id = "list-runs-step-11"
+what = "list runs step 11 (F34)"
+file = "crates/chst-format/src/report.rs"
+old = "    let (_, tables) = read_tables(src, limits, Purpose::List)?;"
+new = "    let (_, tables) = read_tables(src, limits, Purpose::List)?;\n    check_blobs(src, &tables)?;"
+
+[[mutant]]
+id = "inspect-runs-step-11"
+what = "inspect runs step 11 (F34)"
+file = "crates/chst-format/src/report.rs"
+old = "    let (opened, tables) = read_tables(src, limits, Purpose::Inspect)?;"
+new = "    let (opened, tables) = read_tables(src, limits, Purpose::Inspect)?;\n    check_blobs(src, &tables)?;"
+
+[[mutant]]
+id = "list-checks-lim5"
+what = "list applies LIM-5"
+file = "crates/chst-format/src/report.rs"
+old = "read_tables(src, limits, Purpose::List)?"
+new = "read_tables(src, limits, Purpose::Verify)?"
+
+[[mutant]]
+id = "inspect-checks-lim5"
+what = "inspect applies LIM-5"
+file = "crates/chst-format/src/report.rs"
+old = "read_tables(src, limits, Purpose::Inspect)?"
+new = "read_tables(src, limits, Purpose::Verify)?"
+
+[[mutant]]
+id = "verify-skips-lim5"
+what = "verify doesn't apply LIM-5"
+file = "crates/chst-format/src/report.rs"
+old = "read_tables(src, limits, Purpose::Verify)?"
+new = "read_tables(src, limits, Purpose::List)?"
+
+# ---- The verify summary ----
+
+[[mutant]]
+id = "summary-files-are-dirs"
+what = "files counts the directories"
+file = "crates/chst-format/src/report.rs"
+old = ".filter(|e| matches!(e.kind, EntryKind::File { .. }))"
+new = ".filter(|e| !matches!(e.kind, EntryKind::File { .. }))"
+
+[[mutant]]
+id = "summary-dirs-are-entries"
+what = "directories counts every entry"
+file = "crates/chst-format/src/report.rs"
+old = "directories: count(tables.entries.len().saturating_sub(files)),"
+new = "directories: count(tables.entries.len()),"
+
+[[mutant]]
+id = "summary-blobs-are-files"
+what = "blobs counts the file entries"
+file = "crates/chst-format/src/report.rs"
+old = "blobs: count(tables.blobs.len()),"
+new = "blobs: count(files),"
+
+[[mutant]]
+id = "summary-extracted-per-blob"
+what = "extracted_bytes counts each blob once"
+file = "crates/chst-format/src/report.rs"
+old = '''    let extracted_bytes = tables
+        .entries
+        .iter()
+        .filter_map(|e| match e.kind {
+            EntryKind::File { blob } => tables.blobs.get(blob),
+            EntryKind::Directory => None,
+        })'''
+new = '''    let extracted_bytes = tables
+        .blobs
+        .iter()'''
+
+[[mutant]]
+id = "summary-raw-per-entry"
+what = "raw_bytes counts a shared blob once per entry"
+file = "crates/chst-format/src/report.rs"
+old = "raw_bytes: tables.blobs.iter().map(|b| u128::from(b.raw_length)).sum(),"
+new = "raw_bytes: extracted_bytes,"
+
+[[mutant]]
+id = "summary-flags-swapped"
+what = "optional_flags named from the required bits"
+file = "crates/chst-format/src/report.rs"
+old = "            opened.header.optional_flags,\n"
+new = "            opened.header.required_flags,\n"
+
+[[mutant]]
+id = "flags-ignore-known-mask"
+what = "a flag is named even if the reader doesn't implement it (F33)"
+file = "crates/chst-format/src/report.rs"
+old = ".find(|(b, _)| *b == bit && known >> bit & 1 == 1)"
+new = ".find(|(b, _)| *b == bit)"
+
+[[mutant]]
+id = "flags-never-named"
+what = "an implemented flag is named by its bit"
+file = "crates/chst-format/src/report.rs"
+old = ".find(|(b, _)| *b == bit && known >> bit & 1 == 1)"
+new = ".find(|(b, _)| *b == bit && known >> bit & 1 == 2)"
+
+[[mutant]]
+id = "flags-bit-number-off"
+what = "bit<N> uses the wrong N"
+file = "crates/chst-format/src/report.rs"
+old = 'format!("bit{bit}")'
+new = 'format!("bit{}", bit + 1)'
+
+[[mutant]]
+id = "flags-miss-bit-63"
+what = "bit 63 is never reported"
+file = "crates/chst-format/src/report.rs"
+old = "(0..64u32)"
+new = "(0..63u32)"
+
+# ---- Equivalent in Core (skipped) ----
+# BLB-3 makes stored_length equal raw_length for every blob a Core reader accepts, so these
+# mutants can't be told apart from the code yet. Remove `skip` once encoded blobs exist (ZSTD,
+# Phase X), when the two lengths can differ.
+
+[[mutant]]
+id = "summary-stored-is-raw"
+what = "stored_bytes sums raw_length"
+skip = "equivalent until stored and raw lengths can differ (ZSTD, Phase X)"
+file = "crates/chst-format/src/report.rs"
+old = ".map(|b| u128::from(b.stored_length))"
+new = ".map(|b| u128::from(b.raw_length))"
+
+[[mutant]]
+id = "list-size-is-stored"
+what = "a listed file's size is its stored_length"
+skip = "equivalent until stored and raw lengths can differ (ZSTD, Phase X)"
+file = "crates/chst-format/src/report.rs"
+old = "size: b.map_or(0, |b| b.raw_length),"
+new = "size: b.map_or(0, |b| b.stored_length),"
+
+# ---- The list report ----
+
+[[mutant]]
+id = "list-encoding-inverted"
+what = "a stored blob is listed as zstd"
+file = "crates/chst-format/src/report.rs"
+old = "b.is_some_and(|b| b.encoding == 1)"
+new = "b.is_some_and(|b| b.encoding == 0)"
+
+[[mutant]]
+id = "list-blob-key-zero"
+what = "the blob key isn't listed"
+file = "crates/chst-format/src/report.rs"
+old = "blob: b.map_or([0; 32], |b| b.key),"
+new = "blob: [0; 32],"
+
+# ---- The inspect report ----
+
+[[mutant]]
+id = "inspect-names-kv"
+what = "an unimplemented section type is named (F33)"
+file = "crates/chst-format/src/report.rs"
+old = '("unknown", Vec::new())'
+new = '("KV_METADATA", Vec::new())'
+
+[[mutant]]
+id = "inspect-empty-payload-shown"
+what = "an empty payload gets a field"
+file = "crates/chst-format/src/report.rs"
+old = '''        if b.is_empty() {
+            return Ok(());
+        }'''
+new = ""
+
+[[mutant]]
+id = "inspect-pool-as-hex"
+what = "the PATH_POOL payload is shown as hex"
+file = "crates/chst-format/src/report.rs"
+old = 'f.rest("payload", true)?;'
+new = 'f.rest("payload", false)?;'
+
+[[mutant]]
+id = "inspect-no-extra"
+what = "bytes beyond a record's base size are left out"
+file = "crates/chst-format/src/report.rs"
+old = '        f.rest("extra", false)?;'
+new = ""
+
+[[mutant]]
+id = "inspect-record-offset-stuck"
+what = "every record gets the first record's offset"
+file = "crates/chst-format/src/report.rs"
+old = "        offset = offset.saturating_add(u64::from(record_size));"
+new = ""
+
+[[mutant]]
+id = "inspect-record-index-off"
+what = "record indexes start at 1"
+file = "crates/chst-format/src/report.rs"
+old = "            index: count(i),"
+new = "            index: count(i + 1),"
+
+[[mutant]]
+id = "inspect-data-length"
+what = "the data region's length includes the header"
+file = "crates/chst-format/src/report.rs"
+old = "length: index_offset.saturating_sub(HEADER_LEN),"
+new = "length: index_offset,"
+
+[[mutant]]
+id = "inspect-trailer-hash-offset"
+what = "structure_hash is placed one byte late"
+file = "crates/chst-format/src/report.rs"
+old = "trailer_offset.saturating_add(16),"
+new = "trailer_offset.saturating_add(17),"
+
+[[mutant]]
+id = "inspect-section-offset-relative"
+what = "section offsets are relative to the index"
+file = "crates/chst-format/src/report.rs"
+old = "let offset = index_offset.saturating_add(count(s.at));"
+new = "let offset = count(s.at);"
+
+[[mutant]]
+id = "inspect-section-length-payload"
+what = "a section's length leaves out its header"
+file = "crates/chst-format/src/report.rs"
+old = "length: count(s.payload.end.saturating_sub(s.at)),"
+new = "length: count(s.payload.len()),"
+
+[[mutant]]
+id = "inspect-int-big-endian"
+what = "integer fields are read big-endian"
+file = "crates/chst-format/src/report.rs"
+old = "u64::from_le_bytes(le))"
+new = "u64::from_be_bytes(le))"
+
+[[mutant]]
+id = "inspect-minor-is-major"
+what = "minor_version shows the major version"
+file = "crates/chst-format/src/report.rs"
+old = 'int("minor_version", 10, 2, u64::from(h.minor_version)),'
+new = 'int("minor_version", 10, 2, u64::from(h.major_version)),'
+
+[[mutant]]
+id = "inspect-blob-fields-swapped"
+what = "stored_length and raw_length change places"
+file = "crates/chst-format/src/report.rs"
+old = '''    ("stored_length", 8, Kind::Int),
+    ("raw_length", 8, Kind::Int),'''
+new = '''    ("raw_length", 8, Kind::Int),
+    ("stored_length", 8, Kind::Int),'''
+
+[[mutant]]
+id = "inspect-path-length-width"
+what = "path_length is read as 8 bytes"
+file = "crates/chst-format/src/report.rs"
+old = '("path_length", 4, Kind::Int),'
+new = '("path_length", 8, Kind::Int),'
+
+[[mutant]]
+id = "section-header-at"
+what = "section_headers reports the payload start as the header offset"
+file = "crates/chst-format/src/sections.rs"
+old = "at: s.payload.start.saturating_sub(SECTION_HEADER_LEN),"
+new = "at: s.payload.start,"

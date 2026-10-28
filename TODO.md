@@ -22,6 +22,12 @@
   not here.
 - **Sub-steps** (C-6a, C-6b, …) are tasks in their own right: one commit each, in order,
   each with its own Verify line. Each acceptance ID is owned by exactly one task or sub-step.
+- **Mutation suites** (`tools/mutants/<task>.toml`, run by `tools/mutants/mutate.py`). A task
+  that changes code a suite mutates updates that suite and re-runs it before the task is
+  checked: an edit whose old text no longer matches is fixed, not deleted, and every mutant
+  that isn't skipped must be caught. A task that adds tested code gets its own suite. Record
+  the result in PROGRESS.md. A mutant is skipped only with a written reason, such as being
+  equivalent until a later feature exists.
 
 ### Verify lines
 

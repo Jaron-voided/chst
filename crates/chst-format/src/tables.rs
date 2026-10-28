@@ -1049,6 +1049,17 @@ mod tests {
         c.entries[1].key = c.blobs[2].key;
         c.entries[2].key = c.blobs[1].key;
         fails(&c, detail::CANON_BLOB_ORDER);
+        // A repeated reference doesn't count as a new blob: here the second distinct blob
+        // referenced is blob 2.
+        let mut r = canonical(&[
+            ("a", Some("1")),
+            ("b", Some("1")),
+            ("c", Some("2")),
+            ("d", Some("3")),
+        ]);
+        r.entries[2].key = r.blobs[2].key;
+        r.entries[3].key = r.blobs[1].key;
+        fails(&r, detail::CANON_BLOB_ORDER);
         // CAN-2 comes before LIM-5.
         let limits = Limits {
             max_total_bytes: 0,

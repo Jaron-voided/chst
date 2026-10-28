@@ -1,0 +1,1935 @@
+# Mutation suite for C-4: §13 step 10 (tables.rs) and the path rules (paths.rs).
+# Rebuilt during C-5 from C-4's description in PROGRESS.md; C-4's own throwaway list was not kept.
+# Run from the repository root: python3.14 -I tools/mutants/mutate.py tools/mutants/C-4.toml
+
+build = "cargo test --locked --release --no-run -p chst-format -p chst-cli"
+
+[commands]
+unit = "cargo test --locked --release -p chst-format"
+fixtures = 'CHST_LIM2=$(fixture_file fixtures/core/invalid/LIM-2.expect.json) cargo test --locked --release -p chst-cli --test task_reader -- reader_step_ reports'
+
+[[mutant]]
+id = "blb1-off"
+what = "BLB-1 never fails"
+file = "crates/chst-format/src/tables.rs"
+old = '''if reserved != [0; 7] {'''
+new = '''if false && reserved != [0; 7] {'''
+
+[[mutant]]
+id = "blb1-last-byte"
+what = "BLB-1 ignores the last reserved byte"
+file = "crates/chst-format/src/tables.rs"
+old = '''let reserved: [u8; 7] = bytes(record, 57);'''
+new = '''let reserved: [u8; 7] = { let mut r: [u8; 7] = bytes(record, 57); r[6] = 0; r };'''
+
+[[mutant]]
+id = "blb2-off"
+what = "BLB-2 never fails"
+file = "crates/chst-format/src/tables.rs"
+old = '''if blob.encoding != 0 {'''
+new = '''if false && blob.encoding != 0 {'''
+
+[[mutant]]
+id = "blb2-allows-zstd"
+what = "BLB-2 accepts encoding 1 in a Core reader"
+file = "crates/chst-format/src/tables.rs"
+old = '''if blob.encoding != 0 {'''
+new = '''if blob.encoding > 1 {'''
+
+[[mutant]]
+id = "blb3-off"
+what = "BLB-3 never fails"
+file = "crates/chst-format/src/tables.rs"
+old = '''if blob.stored_length != blob.raw_length {'''
+new = '''if false && blob.stored_length != blob.raw_length {'''
+
+[[mutant]]
+id = "a-per-rule"
+what = "(a) as one pass for BLB-1, then one for BLB-2 and BLB-3"
+[[mutant.edit]]
+file = "crates/chst-format/src/tables.rs"
+old = '''        if blob.encoding != 0 {
+            return Err(malformed(
+                detail::BLOB_ENCODING,
+                format!("blob {i}: encoding {} is not supported", blob.encoding),
+            ));
+        }
+        if blob.stored_length != blob.raw_length {
+            return Err(malformed(
+                detail::BLOB_RAW_LENGTH,
+                format!(
+                    "blob {i}: stored blob of {} bytes has raw length {}",
+                    blob.stored_length, blob.raw_length
+                ),
+            ));
+        }
+'''
+new = ""
+[[mutant.edit]]
+file = "crates/chst-format/src/tables.rs"
+old = '''        blobs.push(blob);
+    }
+'''
+new = '''        blobs.push(blob);
+    }
+    for (i, blob) in blobs.iter().enumerate() {
+        if blob.encoding != 0 {
+            return Err(malformed(
+                detail::BLOB_ENCODING,
+                format!("blob {i}: encoding {} is not supported", blob.encoding),
+            ));
+        }
+        if blob.stored_length != blob.raw_length {
+            return Err(malformed(
+                detail::BLOB_RAW_LENGTH,
+                format!(
+                    "blob {i}: stored blob of {} bytes has raw length {}",
+                    blob.stored_length, blob.raw_length
+                ),
+            ));
+        }
+    }
+'''
+
+[[mutant]]
+id = "blb4-gap"
+what = "BLB-4 allows a blob beyond the running offset"
+file = "crates/chst-format/src/tables.rs"
+old = '''if blob.offset != next {'''
+new = '''if blob.offset < next {'''
+
+[[mutant]]
+id = "blb4-overlap"
+what = "BLB-4 allows a blob before the running offset"
+file = "crates/chst-format/src/tables.rs"
+old = '''if blob.offset != next {'''
+new = '''if blob.offset > next {'''
+
+[[mutant]]
+id = "blb4-wrapping"
+what = "BLB-4 adds with wrapping"
+file = "crates/chst-format/src/tables.rs"
+old = '''next = next.checked_add(blob.stored_length).ok_or_else(|| {
+            malformed(
+                detail::BLOB_LAYOUT,
+                format!("blob {i} ends beyond the largest offset"),
+            )
+        })?;'''
+new = '''next = next.wrapping_add(blob.stored_length);'''
+
+[[mutant]]
+id = "blb4-end"
+what = "BLB-4 doesn't check where the last blob ends"
+file = "crates/chst-format/src/tables.rs"
+old = '''if next != opened.trailer.index_offset {'''
+new = '''if false && next != opened.trailer.index_offset {'''
+
+[[mutant]]
+id = "blb5-off"
+what = "BLB-5 never fails"
+file = "crates/chst-format/src/tables.rs"
+old = '''            && blobs.get(a).map(|x| x.key) == blobs.get(b).map(|x| x.key)'''
+new = '''            && false'''
+
+[[mutant]]
+id = "blb5-unsorted"
+what = "the key index isn't sorted"
+file = "crates/chst-format/src/tables.rs"
+old = '''    by_key.sort_unstable_by_key(|&i| (blobs.get(i).map(|b| b.key), i));
+'''
+new = ''''''
+
+[[mutant]]
+id = "ent1-off"
+what = "ENT-1 never fails"
+file = "crates/chst-format/src/tables.rs"
+old = '''if e.ty != TYPE_DIRECTORY && e.ty != TYPE_FILE {'''
+new = '''if false {'''
+
+[[mutant]]
+id = "ent1-allows-3"
+what = "ENT-1 accepts type 3"
+file = "crates/chst-format/src/tables.rs"
+old = '''if e.ty != TYPE_DIRECTORY && e.ty != TYPE_FILE {'''
+new = '''if e.ty != TYPE_DIRECTORY && e.ty != TYPE_FILE && e.ty != 3 {'''
+
+[[mutant]]
+id = "ent2-off"
+what = "ENT-2 never fails"
+file = "crates/chst-format/src/tables.rs"
+old = '''if e.reserved != [0; 3] {'''
+new = '''if false && e.reserved != [0; 3] {'''
+
+[[mutant]]
+id = "ent3-off"
+what = "ENT-3 never fails"
+file = "crates/chst-format/src/tables.rs"
+old = '''if e.blob_key != [0; 32] {'''
+new = '''if false && e.blob_key != [0; 32] {'''
+
+[[mutant]]
+id = "ent4-off"
+what = "ENT-4 sends a dangling key to blob 0"
+file = "crates/chst-format/src/tables.rs"
+old = '''let Some(blob) = found else {'''
+new = '''let Some(blob) = found.or(Some(0)) else {'''
+
+[[mutant]]
+id = "d-per-rule"
+what = "(d) checks ENT-2 for every entry before ENT-1"
+file = "crates/chst-format/src/tables.rs"
+old = '''    // (d) Per entry: ENT-1, ENT-2, ENT-3, ENT-4.
+'''
+new = '''    for (i, e) in raw.iter().enumerate() {
+        if e.reserved != [0; 3] {
+            return Err(malformed(detail::ENTRY_RESERVED, format!("entry {i}: reserved")));
+        }
+    }
+'''
+
+[[mutant]]
+id = "ent5-past-end"
+what = "ENT-5 allows a path one byte past the pool"
+file = "crates/chst-format/src/tables.rs"
+old = '''.filter(|r| r.end <= pool.len())'''
+new = '''.filter(|r| r.end <= pool.len() + 1)'''
+
+[[mutant]]
+id = "ent5-start-only"
+what = "ENT-5 checks only where a path starts"
+file = "crates/chst-format/src/tables.rs"
+old = '''.filter(|r| r.end <= pool.len())'''
+new = '''.filter(|r| r.start <= pool.len())'''
+
+[[mutant]]
+id = "ent5-wrapping"
+what = "ENT-5 adds with wrapping"
+file = "crates/chst-format/src/tables.rs"
+old = '''let end = start.checked_add(usize::try_from(e.path_length).ok()?)?;'''
+new = '''let end = start.wrapping_add(usize::try_from(e.path_length).ok()?);'''
+
+[[mutant]]
+id = "can3-gap"
+what = "CAN-3 allows a gap"
+file = "crates/chst-format/src/tables.rs"
+old = '''if range.start != packed {'''
+new = '''if range.start < packed {'''
+
+[[mutant]]
+id = "can3-overlap"
+what = "CAN-3 allows an overlap"
+file = "crates/chst-format/src/tables.rs"
+old = '''if range.start != packed {'''
+new = '''if range.start > packed {'''
+
+[[mutant]]
+id = "can3-fill"
+what = "CAN-3 allows unused bytes at the end"
+file = "crates/chst-format/src/tables.rs"
+old = '''if packed != pool.len() {'''
+new = '''if false && packed != pool.len() {'''
+
+[[mutant]]
+id = "path1-off"
+what = "PATH-1 never fails (invalid UTF-8 reads as empty)"
+file = "crates/chst-format/src/paths.rs"
+old = '''let text = std::str::from_utf8(path).map_err('''
+new = '''let text = std::str::from_utf8(path).or_else(|_| Ok::<&str, std::str::Utf8Error>("")).map_err('''
+
+[[mutant]]
+id = "path2-off"
+what = "PATH-2 never fails"
+file = "crates/chst-format/src/paths.rs"
+old = '''if !is_nfc(text) {'''
+new = '''if false && !is_nfc(text) {'''
+
+[[mutant]]
+id = "path2-quick-check"
+what = "PATH-2 by the quick check alone"
+file = "crates/chst-format/src/paths.rs"
+old = '''if !is_nfc(text) {'''
+new = '''if unicode_normalization::is_nfc_quick(text.chars()) == unicode_normalization::IsNormalized::No {'''
+
+[[mutant]]
+id = "path4-leading"
+what = "PATH-4 allows a leading '/'"
+file = "crates/chst-format/src/paths.rs"
+old = '''text.starts_with('/') || '''
+new = ''''''
+
+[[mutant]]
+id = "path4-trailing"
+what = "PATH-4 allows a trailing '/'"
+file = "crates/chst-format/src/paths.rs"
+old = ''' || text.ends_with('/')'''
+new = ''''''
+
+[[mutant]]
+id = "path4-double"
+what = "PATH-4 allows '//'"
+file = "crates/chst-format/src/paths.rs"
+old = ''' || text.contains("//")'''
+new = ''''''
+
+[[mutant]]
+id = "path3-empty"
+what = "PATH-3 allows an empty path"
+file = "crates/chst-format/src/paths.rs"
+old = '''if text.is_empty() || text.len() > MAX_PATH_LEN {'''
+new = '''if text.len() > MAX_PATH_LEN {'''
+
+[[mutant]]
+id = "path3-path-plus-one"
+what = "PATH-3 allows 4097 bytes"
+file = "crates/chst-format/src/paths.rs"
+old = '''text.len() > MAX_PATH_LEN {'''
+new = '''text.len() > MAX_PATH_LEN + 1 {'''
+
+[[mutant]]
+id = "path3-segment-plus-one"
+what = "PATH-3 allows a 256-byte segment"
+file = "crates/chst-format/src/paths.rs"
+old = '''s.len() > MAX_SEGMENT_LEN'''
+new = '''s.len() > MAX_SEGMENT_LEN + 1'''
+
+[[mutant]]
+id = "path3-last-segment-only"
+what = "PATH-3 checks only the last segment"
+file = "crates/chst-format/src/paths.rs"
+old = '''if text.split('/').any(|s| s.len() > MAX_SEGMENT_LEN) {'''
+new = '''if text.rsplit('/').take(1).any(|s| s.len() > MAX_SEGMENT_LEN) {'''
+
+[[mutant]]
+id = "path5-dot"
+what = "PATH-5 allows '.'"
+file = "crates/chst-format/src/paths.rs"
+old = '''s == "." || '''
+new = ''''''
+
+[[mutant]]
+id = "path5-dotdot"
+what = "PATH-5 allows '..'"
+file = "crates/chst-format/src/paths.rs"
+old = ''' || s == ".."'''
+new = ''''''
+
+[[mutant]]
+id = "path6-nul"
+what = "PATH-6 allows U+0000"
+file = "crates/chst-format/src/paths.rs"
+old = ''''\u{0}'..='\u{1F}' | '\u{7F}'..='\u{9F}'
+        | '\u{61C}' | '\u{200E}' | '\u{200F}' | '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}')'''
+new = ''''\u{1}'..='\u{1F}' | '\u{7F}'..='\u{9F}'
+        | '\u{61C}' | '\u{200E}' | '\u{200F}' | '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}')'''
+
+[[mutant]]
+id = "path6-us"
+what = "PATH-6 allows U+001F"
+file = "crates/chst-format/src/paths.rs"
+old = ''''\u{0}'..='\u{1F}' | '\u{7F}'..='\u{9F}'
+        | '\u{61C}' | '\u{200E}' | '\u{200F}' | '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}')'''
+new = ''''\u{0}'..='\u{1E}' | '\u{7F}'..='\u{9F}'
+        | '\u{61C}' | '\u{200E}' | '\u{200F}' | '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}')'''
+
+[[mutant]]
+id = "path6-del"
+what = "PATH-6 allows U+007F"
+file = "crates/chst-format/src/paths.rs"
+old = ''''\u{0}'..='\u{1F}' | '\u{7F}'..='\u{9F}'
+        | '\u{61C}' | '\u{200E}' | '\u{200F}' | '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}')'''
+new = ''''\u{0}'..='\u{1F}' | '\u{80}'..='\u{9F}'
+        | '\u{61C}' | '\u{200E}' | '\u{200F}' | '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}')'''
+
+[[mutant]]
+id = "path6-apc"
+what = "PATH-6 allows U+009F"
+file = "crates/chst-format/src/paths.rs"
+old = ''''\u{0}'..='\u{1F}' | '\u{7F}'..='\u{9F}'
+        | '\u{61C}' | '\u{200E}' | '\u{200F}' | '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}')'''
+new = ''''\u{0}'..='\u{1F}' | '\u{7F}'..='\u{9E}'
+        | '\u{61C}' | '\u{200E}' | '\u{200F}' | '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}')'''
+
+[[mutant]]
+id = "path6-alm"
+what = "PATH-6 allows U+061C"
+file = "crates/chst-format/src/paths.rs"
+old = ''''\u{0}'..='\u{1F}' | '\u{7F}'..='\u{9F}'
+        | '\u{61C}' | '\u{200E}' | '\u{200F}' | '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}')'''
+new = ''''\u{0}'..='\u{1F}' | '\u{7F}'..='\u{9F}'
+        | '\u{200E}' | '\u{200F}' | '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}')'''
+
+[[mutant]]
+id = "path6-lrm"
+what = "PATH-6 allows U+200E"
+file = "crates/chst-format/src/paths.rs"
+old = ''''\u{0}'..='\u{1F}' | '\u{7F}'..='\u{9F}'
+        | '\u{61C}' | '\u{200E}' | '\u{200F}' | '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}')'''
+new = ''''\u{0}'..='\u{1F}' | '\u{7F}'..='\u{9F}'
+        | '\u{61C}' | '\u{200F}' | '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}')'''
+
+[[mutant]]
+id = "path6-rlm"
+what = "PATH-6 allows U+200F"
+file = "crates/chst-format/src/paths.rs"
+old = ''''\u{0}'..='\u{1F}' | '\u{7F}'..='\u{9F}'
+        | '\u{61C}' | '\u{200E}' | '\u{200F}' | '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}')'''
+new = ''''\u{0}'..='\u{1F}' | '\u{7F}'..='\u{9F}'
+        | '\u{61C}' | '\u{200E}' | '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}')'''
+
+[[mutant]]
+id = "path6-lre"
+what = "PATH-6 allows U+202A"
+file = "crates/chst-format/src/paths.rs"
+old = ''''\u{0}'..='\u{1F}' | '\u{7F}'..='\u{9F}'
+        | '\u{61C}' | '\u{200E}' | '\u{200F}' | '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}')'''
+new = ''''\u{0}'..='\u{1F}' | '\u{7F}'..='\u{9F}'
+        | '\u{61C}' | '\u{200E}' | '\u{200F}' | '\u{202B}'..='\u{202E}' | '\u{2066}'..='\u{2069}')'''
+
+[[mutant]]
+id = "path6-rlo"
+what = "PATH-6 allows U+202E"
+file = "crates/chst-format/src/paths.rs"
+old = ''''\u{0}'..='\u{1F}' | '\u{7F}'..='\u{9F}'
+        | '\u{61C}' | '\u{200E}' | '\u{200F}' | '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}')'''
+new = ''''\u{0}'..='\u{1F}' | '\u{7F}'..='\u{9F}'
+        | '\u{61C}' | '\u{200E}' | '\u{200F}' | '\u{202A}'..='\u{202D}' | '\u{2066}'..='\u{2069}')'''
+
+[[mutant]]
+id = "path6-lri"
+what = "PATH-6 allows U+2066"
+file = "crates/chst-format/src/paths.rs"
+old = ''''\u{0}'..='\u{1F}' | '\u{7F}'..='\u{9F}'
+        | '\u{61C}' | '\u{200E}' | '\u{200F}' | '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}')'''
+new = ''''\u{0}'..='\u{1F}' | '\u{7F}'..='\u{9F}'
+        | '\u{61C}' | '\u{200E}' | '\u{200F}' | '\u{202A}'..='\u{202E}' | '\u{2067}'..='\u{2069}')'''
+
+[[mutant]]
+id = "path6-pdi"
+what = "PATH-6 allows U+2069"
+file = "crates/chst-format/src/paths.rs"
+old = ''''\u{0}'..='\u{1F}' | '\u{7F}'..='\u{9F}'
+        | '\u{61C}' | '\u{200E}' | '\u{200F}' | '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}')'''
+new = ''''\u{0}'..='\u{1F}' | '\u{7F}'..='\u{9F}'
+        | '\u{61C}' | '\u{200E}' | '\u{200F}' | '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2068}')'''
+
+[[mutant]]
+id = "path6-off"
+what = "PATH-6 never fails"
+file = "crates/chst-format/src/paths.rs"
+old = '''.find(|c| is_control(*c))'''
+new = '''.find(|c| false && is_control(*c))'''
+
+[[mutant]]
+id = "path7-backslash"
+what = "PATH-7 allows the backslash character"
+file = "crates/chst-format/src/paths.rs"
+old = '''matches!(c, '\\' | '<' | '>' | ':' | '"' | '|' | '?' | '*')'''
+new = '''matches!(c, '<' | '>' | ':' | '"' | '|' | '?' | '*')'''
+
+[[mutant]]
+id = "path7-lt"
+what = "PATH-7 allows the lt character"
+file = "crates/chst-format/src/paths.rs"
+old = '''matches!(c, '\\' | '<' | '>' | ':' | '"' | '|' | '?' | '*')'''
+new = '''matches!(c, '\\' | '>' | ':' | '"' | '|' | '?' | '*')'''
+
+[[mutant]]
+id = "path7-gt"
+what = "PATH-7 allows the gt character"
+file = "crates/chst-format/src/paths.rs"
+old = '''matches!(c, '\\' | '<' | '>' | ':' | '"' | '|' | '?' | '*')'''
+new = '''matches!(c, '\\' | '<' | ':' | '"' | '|' | '?' | '*')'''
+
+[[mutant]]
+id = "path7-colon"
+what = "PATH-7 allows the colon character"
+file = "crates/chst-format/src/paths.rs"
+old = '''matches!(c, '\\' | '<' | '>' | ':' | '"' | '|' | '?' | '*')'''
+new = '''matches!(c, '\\' | '<' | '>' | '"' | '|' | '?' | '*')'''
+
+[[mutant]]
+id = "path7-quote"
+what = "PATH-7 allows the quote character"
+file = "crates/chst-format/src/paths.rs"
+old = '''matches!(c, '\\' | '<' | '>' | ':' | '"' | '|' | '?' | '*')'''
+new = '''matches!(c, '\\' | '<' | '>' | ':' | '|' | '?' | '*')'''
+
+[[mutant]]
+id = "path7-pipe"
+what = "PATH-7 allows the pipe character"
+file = "crates/chst-format/src/paths.rs"
+old = '''matches!(c, '\\' | '<' | '>' | ':' | '"' | '|' | '?' | '*')'''
+new = '''matches!(c, '\\' | '<' | '>' | ':' | '"' | '?' | '*')'''
+
+[[mutant]]
+id = "path7-question"
+what = "PATH-7 allows the question character"
+file = "crates/chst-format/src/paths.rs"
+old = '''matches!(c, '\\' | '<' | '>' | ':' | '"' | '|' | '?' | '*')'''
+new = '''matches!(c, '\\' | '<' | '>' | ':' | '"' | '|' | '*')'''
+
+[[mutant]]
+id = "path7-star"
+what = "PATH-7 allows the star character"
+file = "crates/chst-format/src/paths.rs"
+old = '''matches!(c, '\\' | '<' | '>' | ':' | '"' | '|' | '?' | '*')'''
+new = '''matches!(c, '\\' | '<' | '>' | ':' | '"' | '|' | '?')'''
+
+[[mutant]]
+id = "path8-dot"
+what = "PATH-8 allows a trailing '.'"
+file = "crates/chst-format/src/paths.rs"
+old = '''s.ends_with('.') || '''
+new = ''''''
+
+[[mutant]]
+id = "path8-space"
+what = "PATH-8 allows a trailing ' '"
+file = "crates/chst-format/src/paths.rs"
+old = ''' || s.ends_with(' ')'''
+new = ''''''
+
+[[mutant]]
+id = "path8-last-segment-only"
+what = "PATH-8 checks only the last segment"
+file = "crates/chst-format/src/paths.rs"
+old = '''    if text
+        .split('/')
+        .any(|s| s.ends_with('.') || s.ends_with(' '))'''
+new = '''    if text
+        .rsplit('/')
+        .take(1)
+        .any(|s| s.ends_with('.') || s.ends_with(' '))'''
+
+[[mutant]]
+id = "path9-con"
+what = "PATH-9 allows con"
+file = "crates/chst-format/src/paths.rs"
+old = '''["con", "prn", "aux", "nul", "conin$", "conout$"]'''
+new = '''["prn", "aux", "nul", "conin$", "conout$"]'''
+
+[[mutant]]
+id = "path9-prn"
+what = "PATH-9 allows prn"
+file = "crates/chst-format/src/paths.rs"
+old = '''["con", "prn", "aux", "nul", "conin$", "conout$"]'''
+new = '''["con", "aux", "nul", "conin$", "conout$"]'''
+
+[[mutant]]
+id = "path9-aux"
+what = "PATH-9 allows aux"
+file = "crates/chst-format/src/paths.rs"
+old = '''["con", "prn", "aux", "nul", "conin$", "conout$"]'''
+new = '''["con", "prn", "nul", "conin$", "conout$"]'''
+
+[[mutant]]
+id = "path9-nul"
+what = "PATH-9 allows nul"
+file = "crates/chst-format/src/paths.rs"
+old = '''["con", "prn", "aux", "nul", "conin$", "conout$"]'''
+new = '''["con", "prn", "aux", "conin$", "conout$"]'''
+
+[[mutant]]
+id = "path9-conin-dollar"
+what = "PATH-9 allows conin$"
+file = "crates/chst-format/src/paths.rs"
+old = '''["con", "prn", "aux", "nul", "conin$", "conout$"]'''
+new = '''["con", "prn", "aux", "nul", "conout$"]'''
+
+[[mutant]]
+id = "path9-conout-dollar"
+what = "PATH-9 allows conout$"
+file = "crates/chst-format/src/paths.rs"
+old = '''["con", "prn", "aux", "nul", "conin$", "conout$"]'''
+new = '''["con", "prn", "aux", "nul", "conin$"]'''
+
+[[mutant]]
+id = "path9-com"
+what = "PATH-9 allows COMn"
+file = "crates/chst-format/src/paths.rs"
+old = '''head.eq_ignore_ascii_case("com") || '''
+new = ''''''
+
+[[mutant]]
+id = "path9-lpt"
+what = "PATH-9 allows LPTn"
+file = "crates/chst-format/src/paths.rs"
+old = ''' || head.eq_ignore_ascii_case("lpt")'''
+new = ''''''
+
+[[mutant]]
+id = "path9-digit-0"
+what = "PATH-9 allows COM0 and LPT0"
+file = "crates/chst-format/src/paths.rs"
+old = '''Some('0'..='9''''
+new = '''Some('1'..='9''''
+
+[[mutant]]
+id = "path9-superscripts"
+what = "PATH-9 allows the superscript digits"
+file = "crates/chst-format/src/paths.rs"
+old = ''' | '¹' | '²' | '³''''
+new = ''''''
+
+[[mutant]]
+id = "path9-two-chars"
+what = "PATH-9 ignores a second character after COM or LPT"
+file = "crates/chst-format/src/paths.rs"
+old = '''(tail.next(), tail.next())'''
+new = '''(tail.next(), None::<char>)'''
+
+[[mutant]]
+id = "path9-case-sensitive"
+what = "PATH-9 compares case-sensitively"
+file = "crates/chst-format/src/paths.rs"
+old = '''.any(|name| stem.eq_ignore_ascii_case(name))'''
+new = '''.any(|name| stem == *name)'''
+
+[[mutant]]
+id = "path9-no-trim"
+what = "PATH-9 doesn't drop trailing spaces from the stem"
+file = "crates/chst-format/src/paths.rs"
+old = '''        .trim_end_matches(' ');'''
+new = ''';'''
+
+[[mutant]]
+id = "path9-last-dot"
+what = "PATH-9 takes the stem after the last '.'"
+file = "crates/chst-format/src/paths.rs"
+old = '''        .split('.')
+        .next()'''
+new = '''        .rsplit('.')
+        .next()'''
+
+[[mutant]]
+id = "path9-first-segment-only"
+what = "PATH-9 checks only the first segment"
+file = "crates/chst-format/src/paths.rs"
+old = '''text.split('/').find(|s| is_reserved_name(s))'''
+new = '''text.split('/').take(1).find(|s| is_reserved_name(s))'''
+
+[[mutant]]
+id = "path10-plus-one"
+what = "PATH-10 allows 257 segments"
+file = "crates/chst-format/src/paths.rs"
+old = '''if depth > MAX_DEPTH {'''
+new = '''if depth > MAX_DEPTH + 1 {'''
+
+[[mutant]]
+id = "path10-counts-slashes"
+what = "PATH-10 counts slashes, not segments"
+file = "crates/chst-format/src/paths.rs"
+old = '''let depth = text.split('/').count();'''
+new = '''let depth = text.matches('/').count();'''
+
+[[mutant]]
+id = "can1-off"
+what = "CAN-1 never fails"
+file = "crates/chst-format/src/tables.rs"
+old = '''            && path_of(pool, a) >= path_of(pool, b)'''
+new = '''            && false'''
+
+[[mutant]]
+id = "can1-equal"
+what = "CAN-1 allows equal paths"
+file = "crates/chst-format/src/tables.rs"
+old = '''&& path_of(pool, a) >= path_of(pool, b)'''
+new = '''&& path_of(pool, a) > path_of(pool, b)'''
+
+[[mutant]]
+id = "ent6-off"
+what = "ENT-6 never fails"
+file = "crates/chst-format/src/tables.rs"
+old = '''if !is_dir {'''
+new = '''if false && !is_dir {'''
+
+[[mutant]]
+id = "ent6-first-slash"
+what = "ENT-6 takes the parent at the first '/'"
+file = "crates/chst-format/src/tables.rs"
+old = '''path.iter().rposition(|&b| b == b'/')'''
+new = '''path.iter().position(|&b| b == b'/')'''
+
+[[mutant]]
+id = "ent6-any-type"
+what = "ENT-6 accepts a file as the parent"
+file = "crates/chst-format/src/tables.rs"
+old = '''.and_then(|at| kinds.get(at))
+            == Some(&EntryKind::Directory);'''
+new = '''.and_then(|at| kinds.get(at))
+            .is_some();'''
+
+[[mutant]]
+id = "path11-off"
+what = "PATH-11 never fails"
+file = "crates/chst-format/src/tables.rs"
+old = '''            && fold_cmp(fold_path(a), fold_path(b)) == Ordering::Equal'''
+new = '''            && false'''
+
+[[mutant]]
+id = "path11-no-fold"
+what = "PATH-11 compares without folding case"
+file = "crates/chst-format/src/tables.rs"
+old = '''    a.iter()
+        .map(u8::to_ascii_lowercase)
+        .cmp(b.iter().map(u8::to_ascii_lowercase))'''
+new = '''    a.iter().cmp(b.iter())'''
+
+[[mutant]]
+id = "blb7-off"
+what = "BLB-7 never fails"
+file = "crates/chst-format/src/tables.rs"
+old = '''.position(|r| !r)'''
+new = '''.position(|r| false && !r)'''
+
+[[mutant]]
+id = "can2-off"
+what = "CAN-2 never fails"
+file = "crates/chst-format/src/tables.rs"
+old = '''if blob > seen {'''
+new = '''if false && blob > seen {'''
+
+[[mutant]]
+id = "can2-advance-on-repeat"
+what = "CAN-2 counts a repeated reference as a new blob"
+file = "crates/chst-format/src/tables.rs"
+old = '''if blob == seen {'''
+new = '''if blob <= seen {'''
+
+[[mutant]]
+id = "lim5-plus-one"
+what = "LIM-5 allows one byte more than the limit"
+file = "crates/chst-format/src/tables.rs"
+old = '''total.is_none_or(|t| t > limits.max_total_bytes)'''
+new = '''total.is_none_or(|t| t > limits.max_total_bytes.saturating_add(1))'''
+
+[[mutant]]
+id = "lim5-overflow-passes"
+what = "LIM-5 accepts a sum of 2^64 or more"
+file = "crates/chst-format/src/tables.rs"
+old = '''total.is_none_or(|t|'''
+new = '''total.is_some_and(|t|'''
+
+[[mutant]]
+id = "lim5-wrapping"
+what = "LIM-5 adds with wrapping"
+file = "crates/chst-format/src/tables.rs"
+old = '''sum.checked_add(blobs.get(*blob).map_or(0, |b| b.raw_length))'''
+new = '''Some(sum.wrapping_add(blobs.get(*blob).map_or(0, |b| b.raw_length)))'''
+
+[[mutant]]
+id = "lim5-per-blob"
+what = "LIM-5 counts each blob once, not once per entry"
+file = "crates/chst-format/src/tables.rs"
+old = '''        if total.is_none_or(|t| t > limits.max_total_bytes) {'''
+new = '''        let total = blobs.iter().try_fold(0u64, |s, b| s.checked_add(b.raw_length));
+        if total.is_none_or(|t| t > limits.max_total_bytes) {'''
+
+[[mutant]]
+id = "lim5-list"
+what = "LIM-5 applies to list"
+file = "crates/chst-format/src/tables.rs"
+old = '''if matches!(purpose, Purpose::Verify | Purpose::Extract) {'''
+new = '''if matches!(purpose, Purpose::Verify | Purpose::Extract | Purpose::List) {'''
+
+[[mutant]]
+id = "lim5-inspect"
+what = "LIM-5 applies to inspect"
+file = "crates/chst-format/src/tables.rs"
+old = '''if matches!(purpose, Purpose::Verify | Purpose::Extract) {'''
+new = '''if matches!(purpose, Purpose::Verify | Purpose::Extract | Purpose::Inspect) {'''
+
+[[mutant]]
+id = "lim5-not-extract"
+what = "LIM-5 doesn't apply to extract"
+file = "crates/chst-format/src/tables.rs"
+old = '''if matches!(purpose, Purpose::Verify | Purpose::Extract) {'''
+new = '''if matches!(purpose, Purpose::Verify) {'''
+
+[[mutant]]
+id = "lim5-not-verify"
+what = "LIM-5 doesn't apply to verify"
+file = "crates/chst-format/src/tables.rs"
+old = '''if matches!(purpose, Purpose::Verify | Purpose::Extract) {'''
+new = '''if matches!(purpose, Purpose::Extract) {'''
+
+[[mutant]]
+id = "blob-records-base-size"
+what = "blob records read at 64 bytes whatever their size"
+file = "crates/chst-format/src/tables.rs"
+old = '''let blob_records = records(index, &sections.blob_table);'''
+new = '''let blob_records = records(index, &Table { record_size: 64, ..sections.blob_table.clone() });'''
+
+[[mutant]]
+id = "entry-records-base-size"
+what = "entry records read at 48 bytes whatever their size"
+file = "crates/chst-format/src/tables.rs"
+old = '''let entry_records = records(index, &sections.entry_table);'''
+new = '''let entry_records = records(index, &Table { record_size: 48, ..sections.entry_table.clone() });'''
+
+[[mutant]]
+id = "order-blb5-before-blb4"
+what = "BLB-5 before BLB-4"
+file = "crates/chst-format/src/tables.rs"
+old = '''    // (b) BLB-4: the blobs tile the data region, in table order.
+    let mut next = HEADER_LEN;
+    for (i, blob) in blobs.iter().enumerate() {
+        if blob.offset != next {
+            return Err(malformed(
+                detail::BLOB_LAYOUT,
+                format!(
+                    "blob {i} is at offset {}; it must be at {next}",
+                    blob.offset
+                ),
+            ));
+        }
+        next = next.checked_add(blob.stored_length).ok_or_else(|| {
+            malformed(
+                detail::BLOB_LAYOUT,
+                format!("blob {i} ends beyond the largest offset"),
+            )
+        })?;
+    }
+    if next != opened.trailer.index_offset {
+        return Err(malformed(
+            detail::BLOB_LAYOUT,
+            format!(
+                "the blobs end at offset {next}, but the index starts at {}",
+                opened.trailer.index_offset
+            ),
+        ));
+    }
+
+    // (c) BLB-5. The blob indexes sorted by key also serve ENT-4's lookup.
+    let mut by_key: Vec<usize> = try_vec(blobs.len(), "blob keys")?;
+    by_key.extend(0..blobs.len());
+    by_key.sort_unstable_by_key(|&i| (blobs.get(i).map(|b| b.key), i));
+    for pair in by_key.windows(2) {
+        if let [a, b] = *pair
+            && blobs.get(a).map(|x| x.key) == blobs.get(b).map(|x| x.key)
+        {
+            return Err(malformed(
+                detail::BLOB_DUPLICATE_KEY,
+                format!("blobs {a} and {b} have the same key"),
+            ));
+        }
+    }
+
+'''
+new = '''    // (c) BLB-5. The blob indexes sorted by key also serve ENT-4's lookup.
+    let mut by_key: Vec<usize> = try_vec(blobs.len(), "blob keys")?;
+    by_key.extend(0..blobs.len());
+    by_key.sort_unstable_by_key(|&i| (blobs.get(i).map(|b| b.key), i));
+    for pair in by_key.windows(2) {
+        if let [a, b] = *pair
+            && blobs.get(a).map(|x| x.key) == blobs.get(b).map(|x| x.key)
+        {
+            return Err(malformed(
+                detail::BLOB_DUPLICATE_KEY,
+                format!("blobs {a} and {b} have the same key"),
+            ));
+        }
+    }
+
+    // (b) BLB-4: the blobs tile the data region, in table order.
+    let mut next = HEADER_LEN;
+    for (i, blob) in blobs.iter().enumerate() {
+        if blob.offset != next {
+            return Err(malformed(
+                detail::BLOB_LAYOUT,
+                format!(
+                    "blob {i} is at offset {}; it must be at {next}",
+                    blob.offset
+                ),
+            ));
+        }
+        next = next.checked_add(blob.stored_length).ok_or_else(|| {
+            malformed(
+                detail::BLOB_LAYOUT,
+                format!("blob {i} ends beyond the largest offset"),
+            )
+        })?;
+    }
+    if next != opened.trailer.index_offset {
+        return Err(malformed(
+            detail::BLOB_LAYOUT,
+            format!(
+                "the blobs end at offset {next}, but the index starts at {}",
+                opened.trailer.index_offset
+            ),
+        ));
+    }
+
+'''
+
+[[mutant]]
+id = "order-ent5-before-d"
+what = "ENT-5 before (d)"
+file = "crates/chst-format/src/tables.rs"
+old = '''    // (d) Per entry: ENT-1, ENT-2, ENT-3, ENT-4.
+    let mut kinds: Vec<EntryKind> = try_vec(raw.len(), "entries")?;
+    for (i, e) in raw.iter().enumerate() {
+        if e.ty != TYPE_DIRECTORY && e.ty != TYPE_FILE {
+            return Err(malformed(
+                detail::ENTRY_TYPE,
+                format!("entry {i}: type {} is not defined", e.ty),
+            ));
+        }
+        if e.reserved != [0; 3] {
+            return Err(malformed(
+                detail::ENTRY_RESERVED,
+                format!("entry {i}: the reserved bytes are not zero"),
+            ));
+        }
+        if e.ty == TYPE_DIRECTORY {
+            if e.blob_key != [0; 32] {
+                return Err(malformed(
+                    detail::ENTRY_DIR_KEY,
+                    format!("entry {i} is a directory with a blob key"),
+                ));
+            }
+            kinds.push(EntryKind::Directory);
+            continue;
+        }
+        let found = by_key
+            .binary_search_by(|&b| {
+                blobs
+                    .get(b)
+                    .map_or(Ordering::Less, |blob| blob.key.cmp(&e.blob_key))
+            })
+            .ok()
+            .and_then(|at| by_key.get(at).copied());
+        let Some(blob) = found else {
+            return Err(malformed(
+                detail::ENTRY_DANGLING_KEY,
+                format!("entry {i}: no blob has its key"),
+            ));
+        };
+        kinds.push(EntryKind::File { blob });
+    }
+
+    // (e) Per entry: ENT-5.
+    let mut ranges: Vec<Range<usize>> = try_vec(raw.len(), "paths")?;
+    for (i, e) in raw.iter().enumerate() {
+        let range = usize::try_from(e.path_offset)
+            .ok()
+            .and_then(|start| {
+                let end = start.checked_add(usize::try_from(e.path_length).ok()?)?;
+                Some(start..end)
+            })
+            .filter(|r| r.end <= pool.len())
+            .ok_or_else(|| {
+                malformed(
+                    detail::ENTRY_PATH_RANGE,
+                    format!(
+                        "entry {i}: the path ({} bytes at {}) is not inside the path pool of {} bytes",
+                        e.path_length,
+                        e.path_offset,
+                        pool.len()
+                    ),
+                )
+            })?;
+        ranges.push(range);
+    }
+
+'''
+new = '''    // (e) Per entry: ENT-5.
+    let mut ranges: Vec<Range<usize>> = try_vec(raw.len(), "paths")?;
+    for (i, e) in raw.iter().enumerate() {
+        let range = usize::try_from(e.path_offset)
+            .ok()
+            .and_then(|start| {
+                let end = start.checked_add(usize::try_from(e.path_length).ok()?)?;
+                Some(start..end)
+            })
+            .filter(|r| r.end <= pool.len())
+            .ok_or_else(|| {
+                malformed(
+                    detail::ENTRY_PATH_RANGE,
+                    format!(
+                        "entry {i}: the path ({} bytes at {}) is not inside the path pool of {} bytes",
+                        e.path_length,
+                        e.path_offset,
+                        pool.len()
+                    ),
+                )
+            })?;
+        ranges.push(range);
+    }
+
+    // (d) Per entry: ENT-1, ENT-2, ENT-3, ENT-4.
+    let mut kinds: Vec<EntryKind> = try_vec(raw.len(), "entries")?;
+    for (i, e) in raw.iter().enumerate() {
+        if e.ty != TYPE_DIRECTORY && e.ty != TYPE_FILE {
+            return Err(malformed(
+                detail::ENTRY_TYPE,
+                format!("entry {i}: type {} is not defined", e.ty),
+            ));
+        }
+        if e.reserved != [0; 3] {
+            return Err(malformed(
+                detail::ENTRY_RESERVED,
+                format!("entry {i}: the reserved bytes are not zero"),
+            ));
+        }
+        if e.ty == TYPE_DIRECTORY {
+            if e.blob_key != [0; 32] {
+                return Err(malformed(
+                    detail::ENTRY_DIR_KEY,
+                    format!("entry {i} is a directory with a blob key"),
+                ));
+            }
+            kinds.push(EntryKind::Directory);
+            continue;
+        }
+        let found = by_key
+            .binary_search_by(|&b| {
+                blobs
+                    .get(b)
+                    .map_or(Ordering::Less, |blob| blob.key.cmp(&e.blob_key))
+            })
+            .ok()
+            .and_then(|at| by_key.get(at).copied());
+        let Some(blob) = found else {
+            return Err(malformed(
+                detail::ENTRY_DANGLING_KEY,
+                format!("entry {i}: no blob has its key"),
+            ));
+        };
+        kinds.push(EntryKind::File { blob });
+    }
+
+'''
+
+[[mutant]]
+id = "order-paths-before-can3"
+what = "(g) before CAN-3"
+file = "crates/chst-format/src/tables.rs"
+old = '''    // (f) CAN-3: the paths are packed into the pool in entry order, and fill it.
+    let mut packed = 0usize;
+    for (i, range) in ranges.iter().enumerate() {
+        if range.start != packed {
+            return Err(malformed(
+                detail::CANON_PATH_POOL,
+                format!(
+                    "entry {i}: its path is at {}; packed in entry order it would be at {packed}",
+                    range.start
+                ),
+            ));
+        }
+        packed = range.end;
+    }
+    if packed != pool.len() {
+        return Err(malformed(
+            detail::CANON_PATH_POOL,
+            format!(
+                "the paths fill {packed} bytes of the {}-byte path pool",
+                pool.len()
+            ),
+        ));
+    }
+
+    // (g) Per entry: PATH-1 ... PATH-10. The paths then make up the pool (CAN-3), and they
+    // are copied into one string.
+    let mut paths = String::new();
+    paths.try_reserve_exact(pool.len()).map_err(|_| {
+        Error::new(
+            Category::Io,
+            detail::IO_MEMORY,
+            format!(
+                "cannot allocate {} bytes of memory for the paths",
+                pool.len()
+            ),
+        )
+    })?;
+    for (i, range) in ranges.iter().enumerate() {
+        paths.push_str(check_path(i, path_of(pool, range))?);
+    }
+
+'''
+new = '''    // (g) Per entry: PATH-1 ... PATH-10. The paths then make up the pool (CAN-3), and they
+    // are copied into one string.
+    let mut paths = String::new();
+    paths.try_reserve_exact(pool.len()).map_err(|_| {
+        Error::new(
+            Category::Io,
+            detail::IO_MEMORY,
+            format!(
+                "cannot allocate {} bytes of memory for the paths",
+                pool.len()
+            ),
+        )
+    })?;
+    for (i, range) in ranges.iter().enumerate() {
+        paths.push_str(check_path(i, path_of(pool, range))?);
+    }
+
+    // (f) CAN-3: the paths are packed into the pool in entry order, and fill it.
+    let mut packed = 0usize;
+    for (i, range) in ranges.iter().enumerate() {
+        if range.start != packed {
+            return Err(malformed(
+                detail::CANON_PATH_POOL,
+                format!(
+                    "entry {i}: its path is at {}; packed in entry order it would be at {packed}",
+                    range.start
+                ),
+            ));
+        }
+        packed = range.end;
+    }
+    if packed != pool.len() {
+        return Err(malformed(
+            detail::CANON_PATH_POOL,
+            format!(
+                "the paths fill {packed} bytes of the {}-byte path pool",
+                pool.len()
+            ),
+        ));
+    }
+
+'''
+
+[[mutant]]
+id = "order-can1-before-paths"
+what = "CAN-1 before (g)"
+file = "crates/chst-format/src/tables.rs"
+old = '''    // (g) Per entry: PATH-1 ... PATH-10. The paths then make up the pool (CAN-3), and they
+    // are copied into one string.
+    let mut paths = String::new();
+    paths.try_reserve_exact(pool.len()).map_err(|_| {
+        Error::new(
+            Category::Io,
+            detail::IO_MEMORY,
+            format!(
+                "cannot allocate {} bytes of memory for the paths",
+                pool.len()
+            ),
+        )
+    })?;
+    for (i, range) in ranges.iter().enumerate() {
+        paths.push_str(check_path(i, path_of(pool, range))?);
+    }
+
+    // (h) CAN-1: strictly ascending bytewise order.
+    for (i, pair) in ranges.windows(2).enumerate() {
+        if let [a, b] = pair
+            && path_of(pool, a) >= path_of(pool, b)
+        {
+            return Err(malformed(
+                detail::CANON_ENTRY_ORDER,
+                format!(
+                    "entry {}, \"{}\", does not sort after entry {i}, \"{}\"",
+                    i + 1,
+                    shown(path_of(pool, b)),
+                    shown(path_of(pool, a))
+                ),
+            ));
+        }
+    }
+
+'''
+new = '''    // (h) CAN-1: strictly ascending bytewise order.
+    for (i, pair) in ranges.windows(2).enumerate() {
+        if let [a, b] = pair
+            && path_of(pool, a) >= path_of(pool, b)
+        {
+            return Err(malformed(
+                detail::CANON_ENTRY_ORDER,
+                format!(
+                    "entry {}, \"{}\", does not sort after entry {i}, \"{}\"",
+                    i + 1,
+                    shown(path_of(pool, b)),
+                    shown(path_of(pool, a))
+                ),
+            ));
+        }
+    }
+
+    // (g) Per entry: PATH-1 ... PATH-10. The paths then make up the pool (CAN-3), and they
+    // are copied into one string.
+    let mut paths = String::new();
+    paths.try_reserve_exact(pool.len()).map_err(|_| {
+        Error::new(
+            Category::Io,
+            detail::IO_MEMORY,
+            format!(
+                "cannot allocate {} bytes of memory for the paths",
+                pool.len()
+            ),
+        )
+    })?;
+    for (i, range) in ranges.iter().enumerate() {
+        paths.push_str(check_path(i, path_of(pool, range))?);
+    }
+
+'''
+
+[[mutant]]
+id = "order-ent6-before-can1"
+what = "ENT-6 before CAN-1"
+file = "crates/chst-format/src/tables.rs"
+old = '''    // (h) CAN-1: strictly ascending bytewise order.
+    for (i, pair) in ranges.windows(2).enumerate() {
+        if let [a, b] = pair
+            && path_of(pool, a) >= path_of(pool, b)
+        {
+            return Err(malformed(
+                detail::CANON_ENTRY_ORDER,
+                format!(
+                    "entry {}, \"{}\", does not sort after entry {i}, \"{}\"",
+                    i + 1,
+                    shown(path_of(pool, b)),
+                    shown(path_of(pool, a))
+                ),
+            ));
+        }
+    }
+
+    // (i) Per entry: ENT-6. The entries are sorted (CAN-1), so the parent is found by search.
+    for (i, range) in ranges.iter().enumerate() {
+        let path = path_of(pool, range);
+        let Some(slash) = path.iter().rposition(|&b| b == b'/') else {
+            continue;
+        };
+        let parent = path.get(..slash).unwrap_or_default();
+        let is_dir = ranges
+            .binary_search_by(|r| path_of(pool, r).cmp(parent))
+            .ok()
+            .and_then(|at| kinds.get(at))
+            == Some(&EntryKind::Directory);
+        if !is_dir {
+            return Err(malformed(
+                detail::ENTRY_PARENT,
+                format!(
+                    "entry {i}, \"{}\": its parent \"{}\" is not a directory entry",
+                    shown(path),
+                    shown(parent)
+                ),
+            ));
+        }
+    }
+
+'''
+new = '''    // (i) Per entry: ENT-6. The entries are sorted (CAN-1), so the parent is found by search.
+    for (i, range) in ranges.iter().enumerate() {
+        let path = path_of(pool, range);
+        let Some(slash) = path.iter().rposition(|&b| b == b'/') else {
+            continue;
+        };
+        let parent = path.get(..slash).unwrap_or_default();
+        let is_dir = ranges
+            .binary_search_by(|r| path_of(pool, r).cmp(parent))
+            .ok()
+            .and_then(|at| kinds.get(at))
+            == Some(&EntryKind::Directory);
+        if !is_dir {
+            return Err(malformed(
+                detail::ENTRY_PARENT,
+                format!(
+                    "entry {i}, \"{}\": its parent \"{}\" is not a directory entry",
+                    shown(path),
+                    shown(parent)
+                ),
+            ));
+        }
+    }
+
+    // (h) CAN-1: strictly ascending bytewise order.
+    for (i, pair) in ranges.windows(2).enumerate() {
+        if let [a, b] = pair
+            && path_of(pool, a) >= path_of(pool, b)
+        {
+            return Err(malformed(
+                detail::CANON_ENTRY_ORDER,
+                format!(
+                    "entry {}, \"{}\", does not sort after entry {i}, \"{}\"",
+                    i + 1,
+                    shown(path_of(pool, b)),
+                    shown(path_of(pool, a))
+                ),
+            ));
+        }
+    }
+
+'''
+
+[[mutant]]
+id = "order-path11-before-ent6"
+what = "PATH-11 before ENT-6"
+file = "crates/chst-format/src/tables.rs"
+old = '''    // (i) Per entry: ENT-6. The entries are sorted (CAN-1), so the parent is found by search.
+    for (i, range) in ranges.iter().enumerate() {
+        let path = path_of(pool, range);
+        let Some(slash) = path.iter().rposition(|&b| b == b'/') else {
+            continue;
+        };
+        let parent = path.get(..slash).unwrap_or_default();
+        let is_dir = ranges
+            .binary_search_by(|r| path_of(pool, r).cmp(parent))
+            .ok()
+            .and_then(|at| kinds.get(at))
+            == Some(&EntryKind::Directory);
+        if !is_dir {
+            return Err(malformed(
+                detail::ENTRY_PARENT,
+                format!(
+                    "entry {i}, \"{}\": its parent \"{}\" is not a directory entry",
+                    shown(path),
+                    shown(parent)
+                ),
+            ));
+        }
+    }
+
+    // (j) PATH-11: no two fold keys are equal.
+    let mut by_fold: Vec<usize> = try_vec(ranges.len(), "fold keys")?;
+    by_fold.extend(0..ranges.len());
+    let fold_path = |i: usize| ranges.get(i).map_or(&[][..], |r| path_of(pool, r));
+    by_fold.sort_unstable_by(|&a, &b| fold_cmp(fold_path(a), fold_path(b)).then(a.cmp(&b)));
+    for pair in by_fold.windows(2) {
+        if let [a, b] = *pair
+            && fold_cmp(fold_path(a), fold_path(b)) == Ordering::Equal
+        {
+            return Err(malformed(
+                detail::PATH_CASE_COLLISION,
+                format!(
+                    "entries {a} and {b}, \"{}\" and \"{}\", differ only in ASCII case",
+                    shown(fold_path(a)),
+                    shown(fold_path(b))
+                ),
+            ));
+        }
+    }
+
+'''
+new = '''    // (j) PATH-11: no two fold keys are equal.
+    let mut by_fold: Vec<usize> = try_vec(ranges.len(), "fold keys")?;
+    by_fold.extend(0..ranges.len());
+    let fold_path = |i: usize| ranges.get(i).map_or(&[][..], |r| path_of(pool, r));
+    by_fold.sort_unstable_by(|&a, &b| fold_cmp(fold_path(a), fold_path(b)).then(a.cmp(&b)));
+    for pair in by_fold.windows(2) {
+        if let [a, b] = *pair
+            && fold_cmp(fold_path(a), fold_path(b)) == Ordering::Equal
+        {
+            return Err(malformed(
+                detail::PATH_CASE_COLLISION,
+                format!(
+                    "entries {a} and {b}, \"{}\" and \"{}\", differ only in ASCII case",
+                    shown(fold_path(a)),
+                    shown(fold_path(b))
+                ),
+            ));
+        }
+    }
+
+    // (i) Per entry: ENT-6. The entries are sorted (CAN-1), so the parent is found by search.
+    for (i, range) in ranges.iter().enumerate() {
+        let path = path_of(pool, range);
+        let Some(slash) = path.iter().rposition(|&b| b == b'/') else {
+            continue;
+        };
+        let parent = path.get(..slash).unwrap_or_default();
+        let is_dir = ranges
+            .binary_search_by(|r| path_of(pool, r).cmp(parent))
+            .ok()
+            .and_then(|at| kinds.get(at))
+            == Some(&EntryKind::Directory);
+        if !is_dir {
+            return Err(malformed(
+                detail::ENTRY_PARENT,
+                format!(
+                    "entry {i}, \"{}\": its parent \"{}\" is not a directory entry",
+                    shown(path),
+                    shown(parent)
+                ),
+            ));
+        }
+    }
+
+'''
+
+[[mutant]]
+id = "order-blb7-before-path11"
+what = "BLB-7 before PATH-11"
+file = "crates/chst-format/src/tables.rs"
+old = '''    // (j) PATH-11: no two fold keys are equal.
+    let mut by_fold: Vec<usize> = try_vec(ranges.len(), "fold keys")?;
+    by_fold.extend(0..ranges.len());
+    let fold_path = |i: usize| ranges.get(i).map_or(&[][..], |r| path_of(pool, r));
+    by_fold.sort_unstable_by(|&a, &b| fold_cmp(fold_path(a), fold_path(b)).then(a.cmp(&b)));
+    for pair in by_fold.windows(2) {
+        if let [a, b] = *pair
+            && fold_cmp(fold_path(a), fold_path(b)) == Ordering::Equal
+        {
+            return Err(malformed(
+                detail::PATH_CASE_COLLISION,
+                format!(
+                    "entries {a} and {b}, \"{}\" and \"{}\", differ only in ASCII case",
+                    shown(fold_path(a)),
+                    shown(fold_path(b))
+                ),
+            ));
+        }
+    }
+
+    // (k) BLB-7: every blob is referenced by a file entry.
+    let mut referenced: Vec<bool> = try_vec(blobs.len(), "blob flags")?;
+    referenced.resize(blobs.len(), false);
+    for kind in &kinds {
+        if let EntryKind::File { blob } = kind
+            && let Some(r) = referenced.get_mut(*blob)
+        {
+            *r = true;
+        }
+    }
+    if let Some(i) = referenced.iter().position(|r| !r) {
+        return Err(malformed(
+            detail::BLOB_UNREFERENCED,
+            format!("blob {i} is referenced by no file entry"),
+        ));
+    }
+
+'''
+new = '''    // (k) BLB-7: every blob is referenced by a file entry.
+    let mut referenced: Vec<bool> = try_vec(blobs.len(), "blob flags")?;
+    referenced.resize(blobs.len(), false);
+    for kind in &kinds {
+        if let EntryKind::File { blob } = kind
+            && let Some(r) = referenced.get_mut(*blob)
+        {
+            *r = true;
+        }
+    }
+    if let Some(i) = referenced.iter().position(|r| !r) {
+        return Err(malformed(
+            detail::BLOB_UNREFERENCED,
+            format!("blob {i} is referenced by no file entry"),
+        ));
+    }
+
+    // (j) PATH-11: no two fold keys are equal.
+    let mut by_fold: Vec<usize> = try_vec(ranges.len(), "fold keys")?;
+    by_fold.extend(0..ranges.len());
+    let fold_path = |i: usize| ranges.get(i).map_or(&[][..], |r| path_of(pool, r));
+    by_fold.sort_unstable_by(|&a, &b| fold_cmp(fold_path(a), fold_path(b)).then(a.cmp(&b)));
+    for pair in by_fold.windows(2) {
+        if let [a, b] = *pair
+            && fold_cmp(fold_path(a), fold_path(b)) == Ordering::Equal
+        {
+            return Err(malformed(
+                detail::PATH_CASE_COLLISION,
+                format!(
+                    "entries {a} and {b}, \"{}\" and \"{}\", differ only in ASCII case",
+                    shown(fold_path(a)),
+                    shown(fold_path(b))
+                ),
+            ));
+        }
+    }
+
+'''
+
+[[mutant]]
+id = "order-can2-before-blb7"
+what = "CAN-2 before BLB-7"
+file = "crates/chst-format/src/tables.rs"
+old = '''    // (k) BLB-7: every blob is referenced by a file entry.
+    let mut referenced: Vec<bool> = try_vec(blobs.len(), "blob flags")?;
+    referenced.resize(blobs.len(), false);
+    for kind in &kinds {
+        if let EntryKind::File { blob } = kind
+            && let Some(r) = referenced.get_mut(*blob)
+        {
+            *r = true;
+        }
+    }
+    if let Some(i) = referenced.iter().position(|r| !r) {
+        return Err(malformed(
+            detail::BLOB_UNREFERENCED,
+            format!("blob {i} is referenced by no file entry"),
+        ));
+    }
+
+    // (l) CAN-2: the blobs are in order of first reference. Keys are unique (BLB-5), so a
+    // blob's index stands for its key, and the blobs referenced so far are exactly 0 .. seen.
+    let mut seen = 0usize;
+    for (i, kind) in kinds.iter().enumerate() {
+        if let EntryKind::File { blob } = *kind {
+            if blob > seen {
+                return Err(malformed(
+                    detail::CANON_BLOB_ORDER,
+                    format!(
+                        "entry {i} is the first to reference blob {blob}, but blob {seen} is not referenced yet"
+                    ),
+                ));
+            }
+            if blob == seen {
+                seen += 1;
+            }
+        }
+    }
+
+'''
+new = '''    // (l) CAN-2: the blobs are in order of first reference. Keys are unique (BLB-5), so a
+    // blob's index stands for its key, and the blobs referenced so far are exactly 0 .. seen.
+    let mut seen = 0usize;
+    for (i, kind) in kinds.iter().enumerate() {
+        if let EntryKind::File { blob } = *kind {
+            if blob > seen {
+                return Err(malformed(
+                    detail::CANON_BLOB_ORDER,
+                    format!(
+                        "entry {i} is the first to reference blob {blob}, but blob {seen} is not referenced yet"
+                    ),
+                ));
+            }
+            if blob == seen {
+                seen += 1;
+            }
+        }
+    }
+
+    // (k) BLB-7: every blob is referenced by a file entry.
+    let mut referenced: Vec<bool> = try_vec(blobs.len(), "blob flags")?;
+    referenced.resize(blobs.len(), false);
+    for kind in &kinds {
+        if let EntryKind::File { blob } = kind
+            && let Some(r) = referenced.get_mut(*blob)
+        {
+            *r = true;
+        }
+    }
+    if let Some(i) = referenced.iter().position(|r| !r) {
+        return Err(malformed(
+            detail::BLOB_UNREFERENCED,
+            format!("blob {i} is referenced by no file entry"),
+        ));
+    }
+
+'''
+
+[[mutant]]
+id = "order-lim5-before-can2"
+what = "LIM-5 before CAN-2"
+file = "crates/chst-format/src/tables.rs"
+old = '''    // (l) CAN-2: the blobs are in order of first reference. Keys are unique (BLB-5), so a
+    // blob's index stands for its key, and the blobs referenced so far are exactly 0 .. seen.
+    let mut seen = 0usize;
+    for (i, kind) in kinds.iter().enumerate() {
+        if let EntryKind::File { blob } = *kind {
+            if blob > seen {
+                return Err(malformed(
+                    detail::CANON_BLOB_ORDER,
+                    format!(
+                        "entry {i} is the first to reference blob {blob}, but blob {seen} is not referenced yet"
+                    ),
+                ));
+            }
+            if blob == seen {
+                seen += 1;
+            }
+        }
+    }
+
+    // (m) FLG-1, (n) ATT-1 and (o) KV-1 apply only to flags the reader knows, and a Core
+    // reader knows none (KNOWN_REQUIRED_FLAGS and KNOWN_OPTIONAL_FLAGS are 0).
+
+    // (p) LIM-5, for verify and extract: the raw length of every file entry's blob, counted
+    // once per entry. A sum of 2^64 or more exceeds every limit.
+    if matches!(purpose, Purpose::Verify | Purpose::Extract) {
+        let total = kinds.iter().try_fold(0u64, |sum, kind| match kind {
+            EntryKind::File { blob } => {
+                sum.checked_add(blobs.get(*blob).map_or(0, |b| b.raw_length))
+            }
+            EntryKind::Directory => Some(sum),
+        });
+        if total.is_none_or(|t| t > limits.max_total_bytes) {
+            return Err(Error::new(
+                Category::LimitExceeded,
+                detail::LIMIT_TOTAL_SIZE,
+                format!(
+                    "the files hold {} bytes in all; the limit is {}",
+                    total.map_or_else(|| "2^64 or more".to_owned(), |t| t.to_string()),
+                    limits.max_total_bytes
+                ),
+            ));
+        }
+    }
+
+'''
+new = '''    // (p) LIM-5, for verify and extract: the raw length of every file entry's blob, counted
+    // once per entry. A sum of 2^64 or more exceeds every limit.
+    if matches!(purpose, Purpose::Verify | Purpose::Extract) {
+        let total = kinds.iter().try_fold(0u64, |sum, kind| match kind {
+            EntryKind::File { blob } => {
+                sum.checked_add(blobs.get(*blob).map_or(0, |b| b.raw_length))
+            }
+            EntryKind::Directory => Some(sum),
+        });
+        if total.is_none_or(|t| t > limits.max_total_bytes) {
+            return Err(Error::new(
+                Category::LimitExceeded,
+                detail::LIMIT_TOTAL_SIZE,
+                format!(
+                    "the files hold {} bytes in all; the limit is {}",
+                    total.map_or_else(|| "2^64 or more".to_owned(), |t| t.to_string()),
+                    limits.max_total_bytes
+                ),
+            ));
+        }
+    }
+
+    // (l) CAN-2: the blobs are in order of first reference. Keys are unique (BLB-5), so a
+    // blob's index stands for its key, and the blobs referenced so far are exactly 0 .. seen.
+    let mut seen = 0usize;
+    for (i, kind) in kinds.iter().enumerate() {
+        if let EntryKind::File { blob } = *kind {
+            if blob > seen {
+                return Err(malformed(
+                    detail::CANON_BLOB_ORDER,
+                    format!(
+                        "entry {i} is the first to reference blob {blob}, but blob {seen} is not referenced yet"
+                    ),
+                ));
+            }
+            if blob == seen {
+                seen += 1;
+            }
+        }
+    }
+
+    // (m) FLG-1, (n) ATT-1 and (o) KV-1 apply only to flags the reader knows, and a Core
+    // reader knows none (KNOWN_REQUIRED_FLAGS and KNOWN_OPTIONAL_FLAGS are 0).
+
+'''
+
+[[mutant]]
+id = "order-path-4-before-path-2"
+what = "PATH-4 before PATH-2"
+file = "crates/chst-format/src/paths.rs"
+old = '''    // PATH-2, with exactly the Unicode 16.0 tables (D16)
+    if !is_nfc(text) {
+        return Err(fail(
+            detail::PATH_NFC,
+            "not in Unicode Normalization Form C",
+        ));
+    }
+    // PATH-4, before PATH-3, so an empty segment is reported as this more specific rule.
+    if text.starts_with('/') || text.ends_with('/') || text.contains("//") {
+        return Err(fail(
+            detail::PATH_SLASH,
+            "begins or ends with '/', or has an empty segment",
+        ));
+    }
+'''
+new = '''    // PATH-4, before PATH-3, so an empty segment is reported as this more specific rule.
+    if text.starts_with('/') || text.ends_with('/') || text.contains("//") {
+        return Err(fail(
+            detail::PATH_SLASH,
+            "begins or ends with '/', or has an empty segment",
+        ));
+    }
+    // PATH-2, with exactly the Unicode 16.0 tables (D16)
+    if !is_nfc(text) {
+        return Err(fail(
+            detail::PATH_NFC,
+            "not in Unicode Normalization Form C",
+        ));
+    }
+'''
+
+[[mutant]]
+id = "order-path-3-before-path-4"
+what = "PATH-3 before PATH-4"
+file = "crates/chst-format/src/paths.rs"
+old = '''    // PATH-4, before PATH-3, so an empty segment is reported as this more specific rule.
+    if text.starts_with('/') || text.ends_with('/') || text.contains("//") {
+        return Err(fail(
+            detail::PATH_SLASH,
+            "begins or ends with '/', or has an empty segment",
+        ));
+    }
+    // PATH-3. PATH-4 has ruled out empty segments in a non-empty path.
+    if text.is_empty() || text.len() > MAX_PATH_LEN {
+        return Err(fail(
+            detail::PATH_LENGTH,
+            &format!("{} bytes; a path is 1 to {MAX_PATH_LEN}", text.len()),
+        ));
+    }
+    if text.split('/').any(|s| s.len() > MAX_SEGMENT_LEN) {
+        return Err(fail(
+            detail::PATH_LENGTH,
+            &format!("a segment is longer than {MAX_SEGMENT_LEN} bytes"),
+        ));
+    }
+'''
+new = '''    // PATH-3. PATH-4 has ruled out empty segments in a non-empty path.
+    if text.is_empty() || text.len() > MAX_PATH_LEN {
+        return Err(fail(
+            detail::PATH_LENGTH,
+            &format!("{} bytes; a path is 1 to {MAX_PATH_LEN}", text.len()),
+        ));
+    }
+    if text.split('/').any(|s| s.len() > MAX_SEGMENT_LEN) {
+        return Err(fail(
+            detail::PATH_LENGTH,
+            &format!("a segment is longer than {MAX_SEGMENT_LEN} bytes"),
+        ));
+    }
+    // PATH-4, before PATH-3, so an empty segment is reported as this more specific rule.
+    if text.starts_with('/') || text.ends_with('/') || text.contains("//") {
+        return Err(fail(
+            detail::PATH_SLASH,
+            "begins or ends with '/', or has an empty segment",
+        ));
+    }
+'''
+
+[[mutant]]
+id = "order-path-5-before-path-3"
+what = "PATH-5 before PATH-3"
+file = "crates/chst-format/src/paths.rs"
+old = '''    // PATH-3. PATH-4 has ruled out empty segments in a non-empty path.
+    if text.is_empty() || text.len() > MAX_PATH_LEN {
+        return Err(fail(
+            detail::PATH_LENGTH,
+            &format!("{} bytes; a path is 1 to {MAX_PATH_LEN}", text.len()),
+        ));
+    }
+    if text.split('/').any(|s| s.len() > MAX_SEGMENT_LEN) {
+        return Err(fail(
+            detail::PATH_LENGTH,
+            &format!("a segment is longer than {MAX_SEGMENT_LEN} bytes"),
+        ));
+    }
+    // PATH-5
+    if text.split('/').any(|s| s == "." || s == "..") {
+        return Err(fail(detail::PATH_DOT_SEGMENT, "has a '.' or '..' segment"));
+    }
+'''
+new = '''    // PATH-5
+    if text.split('/').any(|s| s == "." || s == "..") {
+        return Err(fail(detail::PATH_DOT_SEGMENT, "has a '.' or '..' segment"));
+    }
+    // PATH-3. PATH-4 has ruled out empty segments in a non-empty path.
+    if text.is_empty() || text.len() > MAX_PATH_LEN {
+        return Err(fail(
+            detail::PATH_LENGTH,
+            &format!("{} bytes; a path is 1 to {MAX_PATH_LEN}", text.len()),
+        ));
+    }
+    if text.split('/').any(|s| s.len() > MAX_SEGMENT_LEN) {
+        return Err(fail(
+            detail::PATH_LENGTH,
+            &format!("a segment is longer than {MAX_SEGMENT_LEN} bytes"),
+        ));
+    }
+'''
+
+[[mutant]]
+id = "order-path-6-before-path-5"
+what = "PATH-6 before PATH-5"
+file = "crates/chst-format/src/paths.rs"
+old = '''    // PATH-5
+    if text.split('/').any(|s| s == "." || s == "..") {
+        return Err(fail(detail::PATH_DOT_SEGMENT, "has a '.' or '..' segment"));
+    }
+    // PATH-6
+    if let Some(c) = text.chars().find(|c| is_control(*c)) {
+        return Err(fail(
+            detail::PATH_CONTROL_CHAR,
+            &format!(
+                "holds the control or directional character U+{:04X}",
+                u32::from(c)
+            ),
+        ));
+    }
+'''
+new = '''    // PATH-6
+    if let Some(c) = text.chars().find(|c| is_control(*c)) {
+        return Err(fail(
+            detail::PATH_CONTROL_CHAR,
+            &format!(
+                "holds the control or directional character U+{:04X}",
+                u32::from(c)
+            ),
+        ));
+    }
+    // PATH-5
+    if text.split('/').any(|s| s == "." || s == "..") {
+        return Err(fail(detail::PATH_DOT_SEGMENT, "has a '.' or '..' segment"));
+    }
+'''
+
+[[mutant]]
+id = "order-path-7-before-path-6"
+what = "PATH-7 before PATH-6"
+file = "crates/chst-format/src/paths.rs"
+old = '''    // PATH-6
+    if let Some(c) = text.chars().find(|c| is_control(*c)) {
+        return Err(fail(
+            detail::PATH_CONTROL_CHAR,
+            &format!(
+                "holds the control or directional character U+{:04X}",
+                u32::from(c)
+            ),
+        ));
+    }
+    // PATH-7
+    if let Some(c) = text.chars().find(|c| is_forbidden(*c)) {
+        return Err(fail(
+            detail::PATH_FORBIDDEN_CHAR,
+            &format!("holds the character '{c}'"),
+        ));
+    }
+'''
+new = '''    // PATH-7
+    if let Some(c) = text.chars().find(|c| is_forbidden(*c)) {
+        return Err(fail(
+            detail::PATH_FORBIDDEN_CHAR,
+            &format!("holds the character '{c}'"),
+        ));
+    }
+    // PATH-6
+    if let Some(c) = text.chars().find(|c| is_control(*c)) {
+        return Err(fail(
+            detail::PATH_CONTROL_CHAR,
+            &format!(
+                "holds the control or directional character U+{:04X}",
+                u32::from(c)
+            ),
+        ));
+    }
+'''
+
+[[mutant]]
+id = "order-path-8-before-path-7"
+what = "PATH-8 before PATH-7"
+file = "crates/chst-format/src/paths.rs"
+old = '''    // PATH-7
+    if let Some(c) = text.chars().find(|c| is_forbidden(*c)) {
+        return Err(fail(
+            detail::PATH_FORBIDDEN_CHAR,
+            &format!("holds the character '{c}'"),
+        ));
+    }
+    // PATH-8. PATH-5 has already rejected the segments `.` and `..`.
+    if text
+        .split('/')
+        .any(|s| s.ends_with('.') || s.ends_with(' '))
+    {
+        return Err(fail(
+            detail::PATH_TRAILING_DOT_SPACE,
+            "a segment ends in '.' or ' '",
+        ));
+    }
+'''
+new = '''    // PATH-8. PATH-5 has already rejected the segments `.` and `..`.
+    if text
+        .split('/')
+        .any(|s| s.ends_with('.') || s.ends_with(' '))
+    {
+        return Err(fail(
+            detail::PATH_TRAILING_DOT_SPACE,
+            "a segment ends in '.' or ' '",
+        ));
+    }
+    // PATH-7
+    if let Some(c) = text.chars().find(|c| is_forbidden(*c)) {
+        return Err(fail(
+            detail::PATH_FORBIDDEN_CHAR,
+            &format!("holds the character '{c}'"),
+        ));
+    }
+'''
+
+[[mutant]]
+id = "order-path-9-before-path-8"
+what = "PATH-9 before PATH-8"
+file = "crates/chst-format/src/paths.rs"
+old = '''    // PATH-8. PATH-5 has already rejected the segments `.` and `..`.
+    if text
+        .split('/')
+        .any(|s| s.ends_with('.') || s.ends_with(' '))
+    {
+        return Err(fail(
+            detail::PATH_TRAILING_DOT_SPACE,
+            "a segment ends in '.' or ' '",
+        ));
+    }
+    // PATH-9
+    if let Some(s) = text.split('/').find(|s| is_reserved_name(s)) {
+        return Err(fail(
+            detail::PATH_RESERVED_NAME,
+            &format!(
+                "the segment \"{}\" is a Windows device name",
+                s.escape_default()
+            ),
+        ));
+    }
+'''
+new = '''    // PATH-9
+    if let Some(s) = text.split('/').find(|s| is_reserved_name(s)) {
+        return Err(fail(
+            detail::PATH_RESERVED_NAME,
+            &format!(
+                "the segment \"{}\" is a Windows device name",
+                s.escape_default()
+            ),
+        ));
+    }
+    // PATH-8. PATH-5 has already rejected the segments `.` and `..`.
+    if text
+        .split('/')
+        .any(|s| s.ends_with('.') || s.ends_with(' '))
+    {
+        return Err(fail(
+            detail::PATH_TRAILING_DOT_SPACE,
+            "a segment ends in '.' or ' '",
+        ));
+    }
+'''
+
+[[mutant]]
+id = "order-path-10-before-path-9"
+what = "PATH-10 before PATH-9"
+file = "crates/chst-format/src/paths.rs"
+old = '''    // PATH-9
+    if let Some(s) = text.split('/').find(|s| is_reserved_name(s)) {
+        return Err(fail(
+            detail::PATH_RESERVED_NAME,
+            &format!(
+                "the segment \"{}\" is a Windows device name",
+                s.escape_default()
+            ),
+        ));
+    }
+    // PATH-10
+    let depth = text.split('/').count();
+    if depth > MAX_DEPTH {
+        return Err(fail(
+            detail::PATH_DEPTH,
+            &format!("{depth} segments; the most is {MAX_DEPTH}"),
+        ));
+    }
+'''
+new = '''    // PATH-10
+    let depth = text.split('/').count();
+    if depth > MAX_DEPTH {
+        return Err(fail(
+            detail::PATH_DEPTH,
+            &format!("{depth} segments; the most is {MAX_DEPTH}"),
+        ));
+    }
+    // PATH-9
+    if let Some(s) = text.split('/').find(|s| is_reserved_name(s)) {
+        return Err(fail(
+            detail::PATH_RESERVED_NAME,
+            &format!(
+                "the segment \"{}\" is a Windows device name",
+                s.escape_default()
+            ),
+        ));
+    }
+'''

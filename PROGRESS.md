@@ -51,7 +51,7 @@ Append-only log, one entry per task. Results are in EVIDENCE.md, not here.
   (c) no detail (empty), which breaks the `error[...]` format. Recommendation: (a), recorded in FORMAT_SPEC Appendix A. No check depends on it
   yet (AC-CLI-1 asserts only exit 3). Needs the owner's approval, because it adds a code to the spec's output.
 
-- **Keeping the mutation suites in the repo** (owner's request during C-5; nothing committed yet). C-3 and C-4 used throwaway scripts in
+- **RESOLVED (owner chose (a); committed with "Mutation suites" in the log): keeping the mutation suites in the repo** (owner's request during C-5). C-3 and C-4 used throwaway scripts in
   the session scratchpad, so their mutations can't be re-run after later changes. For C-5 I wrote the proposed form and used it:
   `tools/mutants/mutate.py` (Python 3.14 standard library only) runs a suite file, `tools/mutants/<task>.toml`. Each mutant is one or
   more exact text replacements; an old text that doesn't occur exactly once is an error before anything is changed, so a suite that has
@@ -66,6 +66,20 @@ Append-only log, one entry per task. Results are in EVIDENCE.md, not here.
   touches a mutated line means updating the suite); (c) `cargo-mutants`, which isn't on D15's list and generates mutants by syntax rather
   than by spec rule. Recommendation: (a), and also rewrite C-3's 10 and C-4's 93 mutations as `C-3.toml` and `C-4.toml` against the
   current code, so all three tasks can be re-run. Needs the owner's approval before anything is committed.
+
+- **The mutation-suite rule in CLAUDE.md** (owner asked for the rule "where future sessions will see it, CLAUDE.md if that's allowed").
+  CLAUDE.md is protected, so I may only propose a diff. The rule is in TODO.md now ("How this file works", the "Mutation suites" bullet),
+  which every session reads before it picks a task. Proposed diff for CLAUDE.md, "Implementation rules", after the "Never delete, skip,
+  ignore, or loosen a test" bullet:
+  ```diff
+   - Never delete, skip, ignore, or loosen a test or check to make it pass. Placeholder or empty tests
+     never count as passing.
+  +- Mutation suites (tools/mutants/): a task that changes code a suite mutates updates the suite and
+  +  re-runs it before the task is ticked; a task that adds tested code adds its own suite. Every mutant
+  +  that isn't skipped must be caught, and a mutant is skipped only with a written reason.
+  ```
+  Options: (a) apply it, so the rule sits next to the other test rules; (b) leave it in TODO.md only. Recommendation: (a). TODO.md ranks
+  below CLAUDE.md and is edited every task, so the rule is easier to lose there.
 
 ## Log
 
@@ -551,3 +565,26 @@ Not a TODO task: an owner decision and owner-approved spec changes, shown as a d
 - Acceptance IDs affected: none directly (C-6a to C-6c build on these reports: AC-POS-2, AC-POS-3, AC-NEG-3, AC-CLI-3 and others).
 - Clean-tree fast run at 1652c9c: 17 PASS, 46 FAIL, 3 NOT RUN, 19 N/A (exit 1, as expected while features are missing); the TODO coverage
   preflight passes with C-5 ticked. No status changed.
+
+### Mutation suites in `tools/mutants/` — commit "C-5: mutation suites for C-3, C-4 and C-5"
+Owner's choice (a) after the C-5 review. Not a TODO task; nothing in `check.sh`, ACCEPTANCE.md or EVIDENCE.md changes.
+- **Added** `tools/mutants/mutate.py` (Python 3.14 standard library only) and three suites: `C-3.toml` (10 mutants on `sections.rs`),
+  `C-4.toml` (113 on `tables.rs` and `paths.rs`) and `C-5.toml` (45 on `blobs.rs`, `report.rs` and `sections.rs`, 2 of them skipped).
+  Each suite has two commands: the `chst-format` unit tests, and `task_reader`'s `reader_step_` and `reports` with `$CHST_LIM2`.
+- **The runner now supports skipped mutants:** `skip = "<reason>"`. A skipped mutant isn't run, but its edits must still match the code,
+  so it stays current, and every run lists it with its reason. C-5's two equivalent mutants are skipped this way (`stored_bytes` summing
+  `raw_length`; the listed `size` being `stored_length`), each with "equivalent until stored and raw lengths can differ (ZSTD, Phase X)".
+- **C-3 and C-4 are rebuilt, not copied.** Their mutation scripts were throwaway and weren't kept. C-3's ten are the ten PROGRESS.md
+  describes. C-4's are rebuilt from its description, kind by kind, against the current code, so the list isn't C-4's original one and
+  the count differs: 113 rather than 93. The extra ones are mostly more order swaps (17: 9 between step-10 items and 8 between adjacent path
+  rules) and both directions of BLB-4 and CAN-3. The order swaps are cut at the code's `// (x)` and `// PATH-n` comments by a one-off
+  generator in the session scratchpad; the committed suite is the generated TOML.
+- **Results.** C-3: 10 of 10 caught (3 only by the unit tests, 1 only by the fixtures). C-5: 43 of 43 caught, 2 skipped. C-4, first run:
+  **112 of 113, one survived:** `can2-advance-on-repeat` (CAN-2 counts a repeated reference to an earlier blob as a new blob, so a later
+  out-of-order blob is accepted). It's a real gap in C-4's tests: none had a repeated reference *before* an out-of-order blob. I added that
+  case to `can_2_orders_blobs_by_first_reference` (entries referencing blobs 0, 0, 2, 1); it passes on the real code and catches the mutant.
+  Full C-4 re-run after the fix: **113 of 113 caught** (55 only by the unit tests, 1 only by the fixtures: `blb4-gap`, as in C-4).
+  Sources were byte-identical after every run.
+- **The rule for later tasks** is in TODO.md ("How this file works", "Mutation suites"). A CLAUDE.md diff is proposed under
+  "Needs decision", because CLAUDE.md is protected.
+- Acceptance IDs affected: none.
