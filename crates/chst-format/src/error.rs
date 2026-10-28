@@ -64,9 +64,36 @@ pub mod detail {
     pub const SEC_LAYOUT: &str = "sec.layout";
     pub const SEC_RECORD_SIZE_MIN: &str = "sec.record-size-min";
     pub const SEC_RECORD_SIZE: &str = "sec.record-size";
+    pub const BLOB_RESERVED: &str = "blob.reserved";
+    pub const BLOB_ENCODING: &str = "blob.encoding";
+    pub const BLOB_RAW_LENGTH: &str = "blob.raw-length";
+    pub const BLOB_LAYOUT: &str = "blob.layout";
+    pub const BLOB_DUPLICATE_KEY: &str = "blob.duplicate-key";
+    pub const BLOB_UNREFERENCED: &str = "blob.unreferenced";
+    pub const ENTRY_TYPE: &str = "entry.type";
+    pub const ENTRY_RESERVED: &str = "entry.reserved";
+    pub const ENTRY_DIR_KEY: &str = "entry.dir-key";
+    pub const ENTRY_DANGLING_KEY: &str = "entry.dangling-key";
+    pub const ENTRY_PATH_RANGE: &str = "entry.path-range";
+    pub const ENTRY_PARENT: &str = "entry.parent";
+    pub const PATH_UTF8: &str = "path.utf8";
+    pub const PATH_NFC: &str = "path.nfc";
+    pub const PATH_LENGTH: &str = "path.length";
+    pub const PATH_SLASH: &str = "path.slash";
+    pub const PATH_DOT_SEGMENT: &str = "path.dot-segment";
+    pub const PATH_CONTROL_CHAR: &str = "path.control-char";
+    pub const PATH_FORBIDDEN_CHAR: &str = "path.forbidden-char";
+    pub const PATH_TRAILING_DOT_SPACE: &str = "path.trailing-dot-space";
+    pub const PATH_RESERVED_NAME: &str = "path.reserved-name";
+    pub const PATH_DEPTH: &str = "path.depth";
+    pub const PATH_CASE_COLLISION: &str = "path.case-collision";
+    pub const CANON_ENTRY_ORDER: &str = "canon.entry-order";
+    pub const CANON_BLOB_ORDER: &str = "canon.blob-order";
+    pub const CANON_PATH_POOL: &str = "canon.path-pool";
     pub const LIM_INDEX_SIZE: &str = "lim.index-size";
     pub const LIMIT_ENTRIES: &str = "limit.entries";
     pub const LIMIT_INDEX_SIZE: &str = "limit.index-size";
+    pub const LIMIT_TOTAL_SIZE: &str = "limit.total-size";
     /// The reader can't read or seek its input (FORMAT_SPEC Appendix A).
     pub const IO_READ: &str = "io.read";
     /// The reader can't allocate the memory it needs (FORMAT_SPEC Appendix A).

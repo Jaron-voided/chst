@@ -29,6 +29,17 @@ impl Opened {
     pub fn sections(&self, limits: &Limits) -> Result<crate::sections::Sections, Error> {
         crate::sections::parse_sections(&self.index, &self.header, limits)
     }
+
+    /// Step 10 of §13: checks the blobs, the entries, the paths and the canonical form, for
+    /// `sections` from step 9. LIM-5 is checked only for verify and extract.
+    pub fn tables(
+        &self,
+        sections: &crate::sections::Sections,
+        limits: &Limits,
+        purpose: crate::tables::Purpose,
+    ) -> Result<crate::tables::Tables, Error> {
+        crate::tables::parse_tables(self, sections, limits, purpose)
+    }
 }
 
 fn read_array<R: Read, const N: usize>(src: &mut R) -> Result<[u8; N], Error> {

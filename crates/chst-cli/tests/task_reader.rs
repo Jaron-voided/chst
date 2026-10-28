@@ -12,7 +12,7 @@
 use std::fs::File;
 use std::path::{Path, PathBuf};
 
-use chst_format::{Error, Limits};
+use chst_format::{Error, Limits, Purpose};
 use serde_json::Value;
 
 /// Directories whose `*.expect.json` files make up the fixture set (TODO.md).
@@ -30,7 +30,7 @@ const EXPECT_FILES: usize = 118;
 const VALID_FILES: usize = 10;
 
 /// The number of files whose first violation is at step N or lower (TODO.md).
-const REJECTED_THROUGH: [(u8, usize); 2] = [(8, 19), (9, 32)];
+const REJECTED_THROUGH: [(u8, usize); 3] = [(8, 19), (9, 32), (10, 108)];
 
 struct Case {
     label: String,
@@ -258,6 +258,15 @@ fn reader_through_step_9(file: &mut File, limits: &Limits) -> Result<(), Error> 
         .map(|_| ())
 }
 
+/// Verify mode, so LIM-5 is evaluated (TODO.md, C-4).
+fn reader_through_step_10(file: &mut File, limits: &Limits) -> Result<(), Error> {
+    let opened = chst_format::open(file, limits)?;
+    let sections = opened.sections(limits)?;
+    opened
+        .tables(&sections, limits, Purpose::Verify)
+        .map(|_| ())
+}
+
 fn run_step(n: u8, reader: fn(&mut File, &Limits) -> Result<(), Error>) {
     let cases = load_cases();
     assert_eq!(
@@ -308,4 +317,9 @@ fn reader_step_8() {
 #[test]
 fn reader_step_9() {
     run_step(9, reader_through_step_9);
+}
+
+#[test]
+fn reader_step_10() {
+    run_step(10, reader_through_step_10);
 }
