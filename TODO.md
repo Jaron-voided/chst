@@ -237,7 +237,7 @@ Nothing below starts before that approval.
 
 ### Workspace and format crate
 
-- [ ] **C-1 Workspace skeleton**
+- [x] **C-1 Workspace skeleton**
   - Depends: `checks-v1`.
   - `rust-toolchain.toml` (D16), the workspace, and `crates/chst-format`, `crates/chst-fs`
     and `crates/chst-cli` (binary `chst`).

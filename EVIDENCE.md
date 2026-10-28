@@ -19,12 +19,12 @@ This is the only record of check results. Its format and rules are defined in
 | AC-META-5 | PASS | N/A | N/A | ./check.sh --only AC-META-5 | b94ca4141da1c9e56858828e491caffa580eb3d2 | https://github.com/Jaron-voided/chst/actions/runs/40689182770 |
 | AC-META-6 | PASS | PASS | PASS | ./check.sh --only AC-META-6 | b94ca4141da1c9e56858828e491caffa580eb3d2 | https://github.com/Jaron-voided/chst/actions/runs/40689182770 |
 | AC-META-7 | PASS | PASS | PASS | ./check.sh --only AC-META-7 | b94ca4141da1c9e56858828e491caffa580eb3d2 | https://github.com/Jaron-voided/chst/actions/runs/40689182770 |
-| AC-ENG-1 | FAIL | FAIL | FAIL | ./check.sh --only AC-ENG-1 | b94ca4141da1c9e56858828e491caffa580eb3d2 | https://github.com/Jaron-voided/chst/actions/runs/40689182770 |
+| AC-ENG-1 | PASS | NOT RUN | NOT RUN | ./check.sh --only AC-ENG-1 | 6e450f22f5af1d3e54652b1d5f4d759651d5acb3 | local |
 | AC-ENG-2 | FAIL | FAIL | FAIL | ./check.sh --only AC-ENG-2 | b94ca4141da1c9e56858828e491caffa580eb3d2 | https://github.com/Jaron-voided/chst/actions/runs/40689182770 |
-| AC-ENG-3 | FAIL | FAIL | FAIL | ./check.sh --only AC-ENG-3 | b94ca4141da1c9e56858828e491caffa580eb3d2 | https://github.com/Jaron-voided/chst/actions/runs/40689182770 |
+| AC-ENG-3 | PASS | NOT RUN | NOT RUN | ./check.sh --only AC-ENG-3 | 6e450f22f5af1d3e54652b1d5f4d759651d5acb3 | local |
 | AC-ENG-4 | FAIL | FAIL | FAIL | ./check.sh --only AC-ENG-4 | b94ca4141da1c9e56858828e491caffa580eb3d2 | https://github.com/Jaron-voided/chst/actions/runs/40689182770 |
-| AC-ENG-5 | FAIL | FAIL | FAIL | ./check.sh --only AC-ENG-5 | b94ca4141da1c9e56858828e491caffa580eb3d2 | https://github.com/Jaron-voided/chst/actions/runs/40689182770 |
-| AC-ENG-6 | FAIL | FAIL | FAIL | ./check.sh --only AC-ENG-6 | b94ca4141da1c9e56858828e491caffa580eb3d2 | https://github.com/Jaron-voided/chst/actions/runs/40689182770 |
+| AC-ENG-5 | PASS | NOT RUN | NOT RUN | ./check.sh --only AC-ENG-5 | 6e450f22f5af1d3e54652b1d5f4d759651d5acb3 | local |
+| AC-ENG-6 | PASS | NOT RUN | NOT RUN | ./check.sh --only AC-ENG-6 | 6e450f22f5af1d3e54652b1d5f4d759651d5acb3 | local |
 | AC-ENG-8 | FAIL | FAIL | FAIL | ./check.sh --only AC-ENG-8 | b94ca4141da1c9e56858828e491caffa580eb3d2 | https://github.com/Jaron-voided/chst/actions/runs/40689182770 |
 | AC-ENG-7 | FAIL | FAIL | FAIL | ./check.sh --only AC-ENG-7 | b94ca4141da1c9e56858828e491caffa580eb3d2 | https://github.com/Jaron-voided/chst/actions/runs/40689182770 |
 | AC-POS-1 | FAIL | FAIL | FAIL | ./check.sh --only AC-POS-1 | b94ca4141da1c9e56858828e491caffa580eb3d2 | https://github.com/Jaron-voided/chst/actions/runs/40689182770 |

@@ -21,6 +21,18 @@ Append-only log, one entry per task. Results are in EVIDENCE.md, not here.
     (for example by putting the ASan runtime directory on `PATH`); open-ended, and not needed for Core.
   - **Recommendation: (a).** I haven't edited DESIGN.md: the approved condition was "scope fuzzing to Linux", and (a) isn't that.
 
+- **AC-ENG-2 cannot pass as written** (ACCEPTANCE.md §3.2; owned by C-2, found while doing C-1). Its first line requires
+  `#![forbid(unsafe_code)]` in `crates/chst-format/src/lib.rs`. Its second line, `if grep -rnE 'std::fs|std::env|std::process|std::net|unsafe'
+  crates/chst-format/src; then exit 1; fi`, matches the word `unsafe` in that same line, so it always exits 1. AC-ENG-7 also requires the
+  `forbid` line, so it can't be moved or reworded. The log shows `crates/chst-format/src/lib.rs:5:#![forbid(unsafe_code)]`.
+  Options: (a) the second line ignores the `forbid` line:
+  `if grep -rnE 'std::fs|std::env|std::process|std::net|unsafe' crates/chst-format/src | grep -vE ':[0-9]+:#!\[forbid\(unsafe_code\)\]$'; then exit 1; fi`
+  (still exits 1 on any other match, including a real `unsafe` block, and works under `pipefail`); (b) check for `unsafe` as a whole word
+  with `grep -w`, which doesn't match `unsafe_code` (this also stops a comment like "unsafe code" from passing; weaker on `std::` names, so
+  it would be a separate grep); (c) leave it, which makes AC-ENG-2 unfixable and blocks the definition of done. Recommendation: (a), the
+  smallest change that keeps every other match fatal. It needs the owner's approval (protected ACCEPTANCE.md and the check script).
+  C-2 can't be ticked until this is settled.
+
 ## Log
 
 ### H-1 `check.sh` runner core — 7987503
@@ -252,3 +264,29 @@ DESIGN.md's decision log row 18 now says so, and cites run 40689182770. Only tha
 - Left as written: two "provisional" notes remain in ACCEPTANCE.md (§1.3's table, line 137, and AC-ROB-4W's heading, line 675). They're
   protected and now out of date; the owner may want to approve dropping the word. DESIGN §9g's list (line 801) is a historical review note.
 - Acceptance IDs affected: none.
+
+### C-1 Workspace skeleton — 6e450f2
+- Added `rust-toolchain.toml` (1.99.1, rustfmt and clippy), the root `Cargo.toml` (resolver 3, edition 2024, `rust-version = "1.99"`, members
+  `chst-format`, `chst-fs`, `chst-cli`, `fuzz` excluded), the three crates, and committed `Cargo.lock` and `fuzz/Cargo.lock`.
+- Lint headers per D18: `forbid(unsafe_code)` in `chst-format/src/lib.rs` and `chst-cli/src/main.rs`; in `chst-fs`, `deny(unsafe_code)`,
+  `deny(clippy::undocumented_unsafe_blocks, clippy::missing_safety_doc)` and the single `#[cfg(windows)] #[allow(unsafe_code)] mod windows;`
+  (with an empty `windows.rs`, so the module exists when it compiles on Windows). `chst-fs` has the non-default `test-hooks` feature.
+- **No external dependencies yet.** They come with the first task that uses them (C-2: `sha2`; and so on), which keeps AC-ENG-2's exact
+  dependency list in view. `fuzz/` alone depends on `libfuzzer-sys` 0.4 (D15) and `chst-format`.
+- **`fuzz/` is a skeleton, ahead of C-8.** AC-ENG-5 and AC-ENG-6 (C-1's checks) read `fuzz/Cargo.toml`, `fuzz/Cargo.lock` and
+  `fuzz/rust-toolchain.toml`, which TODO lists under C-8. I added only the manifest (its own `[workspace]`), the nightly pin, the lockfile and an
+  empty library, because cargo rejects a package with no target. C-8 adds the cargo-fuzz targets. A side effect for CI: with
+  `fuzz/rust-toolchain.toml` present, the full-mode Linux and macOS nightly and cargo-fuzz install becomes gating (it worked in run
+  40689182770), and the throwaway probe no longer runs.
+- **The `chst` binary is a stub** that prints `chst: not implemented yet` and exits 70 (`internal`), a code no check expects, so a check can't
+  pass because the stub happens to exit as the check wants. Checked: the only new PASSes are below.
+- Verify: `pass_only AC-ENG-1,AC-ENG-5,AC-ENG-6; cargo build --release --locked; test -x target/release/chst` passes. AC-ENG-5 needed the
+  lockfiles to be tracked, so the files were `git add`ed before the Verify ran, as they are at commit time.
+- Fast run on the clean tree at 6e450f2: 14 PASS, 49 FAIL, 3 NOT RUN, 19 N/A. New PASSes: AC-ENG-1, -5, -6, and **AC-ENG-3**, which belongs to
+  C-6a. It is an absence check (the CLI must not depend directly on `sha2`, `unicode-normalization` or `zstd`), and it holds because the CLI
+  depends on nothing yet. It passes honestly but early; it stays meaningful for C-6a.
+- Re-check: AC-ENG-7 FAILs as expected (`counting_alloc.rs` doesn't exist until C-7).
+- EVIDENCE.md: only the four rows whose status changed were updated (Linux PASS, `local`); their macOS and Windows cells are NOT RUN until a
+  CI run covers this commit. Other rows keep the results of the earlier CI runs.
+- Open issues: the AC-ENG-2 item under "Needs decision".
+- Acceptance IDs affected: AC-ENG-1, AC-ENG-5, AC-ENG-6 (PASS); AC-ENG-3 (PASS early).
