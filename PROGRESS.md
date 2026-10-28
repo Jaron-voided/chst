@@ -472,3 +472,11 @@ Not a TODO task: an owner decision and owner-approved spec changes, shown as a d
 - EVIDENCE.md: the AC-ENG-8 row (Linux PASS, `local`). macOS and Windows stay NOT RUN until a CI run covers this commit.
 - Open issues: none.
 - Acceptance IDs affected: AC-ENG-8 (PASS on Linux).
+
+### C-4 CI result — run 40733189070 (fast, commit 320e4c0)
+- Complete 85-result reports on all three OSes, clean tree. **AC-ENG-8 is PASS on Linux, macOS and Windows**, so the pinned
+  `unicode-normalization` 0.1.24 gives Unicode 16.0.0 tables everywhere. The jobs are red only at the "Job result" step, by design.
+- Compared every status with EVIDENCE.md: AC-ENG-8 is the only change. AC-ROB-4, AC-ROB-4W and AC-ROB-7 are NOT RUN here because they're
+  full-only; their rows keep full-mode run 40689182770.
+- EVIDENCE.md: the AC-ENG-8 row now carries this run.
+- Acceptance IDs affected: AC-ENG-8 (PASS on all three OSes).
