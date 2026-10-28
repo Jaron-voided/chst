@@ -1,0 +1,15 @@
+[package]
+name = "chst-fuzz"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+chst-format = { path = "../crates/chst-format" }
+
+# Not part of the root workspace (see the root Cargo.toml).
+[workspace]

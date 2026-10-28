@@ -1,0 +1,13 @@
+[package]
+name = "chst-fs"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[features]
+# Hook points for the race tests (DESIGN D13). Never part of a release build.
+test-hooks = []
+
+[dependencies]
+chst-format = { path = "../chst-format" }
