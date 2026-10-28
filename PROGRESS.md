@@ -8,6 +8,19 @@ Append-only log, one entry per task. Results are in EVIDENCE.md, not here.
   Options: (a) keep the derived script; (b) have ACCEPTANCE.md state the script. Recommendation: (b) before the cut becomes
   Extended, so the script is the document's, not mine. It's N/A under Core, so nothing is blocked.
 
+- **Fuzz scope and DESIGN decision 18 (Windows).** The first full-mode run with the fuzz probe (run 40689182770, commit b94ca41) shows
+  cargo-fuzz works on Linux and macOS and not on Windows. DESIGN D18's decision 18 already approves the Windows fallback (AC-ROB-4W)
+  "provisionally, until the first full CI run", so this run settles it; no Core work is blocked either way.
+  - **Evidence.** Windows: the nightly and cargo-fuzz 0.13.2 install, and `cargo fuzz init` and the build succeed. The fuzz binary then won't
+    start: `Error: Fuzz target exited with exit code: 0xc0000135` (STATUS_DLL_NOT_FOUND). The log doesn't name the DLL. My reading is that
+    the MSVC AddressSanitizer runtime isn't on `PATH`; that isn't confirmed. Linux and macOS: `fuzz probe ok` (1000 runs).
+  - **Options.** (a) Confirm decision 18 as it stands: cargo-fuzz on Linux and macOS (AC-ROB-4), Windows on the `random_sweep` fallback
+    (AC-ROB-4W). DESIGN's decision 18 changes from "provisional" to "confirmed", and nothing in ACCEPTANCE.md changes. (b) Scope fuzzing to
+    Linux only, as the owner's condition said: AC-ROB-4's OS line (now `linux, macos`) would have to drop macOS, which is moving a check to
+    another OS and so needs the owner's approval. The macOS probe passed, so the evidence doesn't call for it. (c) Try to fix Windows
+    (for example by putting the ASan runtime directory on `PATH`); open-ended, and not needed for Core.
+  - **Recommendation: (a).** I haven't edited DESIGN.md: the approved condition was "scope fuzzing to Linux", and (a) isn't that.
+
 ## Log
 
 ### H-1 `check.sh` runner core — 7987503
@@ -208,3 +221,27 @@ Owner's seven requests before approving `checks-v1`. Nothing in `check.sh`, a ch
   7a69b42. Run 40587076660 (full mode) is at 5057d70, before the probe. The Windows MSVC AddressSanitizer answer and the fuzz-scope decision
   in DESIGN (request 4) wait for that run.
 - Acceptance IDs affected: none changed status.
+
+### CI-1 first full-mode run and the §9g–§9i open items — run 40689182770 (workflow_dispatch, commit b94ca41, clean tree)
+Closes CI-1: both halves of its Verify pass (`pass_only AC-XP-2`; the newest run has `linux macos windows` reports with 85 results each).
+Nothing in `check.sh`, the check scripts, ACCEPTANCE.md, DESIGN.md or fixtures changed. EVIDENCE.md is now filled from this run's reports.
+- **Run result.** Complete 85-result full-mode reports on all three OSes. Linux 10 PASS, 55 FAIL, 19 N/A, 1 NOT RUN; macOS 9, 52, 23, 1;
+  Windows 9, 51, 24, 1. The one NOT RUN is AC-XP-1 on each (the done-only check). The jobs are red only at the "Job result" step, by design.
+  AC-META-7 (`--self-test`) is PASS on all three.
+- **Full-only IDs, first run.** AC-ROB-4 (Linux, macOS): FAIL, `fuzz/rust-toolchain.toml` doesn't exist (C-8). AC-ROB-4W (Windows): FAIL, no
+  `Cargo.toml`. AC-ROB-7 (all three): FAIL, `target/release/chst` doesn't exist. Each is the product missing, not the harness.
+- **§9g runner feasibility.** All three runners complete the whole run. Ubuntu has 88 GiB free before the cleanup step and 105 GiB after.
+  The Windows workspace is on D: with 220 GiB free; macOS has 95 GiB free. Enough for AC-ROB-7's 4 GiB file on each.
+- **§9g nightly components.** `nightly-2026-10-01` (rustc 1.101.0-nightly, 21b707e3f) installs on Linux, macOS and Windows with exactly
+  `cargo`, `rust-std` and `rustc` (minimal profile). cargo-fuzz 0.13.2 `--locked` installs on all three. The probe (`cargo fuzz init` and
+  `cargo fuzz run fuzz_target_1 -- -runs=1000`) passes on Linux and macOS, so no further component is needed there. The "nearest earlier date"
+  fallback isn't needed.
+- **§9g Python.** 3.14.9 on Linux and Windows, 3.14.8 on macOS; `unicodedata` is Unicode 16.0.0 and `compression.zstd` imports on all three.
+- **Tool versions.** jq 1.8.1 (Linux) and 1.8.2 (macOS, Windows). bash 5.3.9 on Linux, 3.2.57 on macOS (so the bash-3.2 rule in `lib.sh`
+  matters), 5.3.15 under Git for Windows.
+- **Windows 8.3 names.** `fsutil 8dot3name query C:` reports creation ENABLED on C:. The checkout is on D:, which I didn't query. Relevant to
+  AC-SAFE-10 when C-15 exists.
+- **§9h M5 (`AT_SYMLINK_NOFOLLOW`) and §9i P4 (`FILE_SHARE_DELETE`).** Not answered. Both need code that doesn't exist yet (C-14c, C-17), and
+  the run doesn't print kernel versions. Still open.
+- Open issues: the fuzz-scope item under "Needs decision".
+- Acceptance IDs affected: AC-ROB-4, AC-ROB-4W and AC-ROB-7 moved from NOT RUN to FAIL (they ran for the first time); no PASS changed.
