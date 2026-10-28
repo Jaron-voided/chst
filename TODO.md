@@ -254,7 +254,7 @@ Nothing below starts before that approval.
   - Re-check: AC-ENG-7 (owned by C-8). It can't pass yet, because the files it inspects
     don't exist until C-7 and C-8.
   - Verify: `pass_only AC-ENG-1,AC-ENG-5,AC-ENG-6; cargo build --release --locked; test -x target/release/chst`.
-- [ ] **C-2 Header, trailer and structure hash** (§13 steps 1–8)
+- [x] **C-2 Header, trailer and structure hash** (§13 steps 1–8)
   - Depends: C-1.
   - Covers:
     - integer decoding (D3);
@@ -462,6 +462,9 @@ The CLI holds no format or safety logic (D13). Its output, text and `--json`, go
     reporting exactly as verify does (EXT-7, M2).
   - Identity checks immediately before and after the final rename.
   - Final permissions (`0755 & ~umask`) only after both pass.
+  - Config variables that tests read (for example `CHST_PROP_CASES`) need a default in the
+    test. The workspace-wide test check runs without setting them, so a test that fails when
+    one is unset would fail that check.
   - Checks:
     - AC-POS-4;
     - AC-SAFE-4, AC-SAFE-6, AC-SAFE-7;

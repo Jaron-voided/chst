@@ -339,8 +339,10 @@ Pass: exit 0. The CLI reaches hashing, normalisation and compression only throug
 #### AC-ENG-4 — The test suite passes
 Core · OS all · fast · Traces: #27
 ```sh
-cargo_test_nonempty --workspace --locked --release
+CHST_LIM2=$(fixture_file $FX/core/invalid/LIM-2.expect.json) cargo_test_nonempty --workspace --locked --release
 ```
+`CHST_LIM2` names the sparse LIM-2 fixture, built here with `fixture_file`. The reader tests in
+`chst-cli` read it and fail if it's unset (TODO.md), so no test silently skips LIM-2.
 
 #### AC-ENG-5 — Every direct dependency is on the approved list
 Core · OS all · fast · Traces: D15

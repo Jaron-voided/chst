@@ -779,7 +779,7 @@ several rules, a reader MUST report the first one in §13's order, and only that
 | Category | Meaning | CLI exit code |
 |---|---|---|
 | `usage` | Invalid command-line usage | 2 |
-| `io` | Operating-system I/O failure, including EXT-4's `extract.no-atomic-rename` | 3 |
+| `io` | Operating-system I/O or resource failure: reading, writing or seeking fails, or memory can't be obtained. Includes EXT-4's `extract.no-atomic-rename` | 3 |
 | `not-a-container` | HDR-1, HDR-2 | 4 |
 | `unsupported` | HDR-3, HDR-4, HDR-6, SEC-2 | 5 |
 | `malformed` | A structural, path, canonical or hard-limit rule | 6 |
@@ -1017,6 +1017,8 @@ SHA-256 of the whole 556-byte file, for fixture checking only:
 | **EXT-7** | integrity | `blob.hash` |
 | **EXT-8** | refused | `extract.unsafe-object` |
 | **EXT-4** | refused | `extract.dest-exists` (at the final rename); `extract.collision` (staging name exists); `extract.unsafe-object` (staging can't be confirmed as the directory just created, or a staging identity mismatch); `io` / `extract.no-atomic-rename` |
+| *(I/O failure)* | io | `io.read`: the reader can't read or seek its input, or the input ends early. Writers and extractors define their own `io` details as they need them |
+| *(memory failure)* | io | `io.memory`: the reader can't allocate the memory it needs, such as for the index |
 | **W-1**, **W-2**, **W-9**, **EXT-3**, **EXT-5**, **EXT-6**, **EXT-9**, **EXT-10** | (requirement; no error of its own) | — |
 | *(retired)* LIM-1 | — | — (§10.1) |
 

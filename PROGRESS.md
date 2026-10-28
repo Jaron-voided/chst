@@ -33,6 +33,24 @@ Append-only log, one entry per task. Results are in EVIDENCE.md, not here.
   smallest change that keeps every other match fatal. It needs the owner's approval (protected ACCEPTANCE.md and the check script).
   C-2 can't be ticked until this is settled.
 
+- **RESOLVED (owner chose (a); applied with C-2): AC-ENG-4 cannot pass while the reader test needs `$CHST_LIM2`** (owned by C-2; the same applies to C-3 to C-5). TODO.md says
+  `task_reader.rs` reads the sparse LIM-2 file from `$CHST_LIM2` and *fails if it's unset*, and that these tests stay in the workspace, which
+  AC-ENG-4 runs. But AC-ENG-4's script, `cargo_test_nonempty --workspace --locked --release`, sets no `CHST_LIM2`, and `check.sh` doesn't
+  either (grep finds the variable only in TODO.md). So AC-ENG-4 always FAILs on `core/invalid/LIM-2 is a sparse recipe and $CHST_LIM2 is not
+  set`. Confirmed both ways: unset, the workspace run fails on that one test; with the variable set, all 10 workspace tests pass.
+  Options: (a) AC-ENG-4's script creates the file the way TODO's Verify lines do:
+  `CHST_LIM2=$(fixture_file $FX/core/invalid/LIM-2.expect.json) cargo_test_nonempty --workspace --locked --release`
+  (one line in ACCEPTANCE.md §3.2 and `AC-ENG-4.sh`; Rust never creates a fixture, as CLAUDE.md requires); (b) the test creates the sparse file
+  itself from the recipe (Rust code materialising a fixture, which CLAUDE.md rules out, and it needs a sparse-file call on Windows);
+  (c) the test skips LIM-2 when the variable is unset (it silently stops testing LIM-2, which TODO.md rules out).
+  Recommendation: (a). It needs the owner's approval (protected ACCEPTANCE.md and check script). C-2 can't be ticked until this is settled.
+- **RESOLVED (owner chose (a); recorded in FORMAT_SPEC Appendix A with C-2): no detail code for a general I/O failure.** FORMAT_SPEC §16 gives category `io` (exit 3) but no detail code except
+  `extract.no-atomic-rename`, while the CLI prints `error[<category>/<detail>]` and JSON reports carry `detail`. `chst-format` uses `io.read`
+  for failing to read or seek the input, and (revised by the owner) `io.memory` for an index it can't allocate. Options: (a) `io.read` for
+  the reader (writer and extractor I/O would get their own codes in C-9 and C-14); (b) one code, `io.error`, for every I/O failure;
+  (c) no detail (empty), which breaks the `error[...]` format. Recommendation: (a), recorded in FORMAT_SPEC Appendix A. No check depends on it
+  yet (AC-CLI-1 asserts only exit 3). Needs the owner's approval, because it adds a code to the spec's output.
+
 ## Log
 
 ### H-1 `check.sh` runner core — 7987503
@@ -301,3 +319,40 @@ DESIGN.md's decision log row 18 now says so, and cites run 40689182770. Only tha
 - AC-ENG-2 fix (a) is approved by the owner and prepared, but not committed: the owner asked to see the diff first.
 - Open issues: none new.
 - Acceptance IDs affected: AC-ENG-1, AC-ENG-3, AC-ENG-5, AC-ENG-6 (PASS on all three OSes).
+
+### C-2 Header, trailer and structure hash
+- `chst-format`: `error.rs` (the nine §16 categories with exit codes, the detail codes for steps 1 to 8, and an `Error` that displays as
+  `error[<category>/<detail>]: <message>`), `limits.rs` (LIM-3 to LIM-6 with their defaults), `format.rs` (header and trailer parsing at
+  constant offsets in fixed-size arrays, so no input can make them fail), `reader.rs` (`open`: §13 steps 1 to 8 in order, with all
+  arithmetic checked, and the index allocated with `try_reserve_exact` only after TRL-2, LIM-2 and LIM-4 and bounded by the real file length).
+  No `std::fs` and no `unsafe`; AC-ENG-2 passes.
+- 10 unit tests (header and trailer field offsets, every step-1 to step-8 rule's order, the overflow cases of TRL-2, LIM-2 before LIM-4 with
+  a virtual 4 GiB source that holds only a header and a trailer, and a failing source).
+- `chst-cli/tests/task_reader.rs` with `reader_step_8`: it classifies all 128 files (118 expectations plus 10 valid) by the §13 step of
+  the first violation, from the rule, or for `compat/` from the detail; 19 are rejected with exactly their expected detail, exit code and
+  category, and 109 pass. It fails if `$CHST_LIM2` is unset, as TODO.md says.
+- **The test can fail.** Mutating the reader made it fail each time: TRL-3 reported as the wrong category; HDR-5 skipped (`core/invalid/HDR-5`
+  accepted); LIM-4 checked before LIM-2 (`core/invalid/LIM-2` got `limit.index-size`); the magic check disabled (`core/invalid/HDR-2` accepted).
+  `reader.rs` was restored and diffed against the saved original afterwards. My first mutation run stopped before restoring (`set -e` with
+  `pipefail`), which I noticed from the output and fixed by restoring from the saved copy before going on.
+- **`unicode-normalization` is pinned to `=0.1.24`.** `chst-format` lists it now because AC-ENG-2 demands exactly `sha2` and
+  `unicode-normalization`, but it isn't used until C-4. The version cargo picked, 0.1.26, has **Unicode 18.0.0** tables; 0.1.25 has 17.0 and
+  0.1.24 has 16.0.0, which D16 requires. I checked each version's `UNICODE_VERSION` and pinned 0.1.24 in the manifest with a comment, so a
+  `cargo update` can't drift to the wrong tables. AC-ENG-8 (C-4) will test the tables.
+- **Spec changes, approved by the owner and shown as a diff first.** (1) AC-ENG-4 (ACCEPTANCE.md §3.2 and `AC-ENG-4.sh`) now runs
+  `CHST_LIM2=$(fixture_file $FX/core/invalid/LIM-2.expect.json) cargo_test_nonempty --workspace --locked --release`, with a note under the block.
+  The owner asked whether C-3 to C-5 need more variables, so one change covers them. I searched TODO.md, ACCEPTANCE.md, DESIGN.md,
+  FORMAT_SPEC.md, `check.sh` and the helpers: `CHST_LIM2` is the only fixture variable the plan names, and `fixtures/` holds one sparse
+  recipe (`LIM-2.recipe.json`). Every `reader_step_*` Verify line in C-2 to C-5 uses that same variable. The other workspace tests read
+  in-tree files (`hostile/`, `fuzz-regressions/`, `valid/*/tree.json`). One rule for later tasks, to avoid the same trap: a config
+  variable such as `CHST_PROP_CASES` (C-14b) must have a default in the test, because AC-ENG-4 runs it without setting anything.
+  (2) FORMAT_SPEC Appendix A has rows for `io.read` (read or seek failure, input ends early) and, after the owner's review, `io.memory`
+  (the reader can't allocate the memory it needs). Memory failure was first grouped under `io.read`, which would send a user looking for a
+  disk problem. Both stay in category `io` (§16: an operating-system failure); other `io` details come with the tasks that need them (C-9, C-14).
+  The owner also widened §16's `io` definition to cover it ("Operating-system I/O or resource failure: reading, writing or seeking fails, or
+  memory can't be obtained"). The allocation is a helper, `allocate_index`, and a unit test covers `io.memory`: asking for `u64::MAX` and
+  `usize::MAX` bytes fails at once with `CapacityOverflow` (more than `isize::MAX`), before the allocator is asked for anything; a 16-byte
+  request succeeds. The test is portable, because on a narrower `usize` the conversion fails instead.
+- Verify: `pass_only AC-ENG-2,AC-ENG-4` and `CHST_LIM2=… reader_step_8` both pass. The META and NEG checks still pass after the spec edits.
+- Fast run (local): AC-ENG-1 to -6 PASS (16 PASS in all with AC-ENG-4).
+- Acceptance IDs affected: AC-ENG-2, AC-ENG-4 (PASS). EVIDENCE.md follows in the next commit, from a clean-tree run.

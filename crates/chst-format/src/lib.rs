@@ -3,3 +3,12 @@
 //! This crate never touches the filesystem (DESIGN D13).
 
 #![forbid(unsafe_code)]
+
+pub mod error;
+pub mod format;
+pub mod limits;
+pub mod reader;
+
+pub use error::{Category, Error};
+pub use limits::Limits;
+pub use reader::{Opened, open};

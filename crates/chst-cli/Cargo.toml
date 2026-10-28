@@ -12,3 +12,6 @@ path = "src/main.rs"
 [dependencies]
 chst-format = { path = "../chst-format" }
 chst-fs = { path = "../chst-fs" }
+
+[dev-dependencies]
+serde_json = "1"
