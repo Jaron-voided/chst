@@ -134,7 +134,7 @@ CI run.**
 
 | Check | ubuntu-latest (x64) | macos-latest (arm64) | windows-latest (x64) |
 |---|---|---|---|
-| AC-ROB-4: cargo-fuzz, 10 minutes per target | Runs | Runs | Doesn't apply (the OS line excludes it). AC-ROB-4W runs instead: the fallback, **approved provisionally until the first full CI run**. That run also tries cargo-fuzz on Windows, as a non-gating, logged workflow step, so the owner can decide whether to switch. |
+| AC-ROB-4: cargo-fuzz, 10 minutes per target | Runs | Runs | Doesn't apply (the OS line excludes it). AC-ROB-4W runs instead: the fallback, **confirmed by the owner** (DESIGN decision 18). A non-gating, logged workflow step still tries cargo-fuzz on Windows. |
 | AC-ROB-7: large-file round-trip | 5 GiB (about 10 GiB peak disk). The workflow frees preinstalled toolchains first. | **4 GiB + 1 MiB** (about 8 GiB peak) | 5 GiB if `$CHST_BIG_ROOT` has at least 12 GiB free, otherwise 4 GiB + 1 MiB. The size used is logged. |
 
 - **No paid runners.**
@@ -672,7 +672,7 @@ coverage-guided fuzzing reaches the section, record, path and canonical rules, w
 libFuzzer can't reach through SHA-256. The other targets take raw files.
 
 #### AC-ROB-4W — Windows fuzzing fallback: 10 minutes of randomised damage sweeps
-Core · OS windows · **full-only** · *provisional until the first full CI run* · Traces: #26, G8, V6
+Core · OS windows · **full-only** · Traces: #26, G8, V6
 ```sh
 CHST_SWEEP_SECONDS=600 cargo_test_nonempty --release -p chst-format --test random_sweep -- --include-ignored
 ```
